@@ -1,0 +1,19 @@
+*.iml
+.gradle
+.kotlin
+/local.properties
+/.idea
+.DS_Store
+/build
+**/build/
+/captures
+.externalNativeBuild
+.cxx
+
+# Heap dumps & profilers
+*.hprof
+
+# Never commit signing material or secrets
+*.jks
+*.keystore
+google-services.json

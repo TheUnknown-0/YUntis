@@ -1,0 +1,48 @@
+package sh.lsx.untisx.data
+
+import android.content.Context
+import sh.lsx.untisx.UntisXApp
+
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
+enum class ThemePreset(val label: String, val seed: Int) {
+    DEVICE("System", 0),
+    ORANGE("Orange", 0xFFEF6C00.toInt()),
+    BLUE("Blue", 0xFF1976D2.toInt()),
+    GREEN("Green", 0xFF388E3C.toInt()),
+    PURPLE("Purple", 0xFF7B1FA2.toInt()),
+    RED("Red", 0xFFD32F2F.toInt()),
+}
+
+data class AppTheme(
+    val mode: ThemeMode = ThemeMode.SYSTEM,
+    val preset: ThemePreset = ThemePreset.DEVICE,
+)
+
+object ThemePrefs {
+    private const val KEY_MODE = "theme_mode"
+    private const val KEY_PRESET = "theme_color"
+
+    val KEYS = listOf(KEY_MODE, KEY_PRESET)
+
+    private fun prefs(context: Context) =
+        context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
+
+    fun get(context: Context): AppTheme {
+        val prefs = prefs(context)
+
+        val mode = runCatching { ThemeMode.valueOf(prefs.getString(KEY_MODE, ThemeMode.SYSTEM.name)!!) }
+            .getOrDefault(ThemeMode.SYSTEM)
+        val preset = runCatching { ThemePreset.valueOf(prefs.getString(KEY_PRESET, ThemePreset.DEVICE.name)!!) }
+            .getOrDefault(ThemePreset.DEVICE)
+
+        return AppTheme(mode = mode, preset = preset)
+    }
+
+    fun save(context: Context, theme: AppTheme) {
+        prefs(context).edit()
+            .putString(KEY_MODE, theme.mode.name)
+            .putString(KEY_PRESET, theme.preset.name)
+            .apply()
+    }
+}
