@@ -27,6 +27,12 @@ Coming soon.
 
 ---
 
+## Note on AI
+
+Parts of this project were written with AI assistance. All code has been carefully reviewed and manually tested before release.
+
+---
+
 ## License
 
 Open source - [GPL-3.0 with additional attribution terms](LICENSE).
