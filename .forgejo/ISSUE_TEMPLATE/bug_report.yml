@@ -1,0 +1,60 @@
+name: Bug Report
+about: Report something that doesn't work as expected
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Two things that make fixing much faster:
+
+        1. The **UntisX version** - Settings > About (a screenshot of the whole screen is fine)
+        2. The **exact steps** that lead to the bug - "it crashes" is unfixable, "I tap Settings > Subject colors > tap a subject > it crashes" is fixable
+
+        ⚠️ Never post your school name, username, password or session data here.
+
+  - type: input
+    id: version
+    attributes:
+      label: UntisX version
+      description: Settings > About
+      placeholder: e.g. 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device & Android version
+      placeholder: e.g. Pixel 7a, Android 17
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do?
+      description: The exact steps to trigger the bug, numbered.
+      placeholder: |
+        1. Open Settings > Subject colors
+        2. Tap on "Math"
+        3. Pick a color and confirm
+        4. App crashes
+    validations:
+      required: true
+
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened instead?
+      placeholder: |
+        e.g. "App crashes" / "The color resets to default after restarting the app"
+    validations:
+      required: true
+
+  - type: textarea
+    id: extras
+    attributes:
+      label: Screenshots / screen recording (optional)
+      description: A screen recording of the steps is the single most helpful thing you can attach.

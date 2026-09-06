@@ -1,0 +1,28 @@
+name: Feature Request
+about: Suggest an idea for UntisX
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One sentence of advice: **don't just tell me *what*, tell me *why* you need it.**
+
+        Example:
+        > I'd like to see upcoming exams in UntisX. Right now I still need the original Untis app to
+        > see them. Ideally a list with date, subject, room and time.
+
+        That's it. No format needed - just write freely. The more context you give, the better.
+
+        ⚠️ Never post your school name, username, password or session data here.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What do you want to see?
+      placeholder: |
+        I'd like to see upcoming exams in UntisX. Right now I still need the original Untis app to see them. Ideally a list with date, subject, room and time.
+    validations:
+      required: true
