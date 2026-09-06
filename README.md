@@ -11,7 +11,7 @@ An open-source timetable viewer for the Untis school system - built natively wit
 - **Timetable** - clear weekly view with all lessons, times, rooms and teachers
 - **School events** - displayed directly in the timetable
 - **Cancelled lessons** - showing up grayed out
-- **Subject colors** - every subject color cam be customized
+- **Subject colors** - every subject color can be customized
 - **Teachers & rooms** - the whole school at a glance
 - **Offline** - your timetable is cached locally and opens instantly
 - **In-app updates** - new versions install straight from the app
@@ -58,10 +58,10 @@ Parts of this project were written with AI assistance. All code has been careful
 
 ## License
 
-Open source - [GPL-3.0 with additional attribution terms](LICENSE).
+Open source - [GPL-3.0](LICENSE).
 
-If you use, modify or redistribute this project, please credit **LSX Studios** and keep a link to
-<https://codeberg.org/Losterixx/UntisX>.
+If you use or build upon this project, a credit to **LSX Studios** and a link to
+<https://codeberg.org/Losterixx/UntisX> is much appreciated <3
 
 ---
 

@@ -228,7 +228,7 @@ private fun LibrariesCard() {
 private fun LegalCard(onOpen: (String) -> Unit) {
     AboutCard("License") {
         Text(
-            text = "UntisX is free and open-source software licensed under the GNU GPL-3.0 with additional attribution terms.",
+            text = "UntisX is free and open-source software licensed under the GNU GPL-3.0.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

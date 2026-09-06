@@ -9,6 +9,7 @@ private const val TOTP_PERIOD_MILLIS = 30_000L
 
 internal fun generateTotp(base32Secret: String, nowMillis: Long): Long {
     val key = decodeBase32(base32Secret) ?: return 0L
+    if (key.isEmpty()) return 0L
 
     val counterBytes = ByteArray(8)
     var counter = nowMillis / TOTP_PERIOD_MILLIS

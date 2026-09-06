@@ -672,38 +672,3 @@ may consider it more useful to permit linking proprietary applications with
 the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
-
-------------------------------------------------------------------------
-
-                         ADDITIONAL TERMS
-
-These additional terms are permitted under Section 7(b) of the GNU
-General Public License, version 3.  They apply to this program,
-"UntisX" (hereafter "the Program"), and to any work that
-distributes or conveys it or a work based on it ("derivative work").
-
-If you distribute or otherwise convey the Program or a derivative
-work (in source or binary form), you must:
-
-  1. preserve the copyright notice "Copyright (c) 2026 LSX Studios"
-     in all copies and in any relevant notices displayed by works
-     containing it;
-
-  2. keep, in a reasonably prominent and accessible place, a link to
-     the original repository of the Program at
-     <https://codeberg.org/Losterixx/UntisX> (for example in the
-     README or an "About" section of the application); and
-
-  3. clearly mark modified versions as modifications of the original
-     Program by LSX Studios, and not present them as the original work.
-
-These additional terms do not impose obligations on private use of
-the Program within your own devices.
-
-This license notice was placed first:
-
-UntisX — Copyright (c) 2026 LSX Studios.
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.

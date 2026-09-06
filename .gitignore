@@ -40,3 +40,6 @@ google-services.json
 
 # Other
 deploy.sh
+
+# Built artifacts
+UntisX.apk
