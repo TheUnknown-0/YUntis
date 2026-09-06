@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,7 +35,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.tapHaptic
+import sh.lsx.untisx.update.UpdateState
+import sh.lsx.untisx.update.UpdateViewModel
 
 private const val REPO_URL = "https://codeberg.org/Losterixx/UntisX"
 private const val LICENSE_URL = "https://codeberg.org/Losterixx/UntisX/src/branch/main/LICENSE"
@@ -63,6 +68,8 @@ fun AboutScreen(
     ) {
         AppCard(versionName)
 
+        UpdatesCard()
+
         LinksCard(
             onOpen = uriHandler::openUri,
         )
@@ -78,6 +85,64 @@ fun AboutScreen(
         )
 
         DebugCard(auth)
+    }
+}
+
+@Composable
+private fun UpdatesCard() {
+    val updateVm: UpdateViewModel = viewModel()
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Text("Updates", style = MaterialTheme.typography.titleMedium)
+
+            Spacer(Modifier.height(10.dp))
+
+            val status = when (val state = updateVm.state) {
+                is UpdateState.Checking -> "Checking for updates…"
+                is UpdateState.UpToDate -> "You are on the latest version."
+                is UpdateState.Available -> "Version ${state.info.versionName} is available!"
+                is UpdateState.Downloading -> "Downloading ${state.info.versionName}... ${(state.progress * 100).toInt()}%"
+                is UpdateState.Downloaded -> "${state.info.versionName} downloaded and ready to install."
+                is UpdateState.Idle ->
+                    updateVm.transientError
+                        ?: if (updateVm.pendingInstall != null) {
+                            "Update downloaded and ready to install."
+                        } else {
+                            "Check for updates manually."
+                        }
+            }
+
+            Text(
+                text = status,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (updateVm.pendingInstall != null) {
+                    Button(onClick = Haptics.haptic(updateVm::installPending)) {
+                        Text("Install")
+                    }
+                }
+
+                Button(
+                    onClick = Haptics.haptic(updateVm::check),
+                    enabled = updateVm.state !is UpdateState.Checking &&
+                        updateVm.state !is UpdateState.Downloading,
+                ) {
+                    Text("Check for updates")
+                }
+            }
+        }
     }
 }
 
@@ -190,7 +255,7 @@ private fun LegalCard(onOpen: (String) -> Unit) {
 private fun CreditsCard(onOpen: (String) -> Unit) {
     AboutCard("Credits") {
         Text(
-            text = "UntisX is inspired by BetterUntis, the open-source Untis client for Android.",
+            text = "UntisX is heavenly inspired by BetterUntis, the open-source Untis client for Android.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

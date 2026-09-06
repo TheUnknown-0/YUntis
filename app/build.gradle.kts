@@ -15,9 +15,24 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 1
-        versionName = "0.0.0"
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    val keystoreFile = rootProject.file("untisx.keystore")
+    val keystorePassword = project.findProperty("keystorePassword") as String?
+    val useReleaseSigning = keystoreFile.exists() && !keystorePassword.isNullOrBlank()
+
+    signingConfigs {
+        if (useReleaseSigning) {
+            create("release") {
+                storeFile = keystoreFile
+                storePassword = keystorePassword
+                keyAlias = "untisx"
+                keyPassword = keystorePassword
+            }
+        }
     }
 
     buildTypes {
@@ -26,8 +41,11 @@ android {
                 enable = false
             }
 
-            // temporary debug-signed release builds so performance can be tested on a real device without upload keys
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (useReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

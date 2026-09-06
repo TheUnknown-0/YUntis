@@ -1,7 +1,9 @@
 package sh.lsx.untisx
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -9,6 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +43,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +60,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.lsx.untisx.data.AppTheme
 import sh.lsx.untisx.data.prefs.AuthData
@@ -64,18 +69,22 @@ import sh.lsx.untisx.data.prefs.HapticsPrefs
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.ThemePrefs
 import sh.lsx.untisx.data.TimetableCache
+import sh.lsx.untisx.ui.components.UpdateDialog
 import sh.lsx.untisx.ui.screens.AboutScreen
 import sh.lsx.untisx.ui.screens.LoginScreen
 import sh.lsx.untisx.ui.screens.OnboardingScreen
 import sh.lsx.untisx.ui.screens.RoomsListScreen
 import sh.lsx.untisx.ui.screens.SettingsScreen
 import sh.lsx.untisx.ui.screens.TeachersListScreen
+import sh.lsx.untisx.ui.timetable.ErrorBanner
 import sh.lsx.untisx.ui.timetable.TimetableScreen
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.theme.UntisXTheme
 import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.LocalHapticsEnabled
 import sh.lsx.untisx.ui.util.tapHaptic
+import sh.lsx.untisx.update.UpdateState
+import sh.lsx.untisx.update.UpdateViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -152,36 +161,70 @@ private fun AppRoot() {
         UntisXTheme(mode = theme.mode, preset = theme.preset) {
             val currentAuth = auth
 
-            when {
-                !onboardingDone -> OnboardingScreen(
-                    theme = theme,
-                    onThemeChange = ::saveTheme,
-                    loggedIn = currentAuth != null,
-                    onFinish = {
-                        prefsEdit(context).putBoolean(UntisXApp.KEY_ONBOARDING_DONE, true).apply()
-                    },
-                )
+            val updateVm: UpdateViewModel = viewModel()
 
-                currentAuth == null -> Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                    LoginScreen(modifier = Modifier.padding(padding))
+            LaunchedEffect(Unit) {
+                updateVm.checkOnStartup()
+            }
+
+            LaunchedEffect(updateVm.transientError) {
+                if (updateVm.transientError != null) {
+                    delay(3000)
+                    updateVm.clearTransientError()
+                }
+            }
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                when {
+                    !onboardingDone -> OnboardingScreen(
+                        theme = theme,
+                        onThemeChange = ::saveTheme,
+                        loggedIn = currentAuth != null,
+                        onFinish = {
+                            prefsEdit(context).putBoolean(UntisXApp.KEY_ONBOARDING_DONE, true).apply()
+                        },
+                    )
+
+                    currentAuth == null -> Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+                        LoginScreen(modifier = Modifier.padding(padding))
+                    }
+
+                    else -> MainApp(
+                        auth = currentAuth,
+                        theme = theme,
+                        onThemeChange = ::saveTheme,
+                        hapticsEnabled = hapticsEnabled,
+                        onHapticsChange = { HapticsPrefs.setEnabled(context, it) },
+                        onLogout = onLogout,
+                        subjectColors = subjectColors,
+                        knownSubjects = knownSubjects,
+                        onSubjectColor = { name, argb -> SubjectColorsPrefs.setColor(context, name, argb) },
+                        defaultSubjectColor = defaultSubjectColor,
+                        onDefaultSubjectColor = { SubjectColorsPrefs.setDefaultColor(context, it) },
+                        lessonTextColor = lessonTextColor,
+                        onLessonTextColor = { SubjectColorsPrefs.setTextColor(context, it) },
+                        cancelledStrike = cancelledStrike,
+                        onCancelledStrike = { SubjectColorsPrefs.setCancelledStrike(context, it) },
+                    )
                 }
 
-                else -> MainApp(
-                    auth = currentAuth,
-                    theme = theme,
-                    onThemeChange = ::saveTheme,
-                    hapticsEnabled = hapticsEnabled,
-                    onHapticsChange = { HapticsPrefs.setEnabled(context, it) },
-                    onLogout = onLogout,
-                    subjectColors = subjectColors,
-                    knownSubjects = knownSubjects,
-                    onSubjectColor = { name, argb -> SubjectColorsPrefs.setColor(context, name, argb) },
-                    defaultSubjectColor = defaultSubjectColor,
-                    onDefaultSubjectColor = { SubjectColorsPrefs.setDefaultColor(context, it) },
-                    lessonTextColor = lessonTextColor,
-                    onLessonTextColor = { SubjectColorsPrefs.setTextColor(context, it) },
-                    cancelledStrike = cancelledStrike,
-                    onCancelledStrike = { SubjectColorsPrefs.setCancelledStrike(context, it) },
+                updateVm.transientError?.let { message ->
+                    ErrorBanner(
+                        text = message,
+                        onRetry = updateVm::check,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .statusBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .fillMaxWidth(),
+                    )
+                }
+
+                UpdateDialog(
+                    state = updateVm.state,
+                    onDownload = updateVm::download,
+                    onInstall = updateVm::install,
+                    onDismiss = updateVm::dismiss,
                 )
             }
         }

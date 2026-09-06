@@ -37,3 +37,6 @@ Thumbs.db
 *.keystore
 keystore.properties
 google-services.json
+
+# Other
+deploy.sh
