@@ -1,4 +1,4 @@
-package sh.lsx.untisx.data
+package sh.lsx.untisx.data.prefs
 
 import android.content.Context
 import sh.lsx.untisx.UntisXApp

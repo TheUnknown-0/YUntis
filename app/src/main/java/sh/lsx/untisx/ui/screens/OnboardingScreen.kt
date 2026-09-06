@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,12 +40,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.launch
 import sh.lsx.untisx.data.AppTheme
+import sh.lsx.untisx.ui.components.ThemeSettingsContent
+import sh.lsx.untisx.ui.util.Haptics
 
 private const val PAGE_COUNT = 3
 
@@ -114,7 +118,7 @@ fun OnboardingScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (pagerState.currentPage > 0) {
-                    TextButton(onClick = {
+                    TextButton(onClick = Haptics.haptic {
                         scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
                     }) {
                         Text("Back")
@@ -131,7 +135,7 @@ fun OnboardingScreen(
 
                 if (pagerState.currentPage < PAGE_COUNT - 1) {
                     Button(
-                        onClick = {
+                        onClick = Haptics.haptic {
                             scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                         },
                         enabled = stepComplete,
@@ -139,7 +143,7 @@ fun OnboardingScreen(
                         Text("Next")
                     }
                 } else {
-                    Button(onClick = onFinish, enabled = stepComplete) {
+                    Button(onClick = Haptics.haptic(onFinish), enabled = stepComplete) {
                         Text("Get started")
                     }
                 }
@@ -187,6 +191,14 @@ private fun PermissionsPage(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        Image(
+            painter = painterResource(sh.lsx.untisx.R.drawable.app_logo),
+            contentDescription = "UntisX logo",
+            modifier = Modifier.size(96.dp),
+        )
+
+        Spacer(Modifier.height(16.dp))
+
         Text(
             text = "Welcome to UntisX",
             style = MaterialTheme.typography.headlineMedium,
@@ -234,7 +246,7 @@ private fun PermissionsPage(
                         color = MaterialTheme.colorScheme.primary,
                     )
                 } else {
-                    Button(onClick = onRequestNotifications) {
+                    Button(onClick = Haptics.haptic(onRequestNotifications)) {
                         Text("Allow notifications")
                     }
                 }

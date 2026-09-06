@@ -2,6 +2,7 @@ package sh.lsx.untisx.data
 
 import android.content.Context
 import sh.lsx.untisx.UntisXApp
+import androidx.core.content.edit
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
@@ -40,9 +41,9 @@ object ThemePrefs {
     }
 
     fun save(context: Context, theme: AppTheme) {
-        prefs(context).edit()
-            .putString(KEY_MODE, theme.mode.name)
-            .putString(KEY_PRESET, theme.preset.name)
-            .apply()
+        prefs(context).edit {
+            putString(KEY_MODE, theme.mode.name)
+            putString(KEY_PRESET, theme.preset.name)
+        }
     }
 }

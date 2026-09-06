@@ -6,47 +6,82 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import sh.lsx.untisx.data.AppTheme
-import sh.lsx.untisx.data.AuthData
-import sh.lsx.untisx.data.AuthPrefs
-import sh.lsx.untisx.data.HapticsPrefs
+import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.data.prefs.AuthPrefs
+import sh.lsx.untisx.data.prefs.HapticsPrefs
+import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.ThemePrefs
+import sh.lsx.untisx.data.TimetableCache
+import sh.lsx.untisx.ui.screens.AboutScreen
 import sh.lsx.untisx.ui.screens.LoginScreen
 import sh.lsx.untisx.ui.screens.OnboardingScreen
+import sh.lsx.untisx.ui.screens.RoomsListScreen
 import sh.lsx.untisx.ui.screens.SettingsScreen
-import sh.lsx.untisx.ui.screens.TimetableScreen
+import sh.lsx.untisx.ui.screens.TeachersListScreen
+import sh.lsx.untisx.ui.timetable.TimetableScreen
+import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.theme.UntisXTheme
 import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.LocalHapticsEnabled
+import sh.lsx.untisx.ui.util.tapHaptic
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
             AppRoot()
         }
@@ -60,14 +95,6 @@ private fun readOnboardingDone(context: Context): Boolean =
 private fun prefsEdit(context: Context) =
     context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE).edit()
 
-private enum class Tab(
-    val label: String,
-    val icon: ImageVector,
-) {
-    TIMETABLE("Timetable", Icons.Filled.DateRange),
-    SETTINGS("Settings", Icons.Filled.Settings),
-}
-
 @Composable
 private fun AppRoot() {
     val context = LocalContext.current
@@ -75,6 +102,11 @@ private fun AppRoot() {
     var onboardingDone by remember { mutableStateOf(readOnboardingDone(context)) }
     var auth by remember { mutableStateOf(AuthPrefs.load(context)) }
     var hapticsEnabled by remember { mutableStateOf(HapticsPrefs.isEnabled(context)) }
+    var subjectColors by remember { mutableStateOf(SubjectColorsPrefs.getColors(context)) }
+    var knownSubjects by remember { mutableStateOf(SubjectColorsPrefs.getKnown(context)) }
+    var defaultSubjectColor by remember { mutableStateOf(SubjectColorsPrefs.getDefaultColor(context)) }
+    var lessonTextColor by remember { mutableStateOf(SubjectColorsPrefs.getTextColor(context)) }
+    var cancelledStrike by remember { mutableStateOf(SubjectColorsPrefs.isCancelledStrike(context)) }
 
     DisposableEffect(Unit) {
         val prefs = context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
@@ -94,6 +126,14 @@ private fun AppRoot() {
             if (key == HapticsPrefs.KEY) {
                 hapticsEnabled = HapticsPrefs.isEnabled(context)
             }
+
+            if (key in SubjectColorsPrefs.KEYS) {
+                subjectColors = SubjectColorsPrefs.getColors(context)
+                knownSubjects = SubjectColorsPrefs.getKnown(context)
+                defaultSubjectColor = SubjectColorsPrefs.getDefaultColor(context)
+                lessonTextColor = SubjectColorsPrefs.getTextColor(context)
+                cancelledStrike = SubjectColorsPrefs.isCancelledStrike(context)
+            }
         }
 
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -101,6 +141,12 @@ private fun AppRoot() {
     }
 
     fun saveTheme(newTheme: AppTheme) = ThemePrefs.save(context, newTheme)
+
+    val onLogout = {
+        AuthPrefs.clear(context)
+        TimetableCache.clear(context)
+        SubjectColorsPrefs.clear(context)
+    }
 
     CompositionLocalProvider(LocalHapticsEnabled provides hapticsEnabled) {
         UntisXTheme(mode = theme.mode, preset = theme.preset) {
@@ -126,7 +172,16 @@ private fun AppRoot() {
                     onThemeChange = ::saveTheme,
                     hapticsEnabled = hapticsEnabled,
                     onHapticsChange = { HapticsPrefs.setEnabled(context, it) },
-                    onLogout = { AuthPrefs.clear(context) },
+                    onLogout = onLogout,
+                    subjectColors = subjectColors,
+                    knownSubjects = knownSubjects,
+                    onSubjectColor = { name, argb -> SubjectColorsPrefs.setColor(context, name, argb) },
+                    defaultSubjectColor = defaultSubjectColor,
+                    onDefaultSubjectColor = { SubjectColorsPrefs.setDefaultColor(context, it) },
+                    lessonTextColor = lessonTextColor,
+                    onLessonTextColor = { SubjectColorsPrefs.setTextColor(context, it) },
+                    cancelledStrike = cancelledStrike,
+                    onCancelledStrike = { SubjectColorsPrefs.setCancelledStrike(context, it) },
                 )
             }
         }
@@ -142,42 +197,296 @@ private fun MainApp(
     hapticsEnabled: Boolean,
     onHapticsChange: (Boolean) -> Unit,
     onLogout: () -> Unit,
+    subjectColors: Map<String, Int>,
+    knownSubjects: List<String>,
+    onSubjectColor: (String, Int?) -> Unit,
+    defaultSubjectColor: Int,
+    onDefaultSubjectColor: (Int) -> Unit,
+    lessonTextColor: Int,
+    onLessonTextColor: (Int) -> Unit,
+    cancelledStrike: Boolean,
+    onCancelledStrike: (Boolean) -> Unit,
 ) {
-    var currentTab by remember { mutableStateOf(Tab.TIMETABLE) }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val timetableVm: TimetableViewModel = viewModel()
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(currentTab.label) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
-            )
-        },
-        bottomBar = {
-            NavigationBar {
-                Tab.entries.forEach { tab ->
-                    NavigationBarItem(
-                        selected = tab == currentTab,
-                        onClick = Haptics.haptic { currentTab = tab },
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) },
+    var currentScreen by remember { mutableStateOf("timetable") }
+
+    val allTeachers = remember {
+        derivedStateOf {
+            timetableVm.teachersById.values
+                .filter { it.name.isNotBlank() }
+                .sortedBy { it.longName.ifBlank { it.name } }
+        }
+    }.value
+
+    val allRooms = remember {
+        derivedStateOf {
+            timetableVm.roomsById.values
+                .filter { it.name.isNotBlank() }
+                .sortedBy { it.name }
+        }
+    }.value
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                modifier = Modifier.fillMaxWidth(0.85f),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.app_logo),
+                        contentDescription = "UntisX Logo",
+                        modifier = Modifier.size(40.dp),
+                    )
+
+                    Spacer(Modifier.width(12.dp))
+
+                    Text(
+                        text = "UntisX",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "Close",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .tapHaptic {
+                                scope.launch { drawerState.close() }
+                            }
+                            .padding(2.dp),
                     )
                 }
+
+                Spacer(Modifier.height(16.dp))
+                SidebarSection("Information")
+
+                SidebarItem(
+                    icon = Icons.Outlined.Person,
+                    label = "Teachers",
+                    badge = allTeachers.size.toString(),
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        currentScreen = "teachers"
+                    },
+                )
+
+                SidebarItem(
+                    icon = Icons.Outlined.DateRange,
+                    label = "Rooms",
+                    badge = "...",
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        currentScreen = "rooms"
+                    },
+                )
+
+                Spacer(Modifier.height(16.dp))
+                SidebarSection("Other")
+
+                SidebarItem(
+                    icon = Icons.Outlined.Settings,
+                    label = "Settings",
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        currentScreen = "settings"
+                    },
+                )
+
+                SidebarItem(
+                    icon = Icons.Outlined.Info,
+                    label = "About",
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        currentScreen = "about"
+                    },
+                )
             }
         },
-    ) { padding ->
-        when (currentTab) {
-            Tab.TIMETABLE -> TimetableScreen(modifier = Modifier.padding(padding))
+    ) {
+        val isTimetable = currentScreen == "timetable"
+        val title = when (currentScreen) {
+            "settings" -> "Settings"
+            "teachers" -> "Teachers"
+            "rooms" -> "Rooms"
+            "about" -> "About"
+            else -> "Timetable"
+        }
 
-            Tab.SETTINGS -> SettingsScreen(
-                auth = auth,
-                theme = theme,
-                onThemeChange = onThemeChange,
-                hapticsEnabled = hapticsEnabled,
-                onHapticsChange = onHapticsChange,
-                onLogout = onLogout,
-                modifier = Modifier.padding(padding),
+        Scaffold(
+            topBar = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface)
+                        .statusBarsPadding()
+                        .padding(horizontal = 6.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (isTimetable) {
+                        Icon(
+                            imageVector = Icons.Outlined.Menu,
+                            contentDescription = "Menu",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .tapHaptic {
+                                    scope.launch {
+                                        if (drawerState.isClosed) drawerState.open()
+                                        else drawerState.close()
+                                    }
+                                }
+                                .padding(8.dp),
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .tapHaptic { currentScreen = "timetable" }
+                                .padding(8.dp),
+                        )
+                    }
+
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                    )
+
+                    if (isTimetable) {
+                        Icon(
+                            imageVector = Icons.Outlined.Person,
+                            contentDescription = "Profile",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .tapHaptic { /* TODO: profile */ }
+                                .padding(8.dp),
+                        )
+                    } else {
+                        Spacer(Modifier.size(40.dp))
+                    }
+                }
+            },
+        ) { padding ->
+            when (currentScreen) {
+                "settings" -> SettingsScreen(
+                    auth = auth,
+                    theme = theme,
+                    onThemeChange = onThemeChange,
+                    hapticsEnabled = hapticsEnabled,
+                    onHapticsChange = onHapticsChange,
+                    onLogout = onLogout,
+                    knownSubjects = knownSubjects,
+                    subjectColors = subjectColors,
+                    onSubjectColor = onSubjectColor,
+                    defaultSubjectColor = defaultSubjectColor,
+                    onDefaultSubjectColor = onDefaultSubjectColor,
+                    lessonTextColor = lessonTextColor,
+                    onLessonTextColor = onLessonTextColor,
+                    cancelledStrike = cancelledStrike,
+                    onCancelledStrike = onCancelledStrike,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
+
+                "teachers" -> TeachersListScreen(
+                    teachers = allTeachers,
+                    modifier = Modifier.padding(padding),
+                )
+
+                "rooms" -> RoomsListScreen(
+                    modifier = Modifier.padding(padding),
+                )
+
+                "about" -> AboutScreen(
+                    auth = auth,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
+
+                else -> TimetableScreen(
+                    subjectColors = subjectColors.mapValues { Color(it.value) },
+                    defaultColor = Color(defaultSubjectColor),
+                    textColor = Color(lessonTextColor),
+                    cancelledStrike = cancelledStrike,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SidebarSection(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun SidebarItem(
+    icon: ImageVector,
+    label: String,
+    badge: String? = null,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(32.dp))
+            .tapHaptic(onClick)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp),
+        )
+
+        Spacer(Modifier.width(20.dp))
+
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+
+        if (badge != null) {
+            Text(
+                text = badge,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

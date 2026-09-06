@@ -1,8 +1,7 @@
-package sh.lsx.untisx.data
+package sh.lsx.untisx.data.prefs
 
 import android.content.Context
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import sh.lsx.untisx.UntisXApp
 import sh.lsx.untisx.data.model.AuthResult

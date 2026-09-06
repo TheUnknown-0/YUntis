@@ -25,32 +25,26 @@ object Haptics {
             current()
         }
     }
+}
 
-    @Composable
-    fun Modifier.tapHaptic(onClick: () -> Unit): Modifier = composed {
-        val hapticsOn = LocalHapticsEnabled.current
-        val haptic = LocalHapticFeedback.current
-        val currentOnClick by rememberUpdatedState(onClick)
+/** Clickable with haptic feedback (respects the "Haptic feedback" setting). */
+@Composable
+fun Modifier.tapHaptic(onClick: () -> Unit): Modifier = tapHaptic(interactive = true, onClick = onClick)
 
-        this.then(
-            Modifier.clickable {
-                if (hapticsOn) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                currentOnClick()
-            },
-        )
-    }
+/** Clickable with haptic feedback that can be disabled via [interactive]. */
+@Composable
+fun Modifier.tapHaptic(
+    interactive: Boolean,
+    onClick: () -> Unit,
+): Modifier = composed {
+    val hapticsOn = LocalHapticsEnabled.current && interactive
+    val haptic = LocalHapticFeedback.current
+    val currentOnClick by rememberUpdatedState(onClick)
 
-    @Composable
-    fun Modifier.tapHaptic(interactive: Boolean, onClick: () -> Unit): Modifier = composed {
-        val hapticsOn = LocalHapticsEnabled.current && interactive
-        val haptic = LocalHapticFeedback.current
-        val currentOnClick by rememberUpdatedState(onClick)
-
-        this.then(
-            Modifier.clickable(enabled = interactive) {
-                if (hapticsOn) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                currentOnClick()
-            },
-        )
-    }
+    this.then(
+        Modifier.clickable(enabled = interactive) {
+            if (hapticsOn) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            currentOnClick()
+        },
+    )
 }

@@ -3,13 +3,20 @@ package sh.lsx.untisx.data.api
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.add
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -20,9 +27,19 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import sh.lsx.untisx.data.model.AuthResult
 import sh.lsx.untisx.data.model.JsonRpcRequest
 import sh.lsx.untisx.data.model.JsonRpcResponse
+import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.data.model.Holiday
+import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.School
 import sh.lsx.untisx.data.model.SchoolSearchResult
+import sh.lsx.untisx.data.model.TimetableElement
+import sh.lsx.untisx.data.model.TimetableEntry
+import sh.lsx.untisx.data.model.TimegridDay
+import sh.lsx.untisx.data.model.TimegridUnit
+import sh.lsx.untisx.data.security.generateTotp
 import java.io.IOException
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -30,6 +47,7 @@ sealed class UntisException(message: String) : Exception(message) {
     data object Network : UntisException("No connection to the Untis server.")
     data object BadCredentials : UntisException("Wrong username or password.")
     data object TooManyResults : UntisException("Too many schools match your search.")
+    data object SessionExpired : UntisException("Session expired.")
     data class Api(val code: Int, override val message: String) : UntisException(message)
 }
 
@@ -43,6 +61,7 @@ object UntisClient {
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
+
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -62,6 +81,7 @@ object UntisClient {
         try {
             val result = executeRpc(SCHOOL_SEARCH_URL, "searchSchool", params)
             val schools = json.decodeFromJsonElement<SchoolSearchResult>(result).schools
+
             Log.d(TAG, "search '$query' -> ${schools.size} schools")
             schools.take(20)
         } catch (e: UntisException.Api) {
@@ -84,38 +104,379 @@ object UntisClient {
             json.decodeFromJsonElement<AuthResult>(result)
         }
 
-    private fun buildUrl(server: String, loginName: String): HttpUrl {
+    suspend fun <T> withAuth(
+        auth: AuthData,
+        request: suspend (AuthData) -> T,
+    ): Pair<T, AuthData?> {
+        return try {
+            request(auth) to null
+        } catch (e: UntisException.SessionExpired) {
+            Log.d(TAG, "session expired -> re-authenticating as ${auth.user}")
+
+            val fresh = authenticate(auth.server, auth.loginName, auth.user, auth.password)
+            val updated = auth.copy(session = fresh)
+
+            request(updated) to updated
+        }
+    }
+
+    suspend fun getTimetable(
+        auth: AuthData,
+        startDate: Int,
+        endDate: Int,
+    ): List<TimetableEntry> = withContext(Dispatchers.IO) {
+        val session = auth.session
+
+        val elementId: Int
+        val elementType: Int
+
+        if (session.personType == 5 && session.personId != 0) {
+            elementId = session.personId
+            elementType = 5
+        } else if (session.klasseId != 0) {
+            elementId = session.klasseId
+            elementType = 1
+        } else {
+            elementId = session.personId
+            elementType = 5
+        }
+
+        val params = buildJsonObject {
+            put("id", elementId)
+            put("type", elementType)
+            put("startDate", startDate)
+            put("endDate", endDate)
+        }
+
+        val url = buildUrl(auth.server, auth.loginName).toString()
+
+        json.decodeFromJsonElement<List<TimetableEntry>>(
+            executeRpc(url, "getTimetable", params, session.sessionId),
+        ).also { Log.d(TAG, "getTimetable $startDate-$endDate -> ${it.size} lessons") }
+    }
+
+    suspend fun getSubjects(auth: AuthData): List<MasterDataItem> = masterData(auth, "getSubjects")
+
+    suspend fun getTeachers(auth: AuthData): List<MasterDataItem> = masterData(auth, "getTeachers")
+
+    suspend fun getRooms(auth: AuthData): List<MasterDataItem> = masterData(auth, "getRooms")
+
+    suspend fun getHolidays(auth: AuthData): List<Holiday> = withContext(Dispatchers.IO) {
+        json.decodeFromJsonElement<List<Holiday>>(
+            rpcCall(auth, "getHolidays"),
+        ).also { Log.d(TAG, "getHolidays -> ${it.size} items") }
+    }
+
+    private suspend fun masterData(auth: AuthData, method: String): List<MasterDataItem> =
+        withContext(Dispatchers.IO) {
+            json.decodeFromJsonElement<List<MasterDataItem>>(
+                rpcCall(auth, method),
+            ).also { Log.d(TAG, "$method -> ${it.size} items") }
+        }
+
+    private fun rpcCall(
+        auth: AuthData,
+        method: String,
+        params: JsonElement = buildJsonObject {},
+    ): JsonElement = executeRpc(
+        buildUrl(auth.server, auth.loginName).toString(),
+        method,
+        params,
+        auth.session.sessionId,
+    )
+
+    private class InternTotp(
+        val url: String,
+        val user: String,
+        val otp: Long,
+        val clientTime: Long,
+    ) {
+        fun credentials(): JsonObject = buildJsonObject {
+            put("user", user)
+            put("otp", otp)
+            put("clientTime", clientTime)
+        }
+    }
+
+    private fun internTotp(auth: AuthData): InternTotp {
+        val url = buildInternalRpcUrl(auth.server, auth.loginName).toString()
+
+        val secret = executeRpc(
+            url,
+            "getAppSharedSecret",
+            buildJsonArray {
+                add(buildJsonObject {
+                    put("userName", auth.user)
+                    put("password", auth.password)
+                })
+            },
+        ).jsonPrimitive.contentOrNull
+            ?: throw UntisException.Api(-1, "No app shared secret.")
+
+        val now = System.currentTimeMillis()
+
+        return InternTotp(
+            url = url,
+            user = auth.user,
+            otp = generateTotp(secret, now),
+            clientTime = now,
+        )
+    }
+
+    suspend fun fetchTimegridViaUserData(auth: AuthData): List<TimegridDay> = withContext(Dispatchers.IO) {
+        val totp = internTotp(auth)
+
+        val result = executeRpc(
+            totp.url,
+            "getUserData2017",
+            buildJsonArray {
+                add(buildJsonObject {
+                    put("elementId", 0)
+                    put("deviceOs", "A")
+                    put("deviceOsVersion", "")
+                    put("auth", totp.credentials())
+                })
+            },
+        )
+
+        parseTimegridResponse(result).also { Log.d(TAG, "timegrid via getUserData2017 -> ${it.size} days") }
+    }
+
+    private fun parseTimegridResponse(result: JsonElement): List<TimegridDay> {
+        val daysElement = runCatching {
+            when {
+                result.jsonObject.containsKey("masterData") ->
+                    result.jsonObject["masterData"]?.jsonObject?.get("timeGrid")?.jsonObject?.get("days")
+
+                result.jsonObject.containsKey("timeGrid") ->
+                    result.jsonObject["timeGrid"]?.jsonObject?.get("days")
+
+                result.jsonObject.containsKey("days") -> result.jsonObject["days"]
+
+                else -> null
+            }?.jsonArray
+        }.getOrNull() ?: return emptyList()
+
+        return daysElement.mapNotNull { day ->
+            val dayObj = runCatching { day.jsonObject }.getOrNull() ?: return@mapNotNull null
+
+            val units = dayObj["units"]?.jsonArray?.mapNotNull { unit ->
+                val unitObj = runCatching { unit.jsonObject }.getOrNull() ?: return@mapNotNull null
+
+                TimegridUnit(
+                    label = unitObj["label"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank),
+                    startTime = parseUntisTime(unitObj["startTime"]) ?: return@mapNotNull null,
+                    endTime = parseUntisTime(unitObj["endTime"]) ?: return@mapNotNull null,
+                    canLesson = unitObj["canLesson"]?.jsonPrimitive?.booleanOrNull,
+                )
+            }.orEmpty()
+
+            TimegridDay(day = dayObj["day"]?.jsonPrimitive?.intOrNull ?: 0, timeUnits = units)
+        }
+    }
+
+    private fun parseUntisTime(element: JsonElement?): Int? {
+        val primitive = element as? JsonPrimitive ?: return null
+
+        primitive.intOrNull?.let { return it }
+
+        val digits = primitive.contentOrNull
+            ?.removePrefix("T")
+            ?.replace(":", "")
+            ?: return null
+
+        return digits.toIntOrNull()
+    }
+
+    suspend fun getTimetableIntern(
+        auth: AuthData,
+        from: LocalDate,
+        to: LocalDate,
+    ): List<TimetableEntry> = withContext(Dispatchers.IO) {
+        val totp = internTotp(auth)
+        val session = auth.session
+
+        val (elementId, elementType) = when {
+            session.personType == 5 && session.personId != 0 -> session.personId to "STUDENT"
+            session.klasseId != 0 -> session.klasseId to "CLASS"
+            else -> session.personId to "STUDENT"
+        }
+
+        val result = executeRpc(
+            totp.url,
+            "getTimetable2017",
+            buildJsonArray {
+                add(buildJsonObject {
+                    put("id", elementId)
+                    put("type", elementType)
+                    put("startDate", from.format(DateTimeFormatter.ISO_LOCAL_DATE))
+                    put("endDate", to.format(DateTimeFormatter.ISO_LOCAL_DATE))
+                    put("masterDataTimestamp", 0)
+                    put("timetableTimestamp", 0)
+                    put("timetableTimestamps", buildJsonArray {})
+                    put("auth", totp.credentials())
+                })
+            },
+        )
+
+        parseInternTimetable(result).also { Log.d(TAG, "getTimetable2017 $from-$to -> ${it.size} periods") }
+    }
+
+    private fun parseInternTimetable(result: JsonElement): List<TimetableEntry> {
+        val periods = runCatching {
+            result.jsonObject["timetable"]?.jsonObject?.get("periods")?.jsonArray
+        }.getOrNull() ?: return emptyList()
+
+        return periods.mapNotNull { period ->
+            runCatching { parseInternPeriod(period.jsonObject) }.getOrNull()
+        }
+    }
+
+    private fun parseInternPeriod(period: JsonObject): TimetableEntry {
+        val start = period["startDateTime"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val end = period["endDateTime"]?.jsonPrimitive?.contentOrNull.orEmpty()
+
+        val elements = period["elements"]?.jsonArray.orEmpty().mapNotNull { element ->
+            val obj = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
+            val typeId = internElementTypeId(obj["type"]?.jsonPrimitive?.contentOrNull)
+                ?: return@mapNotNull null
+
+            typeId to TimetableElement(
+                id = obj["id"]?.jsonPrimitive?.intOrNull ?: 0,
+                orgId = obj["orgId"]?.jsonPrimitive?.intOrNull,
+            )
+        }
+
+        val states = period["is"]?.jsonArray.orEmpty()
+            .mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+
+        val text = runCatching { period["text"]?.jsonObject }.getOrNull()
+        val lstext = text?.get("substitution")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+            ?: text?.get("info")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+
+        return TimetableEntry(
+            id = period["id"]?.jsonPrimitive?.intOrNull ?: 0,
+            date = parseIsoDate(start),
+            startTime = parseIsoTime(start),
+            endTime = parseIsoTime(end),
+            klasse = elements.filter { it.first == 1 }.map { it.second },
+            teacher = elements.filter { it.first == 2 }.map { it.second },
+            subject = elements.filter { it.first == 3 }.map { it.second },
+            room = elements.filter { it.first == 4 }.map { it.second },
+            code = when {
+                states.any { it.equals("CANCELLED", ignoreCase = true) } -> "cancelled"
+                states.any { it.equals("IRREGULAR", ignoreCase = true) } -> "irregular"
+                else -> null
+            },
+            lstext = lstext,
+        )
+    }
+
+    private fun internElementTypeId(name: String?): Int? = when (name?.uppercase()) {
+        "CLASS", "KLASSE" -> 1
+        "TEACHER" -> 2
+        "SUBJECT" -> 3
+        "ROOM" -> 4
+        "STUDENT" -> 5
+        else -> null
+    }
+
+    private fun parseIsoDate(iso: String): Int =
+        iso.take(10).replace("-", "").toIntOrNull() ?: 0
+
+    private fun parseIsoTime(iso: String): Int =
+        runCatching { iso.drop(11).take(5).replace(":", "").toInt() }.getOrDefault(0)
+
+    suspend fun fetchTimegridFromInternalRpc(auth: AuthData): List<TimegridDay> = withContext(Dispatchers.IO) {
+        val url = buildInternalRpcUrl(auth.server, auth.loginName).toString()
+
+        json.decodeFromJsonElement<List<TimegridDay>>(
+            executeRpc(url, "getTimegrid", buildJsonObject {}, auth.session.sessionId),
+        ).also { Log.d(TAG, "timegrid via internal getTimegrid -> ${it.size} days") }
+    }
+
+    suspend fun fetchTimegridRpc(auth: AuthData): List<TimegridDay> = withContext(Dispatchers.IO) {
+        val url = buildUrl(auth.server, auth.loginName).toString()
+
+        val result = executeRpc(url, "getTimegrid", buildJsonObject {}, auth.session.sessionId)
+
+        val days: JsonArray = when {
+            result is JsonArray -> result
+
+            result.jsonObject.containsKey("timeGrid") -> when (val grid = result.jsonObject["timeGrid"]) {
+                is JsonArray -> grid
+                else -> grid?.jsonObject?.get("days")?.jsonArray ?: JsonArray(emptyList())
+            }
+
+            result.jsonObject.containsKey("days") ->
+                result.jsonObject["days"]?.jsonArray ?: JsonArray(emptyList())
+
+            else -> JsonArray(emptyList())
+        }
+
+        json.decodeFromJsonElement<List<TimegridDay>>(days)
+            .also { Log.d(TAG, "timegrid via getTimegrid -> ${it.size} days") }
+    }
+
+    private fun buildUrl(server: String, loginName: String): HttpUrl =
+        buildUrl(server, loginName, "jsonrpc.do")
+
+    private fun buildInternalRpcUrl(server: String, loginName: String): HttpUrl =
+        buildUrl(server, loginName, "jsonrpc_intern.do")
+
+    private fun buildUrl(server: String, loginName: String, rpcPath: String): HttpUrl {
         val host = server.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
-        return "https://$host/WebUntis/jsonrpc.do".toHttpUrl()
+        return "https://$host/WebUntis/$rpcPath".toHttpUrl()
             .newBuilder()
             .addQueryParameter("school", loginName.trim())
             .build()
     }
 
-    private fun executeRpc(url: String, method: String, params: JsonElement): JsonElement {
+    private fun executeRpc(
+        url: String,
+        method: String,
+        params: JsonElement,
+        sessionId: String? = null,
+    ): JsonElement {
         val body = json.encodeToString(
             JsonRpcRequest(id = nextId.getAndIncrement(), method = method, params = params),
         ).toRequestBody("application/json; charset=utf-8".toMediaType())
 
-        val request = Request.Builder().url(url).post(body).build()
+        val request = Request.Builder().url(url).post(body).apply {
+            if (!sessionId.isNullOrBlank()) header("Cookie", "JSESSIONID=$sessionId")
+        }.build()
 
         return try {
             http.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) throw UntisException.Network
+                val text = response.body?.string()
+                val rpc = text?.let {
+                    runCatching { json.decodeFromString<JsonRpcResponse>(it) }.getOrNull()
+                }
 
-                val text = response.body?.string() ?: throw UntisException.Network
-                val rpc = json.decodeFromString<JsonRpcResponse>(text)
+                rpc?.error?.let { err ->
+                    Log.d(TAG, "rpc '$method' error ${err.code}: ${err.message}")
 
-                rpc.error?.let { err ->
                     throw when (err.code) {
                         -8500 -> UntisException.BadCredentials
+                        -8520 -> UntisException.SessionExpired
                         else -> UntisException.Api(err.code, err.message)
                     }
+                }
+
+                if (!response.isSuccessful) {
+                    Log.d(TAG, "rpc '$method' http ${response.code}, body=${text?.take(300)}")
+                    throw UntisException.Network
+                }
+
+                if (rpc == null) {
+                    Log.d(TAG, "rpc '$method' unparseable body: ${text?.take(300)}")
+                    throw UntisException.Network
                 }
 
                 rpc.result ?: throw UntisException.Api(-1, "Empty result.")
             }
         } catch (e: IOException) {
+            Log.d(TAG, "rpc '$method' to $url failed: $e")
             throw UntisException.Network
         }
     }

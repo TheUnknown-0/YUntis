@@ -1,19 +1,39 @@
-*.iml
-.gradle
-.kotlin
-/local.properties
-/.idea
-.DS_Store
-/build
+# Gradle
+.gradle/
+build/
 **/build/
-/captures
-.externalNativeBuild
-.cxx
+!gradle/wrapper/gradle-wrapper.jar
 
-# Heap dumps & profilers
+# Android Studio / IntelliJ
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Kotlin
+.kotlin/
+
+# Local config
+local.properties
+
+# Native build outputs
+*.so
+!.gitignore
+
+# Logs & dumps
+*.log
 *.hprof
 
-# Never commit signing material or secrets
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Secrets & signing material
+.env
+.env.*
+!.env.example
 *.jks
 *.keystore
+keystore.properties
 google-services.json

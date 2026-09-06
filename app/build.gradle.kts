@@ -25,6 +25,9 @@ android {
             optimization {
                 enable = false
             }
+
+            // temporary debug-signed release builds so performance can be tested on a real device without upload keys
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 

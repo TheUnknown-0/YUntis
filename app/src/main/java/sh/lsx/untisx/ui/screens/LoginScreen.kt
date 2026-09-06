@@ -1,5 +1,6 @@
 package sh.lsx.untisx.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,16 +35,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import sh.lsx.untisx.data.AuthData
-import sh.lsx.untisx.data.AuthPrefs
+import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.data.prefs.AuthPrefs
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.School
+import sh.lsx.untisx.ui.util.Haptics
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -168,6 +171,14 @@ fun LoginScreen(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        Image(
+            painter = painterResource(sh.lsx.untisx.R.drawable.app_logo),
+            contentDescription = "UntisX logo",
+            modifier = Modifier.size(96.dp),
+        )
+
+        Spacer(Modifier.height(16.dp))
+
         Text(
             text = "Connect your Account",
             style = MaterialTheme.typography.headlineMedium,
@@ -256,7 +267,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
                                 }
                             }
                         },
-                        onClick = {
+                        onClick = Haptics.haptic {
                             selectedSchool = entry
                             schoolQuery = entry.displayName
                             suggestionsExpanded = false
@@ -323,7 +334,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
             )
         } else {
             Button(
-                onClick = ::signIn,
+                onClick = Haptics.haptic(::signIn),
                 enabled = !signingIn && sel != null && user.isNotBlank() && password.isNotBlank(),
             ) {
                 Text(if (signingIn) "Signing in..." else "Sign in")
