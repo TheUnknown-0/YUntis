@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
@@ -255,6 +256,14 @@ private fun MainApp(
     val timetableVm: TimetableViewModel = viewModel()
 
     var currentScreen by remember { mutableStateOf("timetable") }
+
+    BackHandler(enabled = drawerState.isOpen || currentScreen != "timetable") {
+        if (drawerState.isOpen) {
+            scope.launch { drawerState.close() }
+        } else {
+            currentScreen = "timetable"
+        }
+    }
 
     val allTeachers = remember {
         derivedStateOf {
