@@ -2,28 +2,51 @@
 
 **by LSX Studios**
 
-A better way to read your school timetable - fast, private & open source.
+An open-source timetable viewer for the Untis school system - built natively with Kotlin and Jetpack Compose.
 
 ---
 
-## What it does
+## Features
 
-- **Themes** - follow the system or force light/dark, with color presets including Material You.
-- **...**
+- **Timetable** - clear weekly view with all lessons, times, rooms and teachers
+- **School events** - displayed directly in the timetable
+- **Cancelled lessons** - showing up grayed out
+- **Subject colors** - every subject color cam be customized
+- **Teachers & rooms** - the whole school at a glance
+- **Offline** - your timetable is cached locally and opens instantly
+- **In-app updates** - new versions install straight from the app
+- **Lightweight** - small, fast, no ads, no tracking
 
-UntisX is in early development - features may be incomplete or change.
-
----
-
-## Privacy
-
-Your username and password are sent exclusively to your school's Untis server and nowhere else. They never leave your device unencrypted, and there is no analytics, no accounts and no tracking.
+UntisX is in early development - expect bugs and incomplete features. If you find one, please [report it as an issue](https://codeberg.org/Losterixx/UntisX/issues).
 
 ---
 
 ## Screenshots
 
-Coming soon.
+| | |
+|---|---|
+| ![Timetable](screenshots/timetable.png) | ![Drawer](screenshots/drawer.png) |
+| ![Subject colors](screenshots/subject_colors.png) | ![Restricted days](screenshots/restricted.png) |
+
+---
+
+## Privacy
+
+Your username and password are sent exclusively to your school's Untis server and nowhere else. There is no analytics or tracking.
+
+The only external contact besides your Untis server is our update server (`lsx.sh/api/projects/untisx/<version/apk>`).
+
+---
+
+## Building
+
+```bash
+git clone https://codeberg.org/Losterixx/UntisX
+cd UntisX
+./gradlew assembleDebug
+```
+
+or simply open the project in Android Studio. Debug builds work out of the box; release builds are signed with the project keystore.
 
 ---
 
