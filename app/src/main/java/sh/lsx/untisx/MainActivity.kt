@@ -1,9 +1,7 @@
 package sh.lsx.untisx
 
-import android.content.ComponentName
 import android.content.Context
 import android.content.SharedPreferences
-import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -11,8 +9,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -78,13 +77,12 @@ import sh.lsx.untisx.ui.screens.RoomsListScreen
 import sh.lsx.untisx.ui.screens.SettingsScreen
 import sh.lsx.untisx.ui.screens.TeachersListScreen
 import sh.lsx.untisx.ui.timetable.ErrorBanner
+import sh.lsx.untisx.ui.timetable.InfoBanner
 import sh.lsx.untisx.ui.timetable.TimetableScreen
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.theme.UntisXTheme
-import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.LocalHapticsEnabled
 import sh.lsx.untisx.ui.util.tapHaptic
-import sh.lsx.untisx.update.UpdateState
 import sh.lsx.untisx.update.UpdateViewModel
 
 class MainActivity : ComponentActivity() {
@@ -209,18 +207,6 @@ private fun AppRoot() {
                     )
                 }
 
-                updateVm.transientError?.let { message ->
-                    ErrorBanner(
-                        text = message,
-                        onRetry = updateVm::check,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .statusBarsPadding()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .fillMaxWidth(),
-                    )
-                }
-
                 UpdateDialog(
                     state = updateVm.state,
                     onDownload = updateVm::download,
@@ -254,6 +240,7 @@ private fun MainApp(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val timetableVm: TimetableViewModel = viewModel()
+    val updateVm: UpdateViewModel = viewModel()
 
     var currentScreen by remember { mutableStateOf("timetable") }
 
@@ -377,116 +364,146 @@ private fun MainApp(
             else -> "Timetable"
         }
 
-        Scaffold(
-            topBar = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .statusBarsPadding()
-                        .padding(horizontal = 6.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (isTimetable) {
-                        Icon(
-                            imageVector = Icons.Outlined.Menu,
-                            contentDescription = "Menu",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .tapHaptic {
-                                    scope.launch {
-                                        if (drawerState.isClosed) drawerState.open()
-                                        else drawerState.close()
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                topBar = {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface)
+                            .statusBarsPadding()
+                            .padding(horizontal = 6.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (isTimetable) {
+                            Icon(
+                                imageVector = Icons.Outlined.Menu,
+                                contentDescription = "Menu",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .tapHaptic {
+                                        scope.launch {
+                                            if (drawerState.isClosed) drawerState.open()
+                                            else drawerState.close()
+                                        }
                                     }
-                                }
-                                .padding(8.dp),
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Outlined.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .tapHaptic { currentScreen = "timetable" }
-                                .padding(8.dp),
-                        )
-                    }
+                                    .padding(8.dp),
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Outlined.ArrowBack,
+                                contentDescription = "Back",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .tapHaptic { currentScreen = "timetable" }
+                                    .padding(8.dp),
+                            )
+                        }
 
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                        )
+
+                        if (isTimetable) {
+                            Icon(
+                                imageVector = Icons.Outlined.Person,
+                                contentDescription = "Profile",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .tapHaptic { /* TODO: profile */ }
+                                    .padding(8.dp),
+                            )
+                        } else {
+                            Spacer(Modifier.size(40.dp))
+                        }
+                    }
+                },
+            ) { padding ->
+                when (currentScreen) {
+                    "settings" -> SettingsScreen(
+                        auth = auth,
+                        theme = theme,
+                        onThemeChange = onThemeChange,
+                        hapticsEnabled = hapticsEnabled,
+                        onHapticsChange = onHapticsChange,
+                        onLogout = onLogout,
+                        knownSubjects = knownSubjects,
+                        subjectColors = subjectColors,
+                        onSubjectColor = onSubjectColor,
+                        defaultSubjectColor = defaultSubjectColor,
+                        onDefaultSubjectColor = onDefaultSubjectColor,
+                        lessonTextColor = lessonTextColor,
+                        onLessonTextColor = onLessonTextColor,
+                        cancelledStrike = cancelledStrike,
+                        onCancelledStrike = onCancelledStrike,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
                     )
 
-                    if (isTimetable) {
-                        Icon(
-                            imageVector = Icons.Outlined.Person,
-                            contentDescription = "Profile",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .tapHaptic { /* TODO: profile */ }
-                                .padding(8.dp),
-                        )
-                    } else {
-                        Spacer(Modifier.size(40.dp))
+                    "teachers" -> TeachersListScreen(
+                        teachers = allTeachers,
+                        modifier = Modifier.padding(padding),
+                    )
+
+                    "rooms" -> RoomsListScreen(
+                        modifier = Modifier.padding(padding),
+                    )
+
+                    "about" -> AboutScreen(
+                        auth = auth,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                    )
+
+                    else -> TimetableScreen(
+                        subjectColors = subjectColors.mapValues { Color(it.value) },
+                        defaultColor = Color(defaultSubjectColor),
+                        textColor = Color(lessonTextColor),
+                        cancelledStrike = cancelledStrike,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                updateVm.transientError?.let { message ->
+                    ErrorBanner(text = message, onRetry = updateVm::check)
+                }
+
+                if (isTimetable) {
+                    timetableVm.error?.let { message ->
+                        ErrorBanner(text = message, onRetry = timetableVm::retry)
+                    }
+
+                    timetableVm.info?.let { message ->
+                        InfoBanner(text = message, onRetry = timetableVm::retry)
+                    }
+
+                    timetableVm.timegridError?.let { message ->
+                        InfoBanner(text = message, onRetry = timetableVm::retryTimegrid)
                     }
                 }
-            },
-        ) { padding ->
-            when (currentScreen) {
-                "settings" -> SettingsScreen(
-                    auth = auth,
-                    theme = theme,
-                    onThemeChange = onThemeChange,
-                    hapticsEnabled = hapticsEnabled,
-                    onHapticsChange = onHapticsChange,
-                    onLogout = onLogout,
-                    knownSubjects = knownSubjects,
-                    subjectColors = subjectColors,
-                    onSubjectColor = onSubjectColor,
-                    defaultSubjectColor = defaultSubjectColor,
-                    onDefaultSubjectColor = onDefaultSubjectColor,
-                    lessonTextColor = lessonTextColor,
-                    onLessonTextColor = onLessonTextColor,
-                    cancelledStrike = cancelledStrike,
-                    onCancelledStrike = onCancelledStrike,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                )
-
-                "teachers" -> TeachersListScreen(
-                    teachers = allTeachers,
-                    modifier = Modifier.padding(padding),
-                )
-
-                "rooms" -> RoomsListScreen(
-                    modifier = Modifier.padding(padding),
-                )
-
-                "about" -> AboutScreen(
-                    auth = auth,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                )
-
-                else -> TimetableScreen(
-                    subjectColors = subjectColors.mapValues { Color(it.value) },
-                    defaultColor = Color(defaultSubjectColor),
-                    textColor = Color(lessonTextColor),
-                    cancelledStrike = cancelledStrike,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                )
             }
         }
     }

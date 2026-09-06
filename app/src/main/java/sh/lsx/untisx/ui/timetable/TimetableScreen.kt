@@ -97,31 +97,7 @@ fun TimetableScreen(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        error?.let { message ->
-            ErrorBanner(
-                text = message,
-                onRetry = vm::retry,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
-
-        info?.let { message ->
-            InfoBanner(
-                text = message,
-                onRetry = vm::retry,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
-
-        vm.timegridError?.let { message ->
-            InfoBanner(
-                text = message,
-                onRetry = vm::retryTimegrid,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
-
+    Box(modifier = modifier.fillMaxSize()) {
         val offset = vm.pageToOffset(pagerState.settledPage)
 
         val slots = remember(vm.timegrid) { hourMarkersFrom(vm.timegrid) }
@@ -130,9 +106,7 @@ fun TimetableScreen(
         PullToRefreshBox(
             isRefreshing = refreshing,
             onRefresh = { vm.refreshVisibleWeek(offset) },
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
+            modifier = Modifier.fillMaxSize(),
         ) {
             Row(
                 modifier = Modifier
