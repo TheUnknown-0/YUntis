@@ -1,4 +1,5 @@
 package sh.lsx.untisx.ui.timetable
+import android.util.Log
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -203,11 +204,11 @@ private fun WeekPage(
             CircularProgressIndicator()
         }
 
-        entries == null -> Box(modifier = Modifier.fillMaxSize())
-
         else -> {
-            val displays = remember(entries, subjectsById, teachersById, roomsById) {
-                entries.map { entry ->
+            val safeEntries = entries.orEmpty()
+
+            val displays = remember(safeEntries, subjectsById, teachersById, roomsById) {
+                safeEntries.map { entry ->
                     LessonDisplay(
                         entry = entry,
                         subject = resolveSubject(entry, subjectsById),

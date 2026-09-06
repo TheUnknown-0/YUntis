@@ -93,6 +93,27 @@ internal fun hourMarkersFrom(timegrid: List<TimegridDay>): List<HourMarker> = ti
                     ?: (index + 1).toString(),
             )
         }
+        .ifEmpty { defaultHourMarkers() }
+
+private val DEFAULT_PERIODS = listOf(
+    800 to 845,
+    850 to 935,
+    955 to 1040,
+    1040 to 1125,
+    1205 to 1250,
+    1250 to 1335,
+    1345 to 1430,
+    1435 to 1520,
+    1520 to 1605,
+    1605 to 1650,
+    1650 to 1735,
+    1735 to 1820,
+)
+
+internal fun defaultHourMarkers(): List<HourMarker> = DEFAULT_PERIODS
+        .mapIndexed { index, (start, end) ->
+            HourMarker(start = start, end = end, label = (index + 1).toString())
+        }
 
 internal fun mergeEventSpans(entries: List<TimetableEntry>): List<Pair<Int, Int>> {
     val sorted = entries.sortedWith(compareBy({ it.startTime }, { it.endTime }))

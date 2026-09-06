@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -80,8 +81,16 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     private var lastFetch = 0L
 
     init {
-        loadFromCache()
-        refreshCurrentWeek()
+        viewModelScope.launch {
+            val cached = withContext(Dispatchers.IO) { TimetableCache.load(getApplication()) }
+
+            if (cached != null) {
+                Log.d(TAG, "cache loaded: ${cached.weeks.size} weeks, lastFetch=${cached.lastFetch}")
+                applyCached(cached)
+            }
+
+            refreshCurrentWeek()
+        }
     }
 
     fun pageToOffset(page: Int): Int = page - CENTER
@@ -144,35 +153,31 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         ensureWeekOffset(0, force = true)
     }
 
-    private fun loadFromCache() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val cached = TimetableCache.load(getApplication()) ?: return@launch
+    private fun applyCached(cached: TimetableCache.Data) {
+        lastFetch = cached.lastFetch
 
-            Log.d(TAG, "cache loaded: ${cached.weeks.size} weeks, lastFetch=${cached.lastFetch}")
-            lastFetch = cached.lastFetch
+        val currentMonday = LocalDate.now().toUntisWeekStart()
 
-            val currentMonday = LocalDate.now().toUntisWeekStart()
+        for ((key, entries) in cached.weeks) {
+            val monday = key.toIntOrNull()
+                ?.let { runCatching { it.toUntisLocalDate() }.getOrNull() }
+                ?.toUntisWeekStart()
+                ?: continue
 
-            for ((key, entries) in cached.weeks) {
-                val monday = key.toIntOrNull()
-                    ?.let { runCatching { it.toUntisLocalDate() }.getOrNull() }
-                    ?: continue
+            val offset = ChronoUnit.WEEKS.between(currentMonday, monday).toInt()
 
-                val offset = ChronoUnit.WEEKS.between(currentMonday, monday).toInt()
-
-                if (offset in -CENTER until CENTER) {
-                    weekCache[offset] = entries
-                }
+            if (offset in -CENTER until CENTER) {
+                weekCache[offset] = entries
             }
-
-            weeks = weekCache.toMap()
-            subjectsById = cached.subjects.associateBy { it.id }
-            teachersById = cached.teachers.associateBy { it.id }
-            roomsById = cached.rooms.associateBy { it.id }
-            holidays = cached.holidays
-            timegrid = cached.timegrid
-            restrictedDays = cached.restrictedDays
         }
+
+        weeks = weekCache.toMap()
+        subjectsById = cached.subjects.associateBy { it.id }
+        teachersById = cached.teachers.associateBy { it.id }
+        roomsById = cached.rooms.associateBy { it.id }
+        holidays = cached.holidays
+        timegrid = cached.timegrid
+        restrictedDays = cached.restrictedDays
     }
 
     private fun ensureWeekOffset(
@@ -540,17 +545,23 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun persistCache() {
+        val previous = TimetableCache.load(getApplication())
+
         val data = TimetableCache.Data(
             weeks = weekCache.mapKeys { (offset, _) ->
-                LocalDate.now().plusUntisWeeks(offset.toLong()).toUntisDate().toString()
+                LocalDate.now().plusUntisWeeks(offset.toLong()).toUntisWeekStart().toUntisDate().toString()
             },
-            subjects = subjectsById.values.toList(),
-            teachers = teachersById.values.toList(),
-            rooms = roomsById.values.toList(),
-            holidays = holidays,
-            timegrid = timegrid,
+            subjects = subjectsById.values.toList().ifEmpty { previous?.subjects.orEmpty() },
+            teachers = teachersById.values.toList().ifEmpty { previous?.teachers.orEmpty() },
+            rooms = roomsById.values.toList().ifEmpty { previous?.rooms.orEmpty() },
+            holidays = holidays.ifEmpty { previous?.holidays.orEmpty() },
+            timegrid = timegrid.ifEmpty { previous?.timegrid.orEmpty() },
             restrictedDays = restrictedDays,
-            lastFetch = if (lastFetch == 0L) System.currentTimeMillis() else lastFetch,
+            lastFetch = when {
+                lastFetch > 0L -> lastFetch
+                previous != null -> previous.lastFetch
+                else -> System.currentTimeMillis()
+            },
         )
 
         lastFetch = data.lastFetch
