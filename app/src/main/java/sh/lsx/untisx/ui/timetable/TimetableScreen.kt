@@ -512,7 +512,7 @@ private fun DayColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(overlayHeight)
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)),
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
                 )
             }
 
