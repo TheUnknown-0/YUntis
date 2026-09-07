@@ -28,6 +28,8 @@ object UpdateClient {
     private const val VERSION_URL = "https://lsx.sh/api/projects/untisx/version"
     private const val APK_URL = "https://lsx.sh/api/projects/untisx/apk"
 
+    private const val KEEP_OLD_APKS = 2
+
     private val json = Json { ignoreUnknownKeys = true }
     private val http = OkHttpClient()
 
@@ -97,7 +99,15 @@ object UpdateClient {
             }
 
             target
-        }
+        }.also { pruneOldApks(it.parentFile) }
+    }
+
+    private fun pruneOldApks(dir: File?) {
+        val apks = dir?.listFiles { file -> file.isFile && file.name.endsWith(".apk") } ?: return
+
+        apks.sortedByDescending { it.lastModified() }
+            .drop(KEEP_OLD_APKS + 1)
+            .forEach { runCatching { it.delete() } }
     }
 
     fun install(context: Context, file: File) {
