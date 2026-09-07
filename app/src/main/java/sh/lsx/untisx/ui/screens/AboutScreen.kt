@@ -23,7 +23,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +44,7 @@ import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.tapHaptic
 import sh.lsx.untisx.update.UpdateState
 import sh.lsx.untisx.update.UpdateViewModel
+import android.widget.Toast
 
 private const val REPO_URL = "https://codeberg.org/Losterixx/UntisX"
 private const val LICENSE_URL = "https://codeberg.org/Losterixx/UntisX/src/branch/main/LICENSE"
@@ -272,18 +278,83 @@ private fun CreditsCard(onOpen: (String) -> Unit) {
 
 @Composable
 private fun DebugCard(auth: AuthData?) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    var taps by remember { mutableIntStateOf(0) }
+    val revealed = auth != null && taps >= 3
+
+    val rows = listOf(
+        "Session ID" to auth?.session?.sessionId?.takeIf { it.isNotBlank() },
+        "Person ID" to auth?.session?.personId?.toString(),
+        "Person type" to auth?.session?.personType?.let(::personTypeName),
+        "Klasse ID" to auth?.session?.klasseId?.toString(),
+        "School login name" to auth?.loginName,
+    )
+
     AboutCard("Debug") {
-        DebugRow(
-            "Session ID",
-            auth?.session?.sessionId
-                ?.takeIf { it.isNotBlank() }
-                ?.let { it.take(16) + "..." }
-                ?: "-",
+        rows.forEach { (label, value) ->
+            DebugRow(
+                label = label,
+                value = value,
+                revealed = revealed,
+                onTap = {
+                    when {
+                        !revealed -> {
+                            taps++
+                            if (taps == 3) {
+                                Toast.makeText(
+                                    context,
+                                    "Debug values revealed. Tap a value to copy it.",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        }
+
+                        value != null -> {
+                            clipboard.setText(AnnotatedString(value))
+                            Toast.makeText(context, "$label copied", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DebugRow(
+    label: String,
+    value: String?,
+    revealed: Boolean,
+    onTap: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .tapHaptic(onTap)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(0.4f),
         )
-        DebugRow("Person ID", auth?.session?.personId?.toString() ?: "-")
-        DebugRow("Person type", personTypeName(auth?.session?.personType ?: 0))
-        DebugRow("Klasse ID", auth?.session?.klasseId?.toString() ?: "-")
-        DebugRow("School login name", auth?.loginName ?: "-")
+
+        Text(
+            text = when {
+                value == null || value == "-" -> "-"
+                revealed -> value
+                else -> "•".repeat(16)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(0.6f),
+        )
     }
 }
 
