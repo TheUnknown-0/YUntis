@@ -218,6 +218,14 @@ private fun AppRoot() {
     }
 }
 
+private enum class Screen {
+    TIMETABLE,
+    TEACHERS,
+    ROOMS,
+    SETTINGS,
+    ABOUT,
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainApp(
@@ -242,13 +250,13 @@ private fun MainApp(
     val timetableVm: TimetableViewModel = viewModel()
     val updateVm: UpdateViewModel = viewModel()
 
-    var currentScreen by remember { mutableStateOf("timetable") }
+    var currentScreen by remember { mutableStateOf(Screen.TIMETABLE) }
 
-    BackHandler(enabled = drawerState.isOpen || currentScreen != "timetable") {
+    BackHandler(enabled = drawerState.isOpen || currentScreen != Screen.TIMETABLE) {
         if (drawerState.isOpen) {
             scope.launch { drawerState.close() }
         } else {
-            currentScreen = "timetable"
+            currentScreen = Screen.TIMETABLE
         }
     }
 
@@ -318,7 +326,7 @@ private fun MainApp(
                     badge = allTeachers.size.toString(),
                     onClick = {
                         scope.launch { drawerState.close() }
-                        currentScreen = "teachers"
+                        currentScreen = Screen.TEACHERS
                     },
                 )
 
@@ -328,7 +336,7 @@ private fun MainApp(
                     badge = "...",
                     onClick = {
                         scope.launch { drawerState.close() }
-                        currentScreen = "rooms"
+                        currentScreen = Screen.ROOMS
                     },
                 )
 
@@ -340,7 +348,7 @@ private fun MainApp(
                     label = "Settings",
                     onClick = {
                         scope.launch { drawerState.close() }
-                        currentScreen = "settings"
+                        currentScreen = Screen.SETTINGS
                     },
                 )
 
@@ -349,18 +357,18 @@ private fun MainApp(
                     label = "About",
                     onClick = {
                         scope.launch { drawerState.close() }
-                        currentScreen = "about"
+                        currentScreen = Screen.ABOUT
                     },
                 )
             }
         },
     ) {
-        val isTimetable = currentScreen == "timetable"
+        val isTimetable = currentScreen == Screen.TIMETABLE
         val title = when (currentScreen) {
-            "settings" -> "Settings"
-            "teachers" -> "Teachers"
-            "rooms" -> "Rooms"
-            "about" -> "About"
+            Screen.SETTINGS -> "Settings"
+            Screen.TEACHERS -> "Teachers"
+            Screen.ROOMS -> "Rooms"
+            Screen.ABOUT -> "About"
             else -> "Timetable"
         }
 
@@ -399,7 +407,7 @@ private fun MainApp(
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(CircleShape)
-                                    .tapHaptic { currentScreen = "timetable" }
+                                    .tapHaptic { currentScreen = Screen.TIMETABLE }
                                     .padding(8.dp),
                             )
                         }
@@ -429,7 +437,7 @@ private fun MainApp(
                 },
             ) { padding ->
                 when (currentScreen) {
-                    "settings" -> SettingsScreen(
+                    Screen.SETTINGS -> SettingsScreen(
                         auth = auth,
                         theme = theme,
                         onThemeChange = onThemeChange,
@@ -450,16 +458,16 @@ private fun MainApp(
                             .padding(padding),
                     )
 
-                    "teachers" -> TeachersListScreen(
+                    Screen.TEACHERS -> TeachersListScreen(
                         teachers = allTeachers,
                         modifier = Modifier.padding(padding),
                     )
 
-                    "rooms" -> RoomsListScreen(
+                    Screen.ROOMS -> RoomsListScreen(
                         modifier = Modifier.padding(padding),
                     )
 
-                    "about" -> AboutScreen(
+                    Screen.ABOUT -> AboutScreen(
                         auth = auth,
                         modifier = Modifier
                             .fillMaxSize()
