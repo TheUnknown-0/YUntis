@@ -47,13 +47,7 @@ fun TeachersListScreen(
         if (searchQuery.isBlank()) teachers
         
         else teachers.filter { teacher ->
-            val fullName = listOfNotNull(
-                teacher.foreName.takeIf { it.isNotBlank() },
-                teacher.longName.takeIf { it.isNotBlank() },
-            ).joinToString(" ")
-
-            teacher.name.contains(searchQuery, ignoreCase = true) ||
-                fullName.contains(searchQuery, ignoreCase = true)
+            teacher.name.contains(searchQuery, ignoreCase = true) || teacher.longName.contains(searchQuery, ignoreCase = true)
         }
     }
 
@@ -105,10 +99,7 @@ fun TeachersListScreen(
 
             items(filteredTeachers, key = { it.id }) { teacher ->
                 val initials = teacher.name.take(2).uppercase()
-                val fullName = listOfNotNull(
-                    teacher.foreName.takeIf { it.isNotBlank() },
-                    teacher.longName.takeIf { it.isNotBlank() },
-                ).joinToString(" ").ifBlank { teacher.name }
+                val teacherName = teacher.longName.takeIf { it.isNotBlank() } ?: "???"
 
                 Row(
                     modifier = Modifier
@@ -133,7 +124,7 @@ fun TeachersListScreen(
                     Spacer(Modifier.width(16.dp))
 
                     Text(
-                        text = fullName,
+                        text = teacherName,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f),
