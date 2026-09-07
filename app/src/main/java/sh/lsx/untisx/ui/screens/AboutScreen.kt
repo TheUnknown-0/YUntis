@@ -261,7 +261,7 @@ private fun LegalCard(onOpen: (String) -> Unit) {
 private fun CreditsCard(onOpen: (String) -> Unit) {
     AboutCard("Credits") {
         Text(
-            text = "UntisX is heavenly inspired by BetterUntis, the open-source Untis client for Android.",
+            text = "UntisX is heavily inspired by BetterUntis, the open-source Untis client for Android.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
