@@ -1,12 +1,15 @@
 package sh.lsx.untisx.update
 
 import android.app.Application
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import sh.lsx.untisx.UntisXApp
 import java.io.File
 
 sealed interface UpdateState {
@@ -19,6 +22,11 @@ sealed interface UpdateState {
 }
 
 class UpdateViewModel(application: Application) : AndroidViewModel(application) {
+
+    companion object {
+        private const val LAST_CHECK_KEY = "last_update_check"
+        private const val CHECK_INTERVAL_MS = 6L * 60 * 60 * 1000
+    }
 
     var state by mutableStateOf<UpdateState>(UpdateState.Idle)
         private set
@@ -34,10 +42,14 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
     fun checkOnStartup() {
         if (state !is UpdateState.Idle) return
 
-        check()
+        val prefs = getApplication<Application>().getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
+
+        if (System.currentTimeMillis() - prefs.getLong(LAST_CHECK_KEY, 0) < CHECK_INTERVAL_MS) return
+
+        check(recordTimestamp = true)
     }
 
-    fun check() {
+    fun check(recordTimestamp: Boolean = false) {
         if (state is UpdateState.Downloading || state is UpdateState.Checking) return
 
         state = UpdateState.Checking
@@ -45,6 +57,12 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             try {
                 val info = UpdateClient.check(getApplication())
+
+                if (recordTimestamp) {
+                    getApplication<Application>()
+                        .getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
+                        .edit { putLong(LAST_CHECK_KEY, System.currentTimeMillis()) }
+                }
 
                 state = if (info != null) {
                     UpdateState.Available(info)
