@@ -31,9 +31,14 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -44,6 +49,20 @@ import kotlin.math.sqrt
 private val StrikeColor = Color(0xFFE53935)
 private val RibbonWidth = 6.dp
 private val SlitGap = 1.5.dp
+
+internal fun changedText(orig: String?, current: String): AnnotatedString =
+    if (orig.isNullOrBlank()) {
+        AnnotatedString(current)
+    } else {
+        buildAnnotatedString {
+            withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
+                append(orig)
+            }
+
+            append(" → ")
+            append(current)
+        }
+    }
 
 @Composable
 internal fun LessonCard(
@@ -112,7 +131,7 @@ internal fun LessonCard(
         ) {
             if (lesson.teachers.isNotBlank()) {
                 Text(
-                    text = lesson.teachers,
+                    text = changedText(lesson.origTeachers, lesson.teachers),
                     fontSize = 9.sp,
                     lineHeight = 11.sp,
                     color = bodyColor,
@@ -135,7 +154,7 @@ internal fun LessonCard(
 
             if (lesson.rooms.isNotBlank()) {
                 Text(
-                    text = lesson.rooms,
+                    text = changedText(lesson.origRooms, lesson.rooms),
                     fontSize = 9.sp,
                     lineHeight = 11.sp,
                     color = bodyColor,

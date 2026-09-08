@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.lsx.untisx.data.AppTheme
+import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
@@ -70,6 +71,7 @@ import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.ThemePrefs
 import sh.lsx.untisx.ui.components.UpdateDialog
 import sh.lsx.untisx.ui.screens.AboutScreen
+import sh.lsx.untisx.ui.screens.LessonDetailsScreen
 import sh.lsx.untisx.ui.screens.ProfileScreen
 import sh.lsx.untisx.ui.screens.LoginScreen
 import sh.lsx.untisx.ui.screens.OnboardingScreen
@@ -214,6 +216,7 @@ private fun AppRoot() {
 private enum class Screen {
     TIMETABLE,
     PROFILE,
+    LESSON_DETAILS,
     TEACHERS,
     ROOMS,
     SETTINGS,
@@ -246,6 +249,7 @@ private fun MainApp(
     val updateVm: UpdateViewModel = viewModel()
 
     var currentScreen by remember { mutableStateOf(Screen.TIMETABLE) }
+    var selectedLesson by remember { mutableStateOf<TimetableEntry?>(null) }
 
     BackHandler(enabled = drawerState.isOpen || currentScreen != Screen.TIMETABLE) {
         if (drawerState.isOpen) {
@@ -361,9 +365,10 @@ private fun MainApp(
         val isTimetable = currentScreen == Screen.TIMETABLE
         val title = when (currentScreen) {
             Screen.PROFILE -> "Profile"
-            Screen.SETTINGS -> "Settings"
+            Screen.LESSON_DETAILS -> "Lesson"
             Screen.TEACHERS -> "Teachers"
             Screen.ROOMS -> "Rooms"
+            Screen.SETTINGS -> "Settings"
             Screen.ABOUT -> "About"
             else -> "Timetable"
         }
@@ -474,12 +479,46 @@ private fun MainApp(
                             .padding(padding),
                     )
 
+                    Screen.LESSON_DETAILS -> selectedLesson?.let { lesson ->
+                        LessonDetailsScreen(
+                            entry = lesson,
+                            subjectsById = timetableVm.subjectsById,
+                            teachersById = timetableVm.teachersById,
+                            roomsById = timetableVm.roomsById,
+                            color = subjectColors[
+                                lesson.subject.firstOrNull()
+                                    ?.let { timetableVm.subjectsById[it.id]?.name?.takeIf { name -> name.isNotBlank() } ?: it.name }
+                            ]?.let { Color(it) } ?: Color(defaultSubjectColor),
+                            textColor = Color(lessonTextColor),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding),
+                        )
+                    } ?: TimetableScreen(
+                        vm = timetableVm,
+                        subjectColors = subjectColors.mapValues { Color(it.value) },
+                        defaultColor = Color(defaultSubjectColor),
+                        textColor = Color(lessonTextColor),
+                        cancelledStrike = cancelledStrike,
+                        onLessonClick = { entry ->
+                            selectedLesson = entry
+                            currentScreen = Screen.LESSON_DETAILS
+                        },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                    )
+
                     else -> TimetableScreen(
                         vm = timetableVm,
                         subjectColors = subjectColors.mapValues { Color(it.value) },
                         defaultColor = Color(defaultSubjectColor),
                         textColor = Color(lessonTextColor),
                         cancelledStrike = cancelledStrike,
+                        onLessonClick = { entry ->
+                            selectedLesson = entry
+                            currentScreen = Screen.LESSON_DETAILS
+                        },
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(padding),

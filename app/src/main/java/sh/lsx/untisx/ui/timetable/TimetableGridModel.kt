@@ -24,6 +24,8 @@ internal data class LessonDisplay(
     val subject: String,
     val rooms: String,
     val teachers: String,
+    val origRooms: String? = null,
+    val origTeachers: String? = null,
 )
 
 internal data class HourMarker(
@@ -58,6 +60,19 @@ internal fun resolveNames(
     elements
         .mapNotNull { el -> data[el.id]?.name?.takeIf { it.isNotBlank() } ?: el.name.takeIf { it.isNotBlank() } }
         .joinToString(" ")
+
+internal fun resolveOriginals(
+    elements: List<TimetableElement>,
+    data: Map<Int, MasterDataItem>,
+): String? {
+    val originals = elements.mapNotNull { el ->
+        el.orgId?.takeIf { it > 0 && it != el.id }?.let { orgId ->
+            data[orgId]?.name?.takeIf { it.isNotBlank() } ?: el.orgName?.takeIf { it.isNotBlank() } ?: "?"
+        }
+    }
+
+    return originals.takeIf { it.isNotEmpty() }?.joinToString(" ").takeIf { !it.isNullOrBlank() }
+}
 
 internal fun computeWeekDays(entries: Collection<TimetableEntry>): List<LocalDate> {
     if (entries.isEmpty()) return emptyList()

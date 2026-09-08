@@ -51,6 +51,7 @@ import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.plusUntisWeeks
 import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
+import sh.lsx.untisx.ui.util.tapHaptic
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -66,6 +67,7 @@ fun TimetableScreen(
     defaultColor: Color = Color(0xFF81D4FA),
     textColor: Color = Color(0xFF212121),
     cancelledStrike: Boolean = true,
+    onLessonClick: (TimetableEntry) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val error = vm.error
@@ -148,6 +150,7 @@ fun TimetableScreen(
                         colorFor = colorFor,
                         textColor = textColor,
                         cancelledStrike = cancelledStrike,
+                        onLessonClick = onLessonClick,
                     )
                 }
             }
@@ -171,6 +174,7 @@ private fun WeekPage(
     colorFor: (String) -> Color,
     textColor: Color,
     cancelledStrike: Boolean,
+    onLessonClick: (TimetableEntry) -> Unit,
 ) {
     when {
         loading && entries == null -> Box(
@@ -190,6 +194,8 @@ private fun WeekPage(
                         subject = resolveSubject(entry, subjectsById),
                         rooms = resolveNames(entry.room, roomsById),
                         teachers = resolveNames(entry.teacher, teachersById),
+                        origRooms = resolveOriginals(entry.room, roomsById),
+                        origTeachers = resolveOriginals(entry.teacher, teachersById),
                     )
                 }
             }
@@ -219,6 +225,7 @@ private fun WeekPage(
                     colorFor = colorFor,
                     textColor = textColor,
                     cancelledStrike = cancelledStrike,
+                    onLessonClick = onLessonClick,
                 )
             }
         }
@@ -303,6 +310,7 @@ private fun WeekGrid(
     colorFor: (String) -> Color,
     textColor: Color,
     cancelledStrike: Boolean,
+    onLessonClick: (TimetableEntry) -> Unit,
 ) {
     val today = rememberToday()
     val byDate = remember(displays) { displays.groupBy { it.entry.date } }
@@ -334,6 +342,7 @@ private fun WeekGrid(
                 colorFor = colorFor,
                 textColor = textColor,
                 cancelledStrike = cancelledStrike,
+                onLessonClick = onLessonClick,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -407,6 +416,7 @@ private fun DayColumn(
     colorFor: (String) -> Color,
     textColor: Color,
     cancelledStrike: Boolean,
+    onLessonClick: (TimetableEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dayStartMinutes = minutesOf(dayStart)
@@ -510,7 +520,8 @@ private fun DayColumn(
                         .fillMaxWidth()
                         .offset(y = top)
                         .padding(horizontal = 1.dp)
-                        .height(lessonHeight),
+                        .height(lessonHeight)
+                        .tapHaptic { onLessonClick(entry) },
                 )
             }
         }
