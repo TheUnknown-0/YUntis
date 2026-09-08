@@ -247,7 +247,9 @@ private fun MainApp(
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val timetableVm: TimetableViewModel = viewModel()
+    val timetableVm: TimetableViewModel = viewModel(
+        key = "${auth.loginName}:${auth.session.personId}",
+    )
     val updateVm: UpdateViewModel = viewModel()
 
     var currentScreen by remember { mutableStateOf(Screen.TIMETABLE) }
