@@ -44,6 +44,16 @@ android {
             signingConfig = if (useReleaseSigning) {
                 signingConfigs.getByName("release")
             } else {
+                if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
+                    val answer = System.console()?.readLine(
+                        "WARNING: untisx.keystore missing - this release will be signed with the DEBUG key. Continue? [y/N] "
+                    )
+
+                    if (answer?.trim()?.lowercase() != "y") {
+                        throw GradleException("Release build aborted: untisx.keystore missing or keystorePassword not set.")
+                    }
+                }
+
                 signingConfigs.getByName("debug")
             }
         }
