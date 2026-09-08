@@ -51,7 +51,9 @@ import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.plusUntisWeeks
 import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.TextStyle
 import java.util.Locale
@@ -224,11 +226,26 @@ private fun WeekPage(
 }
 
 @Composable
+private fun rememberToday(): LocalDate {
+    var today by remember { mutableStateOf(LocalDate.now()) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            val now = LocalDateTime.now()
+            today = now.toLocalDate()
+            delay(Duration.between(now, now.toLocalDate().plusDays(1).atStartOfDay()).toMillis())
+        }
+    }
+
+    return today
+}
+
+@Composable
 private fun DayHeadersRow(
     weekDays: List<LocalDate>,
     modifier: Modifier = Modifier,
 ) {
-    val today = remember { LocalDate.now() }
+    val today = rememberToday()
 
     Row(
         modifier = modifier
@@ -287,7 +304,7 @@ private fun WeekGrid(
     textColor: Color,
     cancelledStrike: Boolean,
 ) {
-    val today = remember { LocalDate.now() }
+    val today = rememberToday()
     val byDate = remember(displays) { displays.groupBy { it.entry.date } }
 
     Row(
