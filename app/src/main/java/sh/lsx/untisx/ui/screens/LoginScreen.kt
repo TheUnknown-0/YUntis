@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,7 +43,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.lsx.untisx.data.prefs.AuthData
-import sh.lsx.untisx.data.prefs.AuthPrefs
+import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.School
@@ -50,7 +51,7 @@ import sh.lsx.untisx.ui.util.Haptics
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(modifier: Modifier = Modifier) {
+fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
@@ -120,6 +121,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
 
     fun signIn() {
         val school = selectedSchool ?: return
+        val signedInUser = user.trim()
 
         signingIn = true
         error = null
@@ -129,17 +131,17 @@ fun LoginScreen(modifier: Modifier = Modifier) {
                 val result = UntisClient.authenticate(
                     server = school.server,
                     loginName = school.loginName,
-                    user = user.trim(),
+                    user = signedInUser,
                     password = password,
                 )
 
-                AuthPrefs.save(
+                AccountPrefs.addAccount(
                     context,
                     AuthData(
                         server = school.server,
                         loginName = school.loginName,
                         displayName = school.displayName,
-                        user = user.trim(),
+                        user = signedInUser,
                         password = password,
                         session = result,
                     ),
@@ -147,6 +149,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
 
                 signedIn = true
                 error = null
+                onDone?.invoke()
             } catch (e: UntisException.Network) {
                 error = e.message
             } catch (e: UntisException.BadCredentials) {

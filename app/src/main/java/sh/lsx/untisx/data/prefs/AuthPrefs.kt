@@ -24,7 +24,7 @@ object AuthPrefs {
 
     const val KEY_BLOB = "auth_blob"
 
-    private val json = Json { ignoreUnknownKeys = true }
+    internal val json = Json { ignoreUnknownKeys = true }
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
@@ -34,12 +34,6 @@ object AuthPrefs {
         val plain = Crypto.decrypt(encoded) ?: return null
 
         return runCatching { json.decodeFromString<AuthData>(plain) }.getOrNull()
-    }
-
-    fun save(context: Context, data: AuthData) {
-        prefs(context).edit {
-            putString(KEY_BLOB, Crypto.encrypt(json.encodeToString(data)))
-        }
     }
 
     fun clear(context: Context) {

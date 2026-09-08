@@ -9,14 +9,12 @@ import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.TimegridDay
 import java.io.File
+import java.security.MessageDigest
 
 object TimetableCache {
 
-    private const val FILE_NAME = "timetable_cache.json"
-
-    // Bump when the meaning of stored data changes, so stale caches are
-    // discarded instead of served (e.g. when per-day restriction tracking
-    // was introduced, old caches had no restriction info at all).
+    private const val LEGACY_FILE_NAME = "timetable_cache.json"
+    private const val FILE_PREFIX = "timetable_cache_"
     private const val VERSION = 2
 
     private val json = Json {
@@ -37,10 +35,22 @@ object TimetableCache {
         val version: Int = 0,
     )
 
-    private fun file(context: Context) = File(context.filesDir, FILE_NAME)
+    private fun fileName(accountId: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(accountId.toByteArray(Charsets.UTF_8))
 
-    fun load(context: Context): Data? {
-        val file = file(context)
+        return FILE_PREFIX + digest.joinToString("") { "%02x".format(it) } + ".json"
+    }
+
+    private fun file(context: Context, accountId: String) =
+        File(context.filesDir, fileName(accountId))
+
+    private fun legacyFile(context: Context) = File(context.filesDir, LEGACY_FILE_NAME)
+
+    fun load(context: Context, accountId: String): Data? {
+        migrateLegacy(context, accountId)
+
+        val file = file(context, accountId)
 
         if (!file.exists()) return null
 
@@ -51,13 +61,28 @@ object TimetableCache {
         }.getOrNull()
     }
 
-    fun save(context: Context, data: Data) {
+    fun save(context: Context, accountId: String, data: Data) {
         runCatching {
-            file(context).writeText(json.encodeToString(data.copy(version = VERSION)))
+            file(context, accountId).writeText(json.encodeToString(data.copy(version = VERSION)))
         }
     }
 
-    fun clear(context: Context) {
-        runCatching { file(context).delete() }
+    fun clear(context: Context, accountId: String) {
+        runCatching { file(context, accountId).delete() }
+    }
+
+    private fun migrateLegacy(context: Context, accountId: String) {
+        val legacy = legacyFile(context)
+
+        if (!legacy.exists()) return
+
+        val hasAccountCaches = context.filesDir.listFiles()
+            ?.any { it.name.startsWith(FILE_PREFIX) } == true
+
+        if (!hasAccountCaches) {
+            runCatching { legacy.renameTo(file(context, accountId)) }.onFailure { legacy.delete() }
+        } else {
+            legacy.delete()
+        }
     }
 }

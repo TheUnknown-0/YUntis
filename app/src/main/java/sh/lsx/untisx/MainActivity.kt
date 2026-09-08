@@ -64,14 +64,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.lsx.untisx.data.AppTheme
 import sh.lsx.untisx.data.prefs.AuthData
-import sh.lsx.untisx.data.api.UntisClient
-import sh.lsx.untisx.data.prefs.AuthPrefs
+import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.ThemePrefs
-import sh.lsx.untisx.data.TimetableCache
 import sh.lsx.untisx.ui.components.UpdateDialog
 import sh.lsx.untisx.ui.screens.AboutScreen
+import sh.lsx.untisx.ui.screens.ProfileScreen
 import sh.lsx.untisx.ui.screens.LoginScreen
 import sh.lsx.untisx.ui.screens.OnboardingScreen
 import sh.lsx.untisx.ui.screens.RoomsListScreen
@@ -109,7 +108,7 @@ private fun AppRoot() {
     val context = LocalContext.current
     var theme by remember { mutableStateOf(ThemePrefs.get(context)) }
     var onboardingDone by remember { mutableStateOf(readOnboardingDone(context)) }
-    var auth by remember { mutableStateOf(AuthPrefs.load(context)) }
+    var auth by remember { mutableStateOf(AccountPrefs.getActive(context)) }
     var hapticsEnabled by remember { mutableStateOf(HapticsPrefs.isEnabled(context)) }
     var subjectColors by remember { mutableStateOf(SubjectColorsPrefs.getColors(context)) }
     var knownSubjects by remember { mutableStateOf(SubjectColorsPrefs.getKnown(context)) }
@@ -128,8 +127,8 @@ private fun AppRoot() {
                 onboardingDone = readOnboardingDone(context)
             }
 
-            if (key == AuthPrefs.KEY_BLOB) {
-                auth = AuthPrefs.load(context)
+            if (key == AccountPrefs.KEY_ACCOUNTS || key == AccountPrefs.KEY_ACTIVE) {
+                auth = AccountPrefs.getActive(context)
             }
 
             if (key == HapticsPrefs.KEY) {
@@ -150,20 +149,6 @@ private fun AppRoot() {
     }
 
     fun saveTheme(newTheme: AppTheme) = ThemePrefs.save(context, newTheme)
-
-    val scope = rememberCoroutineScope()
-
-    val onLogout = {
-        AuthPrefs.load(context)?.let { auth ->
-            scope.launch {
-                UntisClient.logout(auth)
-            }
-        }
-
-        AuthPrefs.clear(context)
-        TimetableCache.clear(context)
-        SubjectColorsPrefs.clear(context)
-    }
 
     CompositionLocalProvider(LocalHapticsEnabled provides hapticsEnabled) {
         UntisXTheme(mode = theme.mode, preset = theme.preset) {
@@ -203,7 +188,6 @@ private fun AppRoot() {
                         onThemeChange = ::saveTheme,
                         hapticsEnabled = hapticsEnabled,
                         onHapticsChange = { HapticsPrefs.setEnabled(context, it) },
-                        onLogout = onLogout,
                         subjectColors = subjectColors,
                         knownSubjects = knownSubjects,
                         onSubjectColor = { name, argb -> SubjectColorsPrefs.setColor(context, name, argb) },
@@ -229,6 +213,7 @@ private fun AppRoot() {
 
 private enum class Screen {
     TIMETABLE,
+    PROFILE,
     TEACHERS,
     ROOMS,
     SETTINGS,
@@ -243,7 +228,6 @@ private fun MainApp(
     onThemeChange: (AppTheme) -> Unit,
     hapticsEnabled: Boolean,
     onHapticsChange: (Boolean) -> Unit,
-    onLogout: () -> Unit,
     subjectColors: Map<String, Int>,
     knownSubjects: List<String>,
     onSubjectColor: (String, Int?) -> Unit,
@@ -376,6 +360,7 @@ private fun MainApp(
     ) {
         val isTimetable = currentScreen == Screen.TIMETABLE
         val title = when (currentScreen) {
+            Screen.PROFILE -> "Profile"
             Screen.SETTINGS -> "Settings"
             Screen.TEACHERS -> "Teachers"
             Screen.ROOMS -> "Rooms"
@@ -438,7 +423,7 @@ private fun MainApp(
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(CircleShape)
-                                    .tapHaptic { /* TODO: profile */ }
+                                    .tapHaptic { currentScreen = Screen.PROFILE }
                                     .padding(8.dp),
                             )
                         } else {
@@ -448,13 +433,17 @@ private fun MainApp(
                 },
             ) { padding ->
                 when (currentScreen) {
+                    Screen.PROFILE -> ProfileScreen(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                    )
+
                     Screen.SETTINGS -> SettingsScreen(
-                        auth = auth,
                         theme = theme,
                         onThemeChange = onThemeChange,
                         hapticsEnabled = hapticsEnabled,
                         onHapticsChange = onHapticsChange,
-                        onLogout = onLogout,
                         knownSubjects = knownSubjects,
                         subjectColors = subjectColors,
                         onSubjectColor = onSubjectColor,
@@ -486,6 +475,7 @@ private fun MainApp(
                     )
 
                     else -> TimetableScreen(
+                        vm = timetableVm,
                         subjectColors = subjectColors.mapValues { Color(it.value) },
                         defaultColor = Color(defaultSubjectColor),
                         textColor = Color(lessonTextColor),

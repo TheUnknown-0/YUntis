@@ -37,7 +37,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import sh.lsx.untisx.data.AppTheme
-import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.ui.components.ColorPickerDialog
 import sh.lsx.untisx.ui.components.ThemeSettingsContent
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
@@ -46,12 +45,10 @@ import sh.lsx.untisx.ui.util.tapHaptic
 
 @Composable
 fun SettingsScreen(
-    auth: AuthData?,
     theme: AppTheme,
     onThemeChange: (AppTheme) -> Unit,
     hapticsEnabled: Boolean,
     onHapticsChange: (Boolean) -> Unit,
-    onLogout: () -> Unit,
     knownSubjects: List<String>,
     subjectColors: Map<String, Int>,
     onSubjectColor: (String, Int?) -> Unit,
@@ -235,38 +232,6 @@ fun SettingsScreen(
                 }
             }
         }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ),
-        ) {
-            Column(Modifier.padding(18.dp)) {
-                Text("Account", style = MaterialTheme.typography.titleMedium)
-
-                Spacer(Modifier.height(12.dp))
-
-                if (auth == null) {
-                    Text(
-                        text = "Not signed in.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    SettingsRow("User", auth.user)
-                    SettingsRow("School", auth.displayName)
-                    SettingsRow("Server", auth.server)
-
-                    Spacer(Modifier.height(12.dp))
-
-                    Button(onClick = Haptics.haptic(onLogout)) {
-                        Text("Logout")
-                    }
-                }
-            }
-        }
     }
 
     colorDialogFor?.let { subjectName ->
@@ -336,30 +301,6 @@ private fun ColorRow(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun SettingsRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(0.4f),
-        )
-
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(0.6f),
         )
     }
 }

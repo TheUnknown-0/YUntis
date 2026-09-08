@@ -15,8 +15,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AuthData
-import sh.lsx.untisx.data.prefs.AuthPrefs
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.TimetableCache
 import sh.lsx.untisx.data.api.UntisClient
@@ -82,7 +82,10 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            val cached = withContext(Dispatchers.IO) { TimetableCache.load(getApplication()) }
+            val account = AccountPrefs.getActive(getApplication())
+            val cached = account?.let {
+                withContext(Dispatchers.IO) { TimetableCache.load(getApplication(), AccountPrefs.accountId(it)) }
+            }
 
             if (cached != null) {
                 Log.d(TAG, "cache loaded: ${cached.weeks.size} weeks, lastFetch=${cached.lastFetch}")
@@ -261,7 +264,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun requireAuth(): AuthData = auth
-            ?: AuthPrefs.load(getApplication())?.also { auth = it }
+            ?: AccountPrefs.getActive(getApplication())?.also { auth = it }
             ?: throw UntisException.BadCredentials
 
     private suspend fun fetchWeekForOffset(claimed: Int, monday: LocalDate): WeekFetch {
@@ -533,7 +536,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun persistSession(updated: AuthData) {
         auth = updated
-        AuthPrefs.save(getApplication(), updated)
+        AccountPrefs.updateSession(getApplication(), updated)
     }
 
     private suspend fun release(offset: Int) = flightLock.withLock {
@@ -545,7 +548,9 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun persistCache() {
-        val previous = TimetableCache.load(getApplication())
+        val currentAuth = auth ?: return
+        val accountId = AccountPrefs.accountId(currentAuth)
+        val previous = TimetableCache.load(getApplication(), accountId)
 
         val data = TimetableCache.Data(
             weeks = weekCache.mapKeys { (offset, _) ->
@@ -565,7 +570,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         )
 
         lastFetch = data.lastFetch
-        TimetableCache.save(getApplication(), data)
+        TimetableCache.save(getApplication(), accountId, data)
     }
 
     private fun friendly(e: Exception): String = when (e) {
