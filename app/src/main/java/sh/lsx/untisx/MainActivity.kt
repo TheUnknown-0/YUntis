@@ -64,6 +64,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.lsx.untisx.data.AppTheme
 import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.prefs.AuthPrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
 import sh.lsx.untisx.data.SubjectColorsPrefs
@@ -150,7 +151,15 @@ private fun AppRoot() {
 
     fun saveTheme(newTheme: AppTheme) = ThemePrefs.save(context, newTheme)
 
+    val scope = rememberCoroutineScope()
+
     val onLogout = {
+        AuthPrefs.load(context)?.let { auth ->
+            scope.launch {
+                UntisClient.logout(auth)
+            }
+        }
+
         AuthPrefs.clear(context)
         TimetableCache.clear(context)
         SubjectColorsPrefs.clear(context)

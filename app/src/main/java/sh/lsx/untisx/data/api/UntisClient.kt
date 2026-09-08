@@ -120,6 +120,12 @@ object UntisClient {
         }
     }
 
+    suspend fun logout(auth: AuthData) = withContext(Dispatchers.IO) {
+        runCatching { rpcCall(auth, "logout") }
+            .onFailure { Log.d(TAG, "server logout failed: ${it.message}") }
+        Unit
+    }
+
     suspend fun getTimetable(
         auth: AuthData,
         startDate: Int,
