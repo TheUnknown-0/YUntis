@@ -19,10 +19,12 @@ import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.TimetableCache
+import sh.lsx.untisx.data.api.SessionManager
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
+import sh.lsx.untisx.data.prefs.PasswordVault
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.TimegridDay
 import sh.lsx.untisx.data.model.plusUntisWeeks
@@ -38,6 +40,15 @@ import java.util.Locale
 
 class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
+    sealed interface LoadError {
+        val message: String
+
+        data class Network(override val message: String) : LoadError
+        data class Auth(override val message: String) : LoadError
+        data class Server(override val message: String) : LoadError
+        data class Unknown(override val message: String) : LoadError
+    }
+
     companion object {
         const val WEEK_SPAN = 104
         const val CENTER = WEEK_SPAN / 2
@@ -51,7 +62,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var loadingWeeks by mutableStateOf<Set<Int>>(emptySet())
         private set
-    var error by mutableStateOf<String?>(null)
+    var error by mutableStateOf<LoadError?>(null)
         private set
     var info by mutableStateOf<String?>(null)
         private set
@@ -247,13 +258,13 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                     loadStaticData()
                 }
             } catch (e: Exception) {
-                Log.d(TAG, "week $claimed failed: ${e.message}")
+                Log.d(TAG, "week $claimed failed")
                 synchronized(failedWeeks) { failedWeeks.add(claimed) }
 
                 if (force && weekCache.isNotEmpty()) {
                     info = refreshFailureMessage(e)
                 } else {
-                    error = friendly(e)
+                    error = classify(e)
                 }
             } finally {
                 release(claimed)
@@ -267,18 +278,30 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             ?: AccountPrefs.getActive(getApplication())?.also { auth = it }
             ?: throw UntisException.BadCredentials
 
+    private fun withPassword(): String {
+        val id = AccountPrefs.accountId(requireAuth())
+
+        return PasswordVault.retrieve(getApplication(), id)
+            ?: throw UntisException.BadCredentials
+    }
+
     private suspend fun fetchWeekForOffset(claimed: Int, monday: LocalDate): WeekFetch {
         val currentAuth = requireAuth()
 
         return if (claimed > 0) {
             try {
                 WeekFetch(
-                    UntisClient.getTimetableIntern(currentAuth, monday, monday.plusDays(6)),
+                    UntisClient.getTimetableIntern(
+                        currentAuth,
+                        withPassword(),
+                        monday,
+                        monday.plusDays(6),
+                    ),
                     currentAuth,
                     allRefused = false,
                 )
             } catch (e: Exception) {
-                Log.d(TAG, "mobile API failed for week $claimed: ${e.message}")
+                Log.d(TAG, "mobile API failed for week $claimed")
                 weekViaLegacy(currentAuth, monday)
             }
         } else {
@@ -288,7 +311,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun weekViaLegacy(auth: AuthData, monday: LocalDate): WeekFetch {
         return try {
-            val (entries, fresh) = UntisClient.withAuth(auth) { a ->
+            val (entries, fresh) = SessionManager.withValidSession(getApplication(), auth) { a ->
                 UntisClient.getTimetable(
                     auth = a,
                     startDate = monday.toUntisDate(),
@@ -301,8 +324,8 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             if (e.code != -7004 && e.code != -8507) throw e
 
             val intern = runCatching {
-                UntisClient.getTimetableIntern(auth, monday, monday.plusDays(6))
-            }.onFailure { Log.d(TAG, "mobile API failed: ${it.message}") }.getOrNull()
+                UntisClient.getTimetableIntern(auth, withPassword(), monday, monday.plusDays(6))
+            }.onFailure { Log.d(TAG, "mobile API failed") }.getOrNull()
 
             if (!intern.isNullOrEmpty()) {
                 WeekFetch(intern, auth, allRefused = false)
@@ -342,7 +365,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             val day = monday.plusDays(i.toLong())
 
             try {
-                val (entries, fresh) = UntisClient.withAuth(latest) { a ->
+                val (entries, fresh) = SessionManager.withValidSession(getApplication(), latest) { a ->
                     UntisClient.getTimetable(
                         auth = a,
                         startDate = day.toUntisDate(),
@@ -422,7 +445,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                     val from = today.minusMonths(fromMonths).toUntisDate()
                     val to = today.plusMonths(toMonths).toUntisDate()
 
-                    val (entries, fresh) = UntisClient.withAuth(currentAuth) { a ->
+                    val (entries, fresh) = SessionManager.withValidSession(getApplication(), currentAuth) { a ->
                         UntisClient.getTimetable(auth = a, startDate = from, endDate = to)
                     }
 
@@ -453,8 +476,10 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun resolveTimegrid(currentAuth: AuthData): List<TimegridDay> {
+        val password = { withPassword() }
+
         val attempts: List<Pair<String, suspend () -> List<TimegridDay>>> = listOf(
-            "getUserData2017" to { UntisClient.fetchTimegridViaUserData(currentAuth) },
+            "getUserData2017" to { UntisClient.fetchTimegridViaUserData(currentAuth, password()) },
             "getTimegrid (internal rpc)" to { UntisClient.fetchTimegridFromInternalRpc(currentAuth) },
             "getTimegrid (public rpc)" to { UntisClient.fetchTimegridRpc(currentAuth) },
         )
@@ -463,7 +488,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             val days = try {
                 attempt()
             } catch (e: Exception) {
-                Log.d(TAG, "timegrid via $name failed: ${e.message}")
+                Log.d(TAG, "timegrid via $name failed")
                 null
             } ?: continue
 
@@ -571,6 +596,14 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
         lastFetch = data.lastFetch
         TimetableCache.save(getApplication(), accountId, data)
+    }
+
+    private fun classify(e: Exception): LoadError = when (e) {
+        is UntisException.Network -> LoadError.Network(friendly(e))
+        is UntisException.BadCredentials -> LoadError.Auth(friendly(e))
+        is UntisException.SessionExpired -> LoadError.Auth(friendly(e))
+        is UntisException.Api -> LoadError.Server(friendly(e))
+        else -> LoadError.Unknown(friendly(e))
     }
 
     private fun friendly(e: Exception): String = when (e) {

@@ -540,8 +540,8 @@ private fun MainApp(
                 }
 
                 if (isTimetable) {
-                    timetableVm.error?.let { message ->
-                        ErrorBanner(text = message, onRetry = timetableVm::retry)
+                    timetableVm.error?.let { loadError ->
+                        ErrorBanner(text = loadError.message, onRetry = timetableVm::retry)
                     }
 
                     timetableVm.info?.let { message ->

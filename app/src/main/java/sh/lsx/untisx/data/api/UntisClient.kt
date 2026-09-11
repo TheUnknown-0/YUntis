@@ -20,6 +20,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -82,10 +83,10 @@ object UntisClient {
             val result = executeRpc(SCHOOL_SEARCH_URL, "searchSchool", params)
             val schools = json.decodeFromJsonElement<SchoolSearchResult>(result).schools
 
-            Log.d(TAG, "search '$query' -> ${schools.size} schools")
+            Log.d(TAG, "school search -> ${schools.size} schools")
             schools.take(20)
         } catch (e: UntisException.Api) {
-            Log.d(TAG, "search '$query' -> Api error ${e.code}: ${e.message}")
+            Log.d(TAG, "school search API error ${e.code}")
             if (e.code == -6003) throw UntisException.TooManyResults
             emptyList()
         }
@@ -104,25 +105,9 @@ object UntisClient {
             json.decodeFromJsonElement<AuthResult>(result)
         }
 
-    suspend fun <T> withAuth(
-        auth: AuthData,
-        request: suspend (AuthData) -> T,
-    ): Pair<T, AuthData?> {
-        return try {
-            request(auth) to null
-        } catch (e: UntisException.SessionExpired) {
-            Log.d(TAG, "session expired -> re-authenticating as ${auth.user}")
-
-            val fresh = authenticate(auth.server, auth.loginName, auth.user, auth.password)
-            val updated = auth.copy(session = fresh)
-
-            request(updated) to updated
-        }
-    }
-
     suspend fun logout(auth: AuthData) = withContext(Dispatchers.IO) {
         runCatching { rpcCall(auth, "logout") }
-            .onFailure { Log.d(TAG, "server logout failed: ${it.message}") }
+            .onFailure { Log.d(TAG, "server logout failed") }
         Unit
     }
 
@@ -204,7 +189,7 @@ object UntisClient {
         }
     }
 
-    private fun internTotp(auth: AuthData): InternTotp {
+    private fun internTotp(auth: AuthData, password: String): InternTotp {
         val url = buildInternalRpcUrl(auth.server, auth.loginName).toString()
 
         val secret = executeRpc(
@@ -213,7 +198,7 @@ object UntisClient {
             buildJsonArray {
                 add(buildJsonObject {
                     put("userName", auth.user)
-                    put("password", auth.password)
+                    put("password", password)
                 })
             },
         ).jsonPrimitive.contentOrNull
@@ -229,8 +214,8 @@ object UntisClient {
         )
     }
 
-    suspend fun fetchTimegridViaUserData(auth: AuthData): List<TimegridDay> = withContext(Dispatchers.IO) {
-        val totp = internTotp(auth)
+    suspend fun fetchTimegridViaUserData(auth: AuthData, password: String): List<TimegridDay> = withContext(Dispatchers.IO) {
+        val totp = internTotp(auth, password)
 
         val result = executeRpc(
             totp.url,
@@ -296,10 +281,11 @@ object UntisClient {
 
     suspend fun getTimetableIntern(
         auth: AuthData,
+        password: String,
         from: LocalDate,
         to: LocalDate,
     ): List<TimetableEntry> = withContext(Dispatchers.IO) {
-        val totp = internTotp(auth)
+        val totp = internTotp(auth, password)
         val session = auth.session
 
         val (elementId, elementType) = when {
@@ -431,9 +417,20 @@ object UntisClient {
         buildUrl(server, loginName, "jsonrpc_intern.do")
 
     private fun buildUrl(server: String, loginName: String, rpcPath: String): HttpUrl {
-        val host = server.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
-        return "https://$host/WebUntis/$rpcPath".toHttpUrl()
-            .newBuilder()
+        val trimmed = server.trim()
+        val raw = buildString {
+            if (!trimmed.contains("://")) append("https://")
+            append(trimmed.removePrefix("https://").removePrefix("http://").trimEnd('/'))
+        }
+
+        val base = raw.toHttpUrlOrNull() ?: throw UntisException.Api(-1, "Invalid server URL: $trimmed")
+
+        if (!base.isHttps) {
+            throw UntisException.Api(-1, "Only HTTPS servers are supported: $trimmed")
+        }
+
+        return base.newBuilder()
+            .addPathSegments("WebUntis/$rpcPath")
             .addQueryParameter("school", loginName.trim())
             .build()
     }
@@ -454,13 +451,10 @@ object UntisClient {
 
         return try {
             http.newCall(request).execute().use { response ->
-                val text = response.body?.string()
-                val rpc = text?.let {
-                    runCatching { json.decodeFromString<JsonRpcResponse>(it) }.getOrNull()
-                }
+                val rpc = response.body?.string()?.let { runCatching { json.decodeFromString<JsonRpcResponse>(it) }.getOrNull() }
 
                 rpc?.error?.let { err ->
-                    Log.d(TAG, "rpc '$method' error ${err.code}: ${err.message}")
+                    Log.d(TAG, "rpc '$method' error ${err.code}")
 
                     throw when (err.code) {
                         -8500 -> UntisException.BadCredentials
@@ -470,19 +464,19 @@ object UntisClient {
                 }
 
                 if (!response.isSuccessful) {
-                    Log.d(TAG, "rpc '$method' http ${response.code}, body=${text?.take(300)}")
+                    Log.d(TAG, "rpc '$method' http ${response.code}")
                     throw UntisException.Network
                 }
 
                 if (rpc == null) {
-                    Log.d(TAG, "rpc '$method' unparseable body: ${text?.take(300)}")
+                    Log.d(TAG, "rpc '$method' returned an unparseable response")
                     throw UntisException.Network
                 }
 
                 rpc.result ?: throw UntisException.Api(-1, "Empty result.")
             }
         } catch (e: IOException) {
-            Log.d(TAG, "rpc '$method' to $url failed: $e")
+            Log.d(TAG, "rpc '$method' network failure")
             throw UntisException.Network
         }
     }

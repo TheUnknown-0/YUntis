@@ -81,13 +81,15 @@ fun LessonDetailsScreen(
                     color = textColor,
                 )
 
-                if (subjectEl?.let { subjectsById[it.id]?.longName }?.isNotBlank() == true) {
-                    Text(
-                        text = subjectsById[subjectEl.id]!!.longName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = textColor.copy(alpha = 0.8f),
-                    )
-                }
+                subjectEl?.let { it -> subjectsById[it.id]?.longName }
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = textColor.copy(alpha = 0.8f),
+                        )
+                    }
 
                 Text(
                     text = formatLessonDate(date, entry),

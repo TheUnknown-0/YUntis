@@ -13,6 +13,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class UpdateInfo(
     val versionName: String,
@@ -82,14 +83,14 @@ object UpdateClient {
         )
     }
 
-    private fun parseTag(tag: String): List<Int>? =
+    internal fun parseTag(tag: String): List<Int>? =
         tag.trim()
             .removePrefix("v")
             .substringBefore("-")
             .split(".")
             .map { it.toIntOrNull() ?: return null }
 
-    private fun compareVersions(a: List<Int>, b: List<Int>): Int {
+    internal fun compareVersions(a: List<Int>, b: List<Int>): Int {
         for (i in 0 until maxOf(a.size, b.size)) {
             val left = a.getOrElse(i) { 0 }
             val right = b.getOrElse(i) { 0 }
@@ -100,7 +101,7 @@ object UpdateClient {
         return 0
     }
 
-    private fun isNewer(candidate: List<Int>, installedName: String): Boolean {
+    internal fun isNewer(candidate: List<Int>, installedName: String): Boolean {
         val installed = parseTag(installedName) ?: return true
 
         for (i in 0 until maxOf(candidate.size, installed.size)) {
@@ -118,50 +119,80 @@ object UpdateClient {
         info: UpdateInfo,
         onProgress: (Float) -> Unit,
     ): File = withContext(Dispatchers.IO) {
-        val request = Request.Builder().url(info.downloadUrl).build()
+        val downloadUrl = info.downloadUrl.toHttpUrlOrNull() ?: throw IllegalStateException("Invalid update URL")
+        require(downloadUrl.isHttps && downloadUrl.host == "codeberg.org") {
+            "Untrusted update source"
+        }
 
-        http.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw IllegalStateException("Codeberg answered with ${response.code}")
-            }
+        val request = Request.Builder().url(downloadUrl).build()
 
-            val body = response.body
-            val total = body.contentLength()
-            val target = File(context.cacheDir, "updates/UntisX-v${info.versionName}.apk")
-            target.parentFile?.mkdirs()
+        try {
+            http.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw IllegalStateException("Codeberg answered with ${response.code}")
+                }
 
-            var lastPercent = -1
+                val body = response.body
+                val total = body.contentLength()
+                val target = File(context.cacheDir, "updates/UntisX-v${info.versionName}.apk")
+                val temporary = File(target.parentFile, "${target.name}.part")
 
-            body.byteStream().use { input ->
-                target.outputStream().use { output ->
-                    val buffer = ByteArray(64 * 1024)
-                    var written = 0L
-                    var read: Int
+                target.parentFile?.mkdirs()
+                temporary.delete()
 
-                    while (input.read(buffer).also { read = it } != -1) {
-                        output.write(buffer, 0, read)
-                        written += read
+                var lastPercent = -1
 
-                        if (total > 0) {
-                            val percent = (written * 100 / total).toInt()
+                try {
+                    body.byteStream().use { input ->
+                        temporary.outputStream().use { output ->
+                            val buffer = ByteArray(64 * 1024)
+                            var written = 0L
+                            var read: Int
 
-                            if (percent != lastPercent) {
-                                lastPercent = percent
-                                onProgress(written.toFloat() / total)
+                            while (input.read(buffer).also { read = it } != -1) {
+                                output.write(buffer, 0, read)
+                                written += read
+
+                                if (total > 0) {
+                                    val percent = (written * 100 / total).toInt()
+
+                                    if (percent != lastPercent) {
+                                        lastPercent = percent
+                                        onProgress(written.toFloat() / total)
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            }
 
-            target
-        }.also { pruneOldApks(it.parentFile) }
+                    if (temporary.length() == 0L) {
+                        throw IllegalStateException("Downloaded update is empty")
+                    }
+
+                    if (!temporary.renameTo(target)) {
+                        throw IllegalStateException("Could not finalize update download")
+                    }
+                } catch (e: Exception) {
+                    temporary.delete()
+                    throw e
+                }
+
+                target
+            }
+        } finally {
+            pruneOldApks(File(context.cacheDir, "updates"))
+        }
     }
 
     private fun pruneOldApks(dir: File?) {
-        val apks = dir?.listFiles { file -> file.isFile && file.name.endsWith(".apk") } ?: return
+        val files = dir?.listFiles { file -> file.isFile && (file.name.endsWith(".apk") || file.name.endsWith(".part")) }
+            ?: return
 
-        apks.sortedByDescending { it.lastModified() }
+        files.filter { it.name.endsWith(".part") }
+            .forEach { runCatching { it.delete() } }
+
+        files.filter { it.name.endsWith(".apk") }
+            .sortedByDescending { it.lastModified() }
             .drop(KEEP_OLD_APKS + 1)
             .forEach { runCatching { it.delete() } }
     }

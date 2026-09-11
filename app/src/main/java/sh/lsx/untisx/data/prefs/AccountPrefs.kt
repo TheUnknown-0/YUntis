@@ -3,6 +3,7 @@ package sh.lsx.untisx.data.prefs
 import android.content.Context
 import kotlinx.serialization.builtins.ListSerializer
 import sh.lsx.untisx.UntisXApp
+import sh.lsx.untisx.data.TimetableCache
 import sh.lsx.untisx.data.security.Crypto
 import androidx.core.content.edit
 
@@ -29,7 +30,10 @@ object AccountPrefs {
 
     private fun saveAccounts(context: Context, accounts: List<AuthData>) {
         prefs(context).edit {
-            putString(KEY_ACCOUNTS, Crypto.encrypt(json.encodeToString(ListSerializer(AuthData.serializer()), accounts)))
+            putString(
+                KEY_ACCOUNTS,
+                Crypto.encrypt(json.encodeToString(ListSerializer(AuthData.serializer()), accounts)),
+            )
         }
     }
 
@@ -49,11 +53,12 @@ object AccountPrefs {
         prefs(context).edit { putString(KEY_ACTIVE, id) }
     }
 
-    fun addAccount(context: Context, data: AuthData) {
+    fun addAccount(context: Context, data: AuthData, password: String) {
         val id = accountId(data)
         val accounts = loadAccounts(context).filterNot { accountId(it) == id } + data
 
         saveAccounts(context, accounts)
+        PasswordVault.store(context, id, password)
         setActive(context, id)
     }
 
@@ -61,6 +66,8 @@ object AccountPrefs {
         val accounts = loadAccounts(context).filterNot { accountId(it) == id }
 
         saveAccounts(context, accounts)
+        PasswordVault.clear(context, id)
+        TimetableCache.clear(context, id)
 
         if (getActiveId(context) == id) {
             val next = accounts.firstOrNull()?.let { accountId(it) }

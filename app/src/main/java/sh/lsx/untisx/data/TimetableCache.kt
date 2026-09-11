@@ -1,6 +1,7 @@
 package sh.lsx.untisx.data
 
 import android.content.Context
+import android.util.Log
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -9,6 +10,7 @@ import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.TimegridDay
 import java.io.File
+import java.io.IOException
 import java.security.MessageDigest
 
 object TimetableCache {
@@ -16,6 +18,7 @@ object TimetableCache {
     private const val LEGACY_FILE_NAME = "timetable_cache.json"
     private const val FILE_PREFIX = "timetable_cache_"
     private const val VERSION = 2
+    private const val TAG = "TimetableCache"
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -63,8 +66,16 @@ object TimetableCache {
 
     fun save(context: Context, accountId: String, data: Data) {
         runCatching {
-            file(context, accountId).writeText(json.encodeToString(data.copy(version = VERSION)))
-        }
+            val target = file(context, accountId)
+            val temp = File(target.parentFile, "${target.name}.tmp")
+
+            temp.writeText(json.encodeToString(data.copy(version = VERSION)))
+
+            if (!temp.renameTo(target)) {
+                temp.delete()
+                throw IOException("Could not replace timetable cache")
+            }
+        }.onFailure { Log.d(TAG, "cache save failed: ${it.message}") }
     }
 
     fun clear(context: Context, accountId: String) {

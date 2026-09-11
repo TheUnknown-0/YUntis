@@ -142,9 +142,9 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
                         loginName = school.loginName,
                         displayName = school.displayName,
                         user = signedInUser,
-                        password = password,
                         session = result,
                     ),
+                    password,
                 )
 
                 signedIn = true

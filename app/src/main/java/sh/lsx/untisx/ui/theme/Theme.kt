@@ -15,6 +15,7 @@ import com.google.android.material.color.utilities.Scheme
 import sh.lsx.untisx.data.ThemeMode
 import sh.lsx.untisx.data.ThemePreset
 
+@Suppress("RestrictedApi") // material-color-utilities scheme is used intentionally for seeded themes
 @Composable
 fun UntisXTheme(
     mode: ThemeMode = ThemeMode.SYSTEM,
@@ -41,6 +42,7 @@ fun UntisXTheme(
     )
 }
 
+@Suppress("RestrictedApi") // material-color-utilities scheme is used intentionally for seeded themes
 private fun seedScheme(s: Scheme, dark: Boolean): ColorScheme {
     return if (dark) darkColorScheme(
         primary = Color(s.primary),

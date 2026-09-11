@@ -284,7 +284,7 @@ private fun DebugCard(auth: AuthData?) {
     val revealed = auth != null && taps >= 3
 
     val rows = listOf(
-        "Session ID" to auth?.session?.sessionId?.takeIf { it.isNotBlank() },
+        "Session ID" to auth?.session?.sessionId?.takeIf { it.isNotBlank() }?.let { "••••${it.takeLast(6)}..." },
         "Person ID" to auth?.session?.personId?.toString(),
         "Person type" to auth?.session?.personType?.let(::personTypeName),
         "Klasse ID" to auth?.session?.klasseId?.toString(),

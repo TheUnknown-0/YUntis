@@ -50,6 +50,7 @@ object Crypto {
 
         return runCatching {
             val data = Base64.decode(encoded, Base64.NO_WRAP)
+            if (data.size <= IV_SIZE + 16) return null
             val cipher = Cipher.getInstance(TRANSFORMATION)
 
             cipher.init(Cipher.DECRYPT_MODE, masterKey(), GCMParameterSpec(128, data, 0, IV_SIZE))
