@@ -15,9 +15,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import sh.lsx.untisx.R
 import sh.lsx.untisx.update.UpdateState
 import sh.lsx.untisx.ui.util.Haptics
 
@@ -43,7 +45,7 @@ fun UpdateDialog(
             dismissOnBackPress = !forced,
             dismissOnClickOutside = !forced,
         ),
-        title = { Text("Update available") },
+        title = { Text(stringResource(R.string.update_available_title)) },
         text = {
             Column {
                 Text(
@@ -56,7 +58,7 @@ fun UpdateDialog(
                 Spacer(Modifier.height(12.dp))
 
                 Text(
-                    text = "Changelog",
+                    text = stringResource(R.string.update_changelog),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -64,7 +66,7 @@ fun UpdateDialog(
                 Spacer(Modifier.height(4.dp))
 
                 Text(
-                    text = info.changelog.ifBlank { "No changelog provided." },
+                    text = info.changelog.ifBlank { stringResource(R.string.update_no_changelog) },
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier
                         .heightIn(max = 160.dp)
@@ -76,7 +78,7 @@ fun UpdateDialog(
                 when (state) {
                     is UpdateState.Downloading -> {
                         Text(
-                            text = "Downloading… ${(state.progress * 100).toInt()}%",
+                            text = stringResource(R.string.update_downloading, (state.progress * 100).toInt()),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -91,7 +93,7 @@ fun UpdateDialog(
 
                     is UpdateState.Downloaded -> {
                         Text(
-                            text = "Download complete. Tap install and confirm the system dialog.",
+                            text = stringResource(R.string.update_download_complete),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -104,11 +106,11 @@ fun UpdateDialog(
         confirmButton = {
             when (state) {
                 is UpdateState.Available -> Button(onClick = Haptics.haptic(onDownload)) {
-                    Text("Download")
+                    Text(stringResource(R.string.update_download))
                 }
 
                 is UpdateState.Downloaded -> Button(onClick = Haptics.haptic(onInstall)) {
-                    Text("Install")
+                    Text(stringResource(R.string.install))
                 }
 
                 else -> {}
@@ -119,8 +121,8 @@ fun UpdateDialog(
                 TextButton(onClick = Haptics.haptic(onDismiss)) {
                     Text(
                         text = when (state) {
-                            is UpdateState.Downloaded -> "Later"
-                            else -> "Not now"
+                            is UpdateState.Downloaded -> stringResource(R.string.update_later)
+                            else -> stringResource(R.string.update_not_now)
                         },
                     )
                 }

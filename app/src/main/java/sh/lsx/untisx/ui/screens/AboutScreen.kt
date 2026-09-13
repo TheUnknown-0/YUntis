@@ -36,10 +36,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import sh.lsx.untisx.R
 import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.ui.util.personTypeName
+import sh.lsx.untisx.ui.util.uiTextString
 import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.tapHaptic
 import sh.lsx.untisx.update.UpdateState
@@ -106,22 +110,23 @@ private fun UpdatesCard() {
         ),
     ) {
         Column(Modifier.padding(18.dp)) {
-            Text("Updates", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.updates_title), style = MaterialTheme.typography.titleMedium)
 
             Spacer(Modifier.height(10.dp))
 
-            val status = when (val state = updateVm.state) {
-                is UpdateState.Checking -> "Checking for updates…"
-                is UpdateState.UpToDate -> "You are on the latest version."
-                is UpdateState.Available -> "Version ${state.info.versionName} is available!"
-                is UpdateState.Downloading -> "Downloading ${state.info.versionName}... ${(state.progress * 100).toInt()}%"
-                is UpdateState.Downloaded -> "${state.info.versionName} downloaded and ready to install."
+            val status: String = when (val state = updateVm.state) {
+                is UpdateState.Checking -> stringResource(R.string.updates_checking)
+                is UpdateState.UpToDate -> stringResource(R.string.updates_up_to_date)
+                is UpdateState.Available -> stringResource(R.string.updates_version_available, state.info.versionName)
+                is UpdateState.Downloading -> stringResource(R.string.updates_downloading_version, state.info.versionName, (state.progress * 100).toInt())
+                is UpdateState.Downloaded -> stringResource(R.string.updates_downloaded_ready, state.info.versionName)
                 is UpdateState.Idle ->
                     updateVm.transientError
+                        ?.let { uiTextString(it) }
                         ?: if (updateVm.pendingInstall != null) {
-                            "Update downloaded and ready to install."
+                            stringResource(R.string.updates_pending_ready)
                         } else {
-                            "Check for updates manually."
+                            stringResource(R.string.updates_check_manually)
                         }
             }
 
@@ -136,7 +141,7 @@ private fun UpdatesCard() {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (updateVm.pendingInstall != null) {
                     Button(onClick = Haptics.haptic(updateVm::installPending)) {
-                        Text("Install")
+                        Text(stringResource(R.string.install))
                     }
                 }
 
@@ -145,7 +150,7 @@ private fun UpdatesCard() {
                     enabled = updateVm.state !is UpdateState.Checking &&
                         updateVm.state !is UpdateState.Downloading,
                 ) {
-                    Text("Check for updates")
+                    Text(stringResource(R.string.updates_check_for_updates))
                 }
             }
         }
@@ -169,7 +174,7 @@ private fun AppCard(versionName: String) {
         ) {
             Image(
                 painter = painterResource(sh.lsx.untisx.R.drawable.app_logo),
-                contentDescription = "UntisX logo",
+                contentDescription = stringResource(R.string.untisx_logo),
                 modifier = Modifier.size(72.dp),
             )
 
@@ -184,7 +189,7 @@ private fun AppCard(versionName: String) {
                 Spacer(Modifier.height(4.dp))
 
                 Text(
-                    text = "by LSX Studios",
+                    text = stringResource(R.string.about_by_lsx),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -192,7 +197,7 @@ private fun AppCard(versionName: String) {
                 Spacer(Modifier.height(2.dp))
 
                 Text(
-                    text = "v$versionName",
+                    text = stringResource(R.string.updates_version, versionName),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -203,9 +208,9 @@ private fun AppCard(versionName: String) {
 
 @Composable
 private fun LinksCard(onOpen: (String) -> Unit) {
-    AboutCard("Project") {
+    AboutCard(stringResource(R.string.about_project)) {
         LinkRow(
-            label = "Source code",
+            label = stringResource(R.string.about_source_code),
             value = "codeberg.org/Losterixx/UntisX",
             onClick = { onOpen(REPO_URL) },
         )
@@ -213,8 +218,8 @@ private fun LinksCard(onOpen: (String) -> Unit) {
         Spacer(Modifier.height(4.dp))
 
         LinkRow(
-            label = "Report an issue",
-            value = "Bugs & feature requests",
+            label = stringResource(R.string.about_report_issue),
+            value = stringResource(R.string.about_report_issue_desc),
             onClick = { onOpen(ISSUES_URL) },
         )
     }
@@ -222,19 +227,19 @@ private fun LinksCard(onOpen: (String) -> Unit) {
 
 @Composable
 private fun LibrariesCard() {
-    AboutCard("Built with") {
-        CreditRow("Jetpack Compose", "UI framework")
-        CreditRow("OkHttp", "HTTP client for the Untis API")
-        CreditRow("kotlinx.serialization", "JSON parsing")
-        CreditRow("Material 3", "Theming with dynamic colors")
+    AboutCard(stringResource(R.string.about_built_with)) {
+        CreditRow("Jetpack Compose", stringResource(R.string.about_lib_compose_desc))
+        CreditRow("OkHttp", stringResource(R.string.about_lib_okhttp_desc))
+        CreditRow("kotlinx.serialization", stringResource(R.string.about_lib_serialization_desc))
+        CreditRow("Material 3", stringResource(R.string.about_lib_material3_desc))
     }
 }
 
 @Composable
 private fun LegalCard(onOpen: (String) -> Unit) {
-    AboutCard("License") {
+    AboutCard(stringResource(R.string.about_license_title)) {
         Text(
-            text = "UntisX is free and open-source software licensed under the GNU GPL-3.0.",
+            text = stringResource(R.string.about_license_text),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -242,7 +247,7 @@ private fun LegalCard(onOpen: (String) -> Unit) {
         Spacer(Modifier.height(6.dp))
 
         Text(
-            text = "UntisX is an unofficial client and is not affiliated with Untis.",
+            text = stringResource(R.string.about_unofficial_text),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -250,7 +255,7 @@ private fun LegalCard(onOpen: (String) -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         LinkRow(
-            label = "View license",
+            label = stringResource(R.string.about_view_license),
             value = "GPL-3.0",
             onClick = { onOpen(LICENSE_URL) },
         )
@@ -259,9 +264,9 @@ private fun LegalCard(onOpen: (String) -> Unit) {
 
 @Composable
 private fun CreditsCard(onOpen: (String) -> Unit) {
-    AboutCard("Credits") {
+    AboutCard(stringResource(R.string.about_credits_title)) {
         Text(
-            text = "UntisX is heavily inspired by BetterUntis, the open-source Untis client for Android.",
+            text = stringResource(R.string.about_credits_text),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -284,15 +289,19 @@ private fun DebugCard(auth: AuthData?) {
     val revealed = auth != null && taps >= 3
 
     val rows = listOf(
-        "Session ID" to auth?.session?.sessionId?.takeIf { it.isNotBlank() }?.let { "••••${it.takeLast(6)}..." },
-        "Person ID" to auth?.session?.personId?.toString(),
-        "Person type" to auth?.session?.personType?.let(::personTypeName),
-        "Klasse ID" to auth?.session?.klasseId?.toString(),
-        "School login name" to auth?.loginName,
+        stringResource(R.string.about_debug_session_id) to auth?.session?.sessionId?.takeIf { it.isNotBlank() }?.let { "••••${it.takeLast(6)}..." },
+        stringResource(R.string.about_debug_person_id) to auth?.session?.personId?.toString(),
+        stringResource(R.string.about_debug_person_type) to auth?.session?.personType?.let { uiTextString(personTypeName(it)) },
+        stringResource(R.string.about_debug_klasse_id) to auth?.session?.klasseId?.toString(),
+        stringResource(R.string.about_debug_school_login) to auth?.loginName,
     )
 
-    AboutCard("Debug") {
+    val revealedToastText = stringResource(R.string.about_debug_revealed_toast)
+
+    AboutCard(stringResource(R.string.about_debug_title)) {
         rows.forEach { (label, value) ->
+            val copiedToastText = stringResource(R.string.about_debug_copied_toast, label)
+
             DebugRow(
                 label = label,
                 value = value,
@@ -304,7 +313,7 @@ private fun DebugCard(auth: AuthData?) {
                             if (taps == 3) {
                                 Toast.makeText(
                                     context,
-                                    "Debug values revealed. Tap a value to copy it.",
+                                    revealedToastText,
                                     Toast.LENGTH_SHORT,
                                 ).show()
                             }
@@ -312,7 +321,7 @@ private fun DebugCard(auth: AuthData?) {
 
                         value != null -> {
                             clipboard.setText(AnnotatedString(value))
-                            Toast.makeText(context, "$label copied", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, copiedToastText, Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
@@ -456,10 +465,4 @@ private fun DebugRow(label: String, value: String) {
             modifier = Modifier.weight(0.6f),
         )
     }
-}
-
-private fun personTypeName(type: Int): String = when (type) {
-    2 -> "Teacher"
-    5 -> "Student"
-    else -> type.toString()
 }

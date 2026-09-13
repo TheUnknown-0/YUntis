@@ -30,8 +30,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import sh.lsx.untisx.R
 import sh.lsx.untisx.ui.theme.SUBJECT_PALETTE
 import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.tapHaptic
@@ -76,7 +78,7 @@ fun ColorPickerDialog(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "Use default color",
+                            text = stringResource(R.string.color_picker_use_default),
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.weight(1f),
                         )
@@ -130,13 +132,13 @@ fun ColorPickerDialog(
                         hex = it
                         hexError = false
                     },
-                    label = { Text("Custom hex") },
+                    label = { Text(stringResource(R.string.color_picker_custom_hex)) },
                     placeholder = { Text("#RRGGBB") },
                     singleLine = true,
                     isError = hexError,
                     enabled = !useDefault,
                     supportingText = if (hexError) {
-                        { Text("Invalid hex color.") }
+                        { Text(stringResource(R.string.color_picker_invalid_hex)) }
                     } else null,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -144,19 +146,19 @@ fun ColorPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = Haptics.haptic(::applyHex), enabled = !useDefault) {
-                Text("Apply")
+                Text(stringResource(R.string.apply))
             }
         },
         dismissButton = {
             Row {
                 if (!allowUseDefault) {
                     TextButton(onClick = Haptics.haptic { onPick(null) }) {
-                        Text("Reset")
+                        Text(stringResource(R.string.reset))
                     }
                 }
 
                 TextButton(onClick = Haptics.haptic(onDismiss)) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         },

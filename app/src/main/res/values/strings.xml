@@ -1,3 +1,187 @@
 <resources>
     <string name="app_name">UntisX</string>
+
+    <!-- Generic -->
+    <string name="cancel">Cancel</string>
+    <string name="retry">Retry</string>
+    <string name="back">Back</string>
+    <string name="next">Next</string>
+    <string name="remove">Remove</string>
+    <string name="apply">Apply</string>
+    <string name="reset">Reset</string>
+    <string name="install">Install</string>
+    <string name="close">Close</string>
+    <string name="menu">Menu</string>
+    <string name="profile">Profile</string>
+    <string name="settings">Settings</string>
+    <string name="about">About</string>
+    <string name="teachers">Teachers</string>
+    <string name="rooms">Rooms</string>
+    <string name="timetable">Timetable</string>
+    <string name="lesson">Lesson</string>
+    <string name="untisx_logo">UntisX logo</string>
+    <string name="person_teacher">Teacher</string>
+    <string name="person_student">Student</string>
+
+    <!-- Main navigation -->
+    <string name="nav_information">Information</string>
+    <string name="nav_other">Other</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_get_started">Get started</string>
+    <string name="onboarding_welcome">Welcome to UntisX</string>
+    <string name="onboarding_tagline">A better app for your timetable.</string>
+    <string name="onboarding_notifications_title">Notifications (optional)</string>
+    <string name="onboarding_notifications_text">Get notified about schedule changes and other events.</string>
+    <string name="onboarding_notifications_granted">Granted</string>
+    <string name="onboarding_notifications_allow">Allow notifications</string>
+    <string name="onboarding_internet_title">Internet access (required)</string>
+    <string name="onboarding_internet_text">UntisX talks to your school\'s Untis server to load your timetable. No account is created, your credentials are only stored on this device.</string>
+    <string name="onboarding_theme_title">Make it yours</string>
+    <string name="onboarding_language_title">Language</string>
+
+    <!-- Login -->
+    <string name="login_connect_account">Connect your Account</string>
+    <string name="login_privacy">Your username and password are encrypted using the Android Keystore and stored only on this device. They are sent exclusively to your school\'s Untis server.</string>
+    <string name="login_school_label">Your school</string>
+    <string name="login_school_selected">%1$s, \"%2$s\"</string>
+    <string name="login_searching">Searching…</string>
+    <string name="login_too_many_results">Too many schools match - keep typing.</string>
+    <string name="login_username">Username</string>
+    <string name="login_password">Password</string>
+    <string name="login_sign_in">Sign in</string>
+    <string name="login_signing_in">Signing in…</string>
+    <string name="login_signed_in">Signed in.</string>
+    <string name="login_error_untis">Untis error %1$d: %2$s</string>
+    <string name="login_error_unexpected">Unexpected error: %1$s</string>
+
+    <!-- Profile -->
+    <string name="profile_signed_in_title">Signed in as</string>
+    <string name="profile_not_signed_in">Not signed in.</string>
+    <string name="profile_accounts_title">Accounts</string>
+    <string name="profile_user">User</string>
+    <string name="profile_school">School</string>
+    <string name="profile_server">Server</string>
+    <string name="profile_person">Person</string>
+    <string name="profile_logout">Logout</string>
+    <string name="profile_add_account">Add account</string>
+    <string name="profile_remove_account">Remove account</string>
+    <string name="profile_remove_dialog_title">Remove account</string>
+    <string name="profile_remove_dialog_text">Sign out \"%1$s\" at \"%2$s\" and remove it from this device?</string>
+
+    <!-- Settings -->
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme_mode">Mode</string>
+    <string name="settings_accent_color">Accent Color</string>
+    <string name="settings_haptics">Haptic feedback</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_system">System</string>
+    <string name="settings_timetable_colors">Timetable colors</string>
+    <string name="settings_default_subject_color">Default subject color</string>
+    <string name="settings_card_text_color">Card text color</string>
+    <string name="settings_no_subjects">No subjects scanned yet. Scan your timetable to customize subject colors.</string>
+    <string name="settings_scan_subjects">Scan subjects</string>
+    <string name="settings_rescan_subjects">Rescan subjects</string>
+    <string name="settings_custom">custom</string>
+    <string name="settings_strike_cancelled">Strike through cancelled</string>
+    <string name="settings_strike_cancelled_desc">Cut a red line through cancelled lessons</string>
+
+    <!-- Theme -->
+    <string name="theme_mode_system">System</string>
+    <string name="theme_mode_light">Light</string>
+    <string name="theme_mode_dark">Dark</string>
+    <string name="theme_preset_device">System</string>
+    <string name="theme_preset_orange">Orange</string>
+    <string name="theme_preset_blue">Blue</string>
+    <string name="theme_preset_green">Green</string>
+    <string name="theme_preset_purple">Purple</string>
+    <string name="theme_preset_red">Red</string>
+
+    <!-- Timetable -->
+    <string name="timetable_holiday">Holiday</string>
+    <string name="timetable_restricted">Restricted</string>
+    <string name="timetable_today">Today</string>
+
+    <!-- Lesson details -->
+    <string name="lesson_cancelled">Cancelled</string>
+    <string name="lesson_changed">Changed</string>
+    <string name="lesson_time">Time</string>
+    <string name="lesson_teacher">Teacher</string>
+    <string name="lesson_room">Room</string>
+    <string name="lesson_date_today">%1$s (Today)</string>
+
+    <!-- Teachers / Rooms lists -->
+    <string name="teachers_empty">No teachers found yet.</string>
+    <string name="teachers_empty_hint">Open the timetable first to load data.</string>
+    <plurals name="teachers_count">
+        <item quantity="one">All Teachers (%1$d)</item>
+        <item quantity="other">All Teachers (%1$d)</item>
+    </plurals>
+    <string name="teachers_search_hint">Search teachers…</string>
+    <string name="teachers_clear_search">Clear search</string>
+    <string name="rooms_coming_soon">Coming soon…</string>
+
+    <!-- Errors / status messages -->
+    <string name="error_network">No connection to the Untis server.</string>
+    <string name="error_bad_credentials">Wrong username or password.</string>
+    <string name="error_too_many_results">Too many schools match your search.</string>
+    <string name="error_session_expired">Session expired.</string>
+    <string name="error_untis_generic">Untis error %1$d: %2$s</string>
+    <string name="error_unexpected">Unexpected error: %1$s</string>
+    <string name="error_refresh_cached">Couldn\'t refresh - showing saved timetable. %1$s</string>
+    <string name="error_refresh_cached_at">Couldn\'t refresh  showing saved timetable from %1$s. %2$s</string>
+    <string name="error_timegrid_missing">Your school doesn\'t provide an hourly grid. The hour column can\'t be shown.</string>
+    <string name="error_update_check_failed">Update check failed: %1$s</string>
+    <string name="error_download_failed">Download failed: %1$s</string>
+
+    <!-- Update dialog / about updates -->
+    <string name="update_available_title">Update available</string>
+    <string name="update_changelog">Changelog</string>
+    <string name="update_no_changelog">No changelog provided.</string>
+    <string name="update_downloading">Downloading… %1$d%%</string>
+    <string name="update_download_complete">Download complete. Tap install and confirm the system dialog.</string>
+    <string name="update_download">Download</string>
+    <string name="update_later">Later</string>
+    <string name="update_not_now">Not now</string>
+    <string name="updates_title">Updates</string>
+    <string name="updates_checking">Checking for updates…</string>
+    <string name="updates_up_to_date">You are on the latest version.</string>
+    <string name="updates_version_available">Version %1$s is available!</string>
+    <string name="updates_downloading_version">Downloading %1$s… %2$d%%</string>
+    <string name="updates_downloaded_ready">%1$s downloaded and ready to install.</string>
+    <string name="updates_pending_ready">Update downloaded and ready to install.</string>
+    <string name="updates_check_manually">Check for updates manually.</string>
+    <string name="updates_check_for_updates">Check for updates</string>
+    <string name="updates_version">v%1$s</string>
+
+    <!-- About -->
+    <string name="about_project">Project</string>
+    <string name="about_source_code">Source code</string>
+    <string name="about_report_issue">Report an issue</string>
+    <string name="about_report_issue_desc">Bugs &amp; feature requests</string>
+    <string name="about_built_with">Built with</string>
+    <string name="about_lib_compose_desc">UI framework</string>
+    <string name="about_lib_okhttp_desc">HTTP client for the Untis API</string>
+    <string name="about_lib_serialization_desc">JSON parsing</string>
+    <string name="about_lib_material3_desc">Theming with dynamic colors</string>
+    <string name="about_license_title">License</string>
+    <string name="about_license_text">UntisX is free and open-source software licensed under the GNU GPL-3.0.</string>
+    <string name="about_unofficial_text">UntisX is an unofficial client and is not affiliated with Untis.</string>
+    <string name="about_view_license">View license</string>
+    <string name="about_credits_title">Credits</string>
+    <string name="about_credits_text">UntisX is heavily inspired by BetterUntis, the open-source Untis client for Android.</string>
+    <string name="about_by_lsx">by LSX Studios</string>
+    <string name="about_debug_title">Debug</string>
+    <string name="about_debug_session_id">Session ID</string>
+    <string name="about_debug_person_id">Person ID</string>
+    <string name="about_debug_person_type">Person type</string>
+    <string name="about_debug_klasse_id">Klasse ID</string>
+    <string name="about_debug_school_login">School login name</string>
+    <string name="about_debug_revealed_toast">Debug values revealed. Tap a value to copy it.</string>
+    <string name="about_debug_copied_toast">%1$s copied</string>
+
+    <!-- Color picker -->
+    <string name="color_picker_use_default">Use default color</string>
+    <string name="color_picker_custom_hex">Custom hex</string>
+    <string name="color_picker_invalid_hex">Invalid hex color.</string>
 </resources>

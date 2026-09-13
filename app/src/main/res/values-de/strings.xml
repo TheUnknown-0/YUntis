@@ -1,0 +1,187 @@
+<resources>
+    <string name="app_name">UntisX</string>
+
+    <!-- Generic -->
+    <string name="cancel">Abbrechen</string>
+    <string name="retry">Erneut versuchen</string>
+    <string name="back">Zurück</string>
+    <string name="next">Weiter</string>
+    <string name="remove">Entfernen</string>
+    <string name="apply">Übernehmen</string>
+    <string name="reset">Zurücksetzen</string>
+    <string name="install">Installieren</string>
+    <string name="close">Schließen</string>
+    <string name="menu">Menü</string>
+    <string name="profile">Profil</string>
+    <string name="settings">Einstellungen</string>
+    <string name="about">Über die App</string>
+    <string name="teachers">Lehrkräfte</string>
+    <string name="rooms">Räume</string>
+    <string name="timetable">Stundenplan</string>
+    <string name="lesson">Stunde</string>
+    <string name="untisx_logo">UntisX-Logo</string>
+    <string name="person_teacher">Lehrkraft</string>
+    <string name="person_student">Schüler:in</string>
+
+    <!-- Main navigation -->
+    <string name="nav_information">Informationen</string>
+    <string name="nav_other">Mehr</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_get_started">Los geht\'s</string>
+    <string name="onboarding_welcome">Willkommen bei UntisX</string>
+    <string name="onboarding_tagline">Eine bessere app für deinen Stundenplan.</string>
+    <string name="onboarding_notifications_title">Benachrichtigungen (optional)</string>
+    <string name="onboarding_notifications_text">Erhalte Benachrichtigungen bei Änderungen an deinem Stundenplan und weiteren Ereignissen.</string>
+    <string name="onboarding_notifications_granted">Erlaubt</string>
+    <string name="onboarding_notifications_allow">Benachrichtigungen erlauben</string>
+    <string name="onboarding_internet_title">Internetzugriff (erforderlich)</string>
+    <string name="onboarding_internet_text">UntisX lädt deinen Stundenplan direkt vom Untis-Server deiner Schule. Es wird kein Konto angelegt, und deine Zugangsdaten bleiben ausschließlich auf diesem Gerät.</string>
+    <string name="onboarding_theme_title">Stil anpassen</string>
+    <string name="onboarding_language_title">Sprache</string>
+
+    <!-- Login -->
+    <string name="login_connect_account">Konto verbinden</string>
+    <string name="login_privacy">"Dein Benutzername und Passwort werden sicher im Android Keystore verschlüsselt und ausschließlich an den Untis-Server deiner Schule gesendet. "</string>
+    <string name="login_school_label">Deine Schule</string>
+    <string name="login_school_selected">%1$s, „%2$s“</string>
+    <string name="login_searching">Suche…</string>
+    <string name="login_too_many_results">Zu viele Treffer - schreib weiter.</string>
+    <string name="login_username">Benutzername</string>
+    <string name="login_password">Passwort</string>
+    <string name="login_sign_in">Anmelden</string>
+    <string name="login_signing_in">Angemeldung läuft…</string>
+    <string name="login_signed_in">Angemeldet.</string>
+    <string name="login_error_untis">Untis-Fehler %1$d: %2$s</string>
+    <string name="login_error_unexpected">Unerwarteter Fehler: %1$s</string>
+
+    <!-- Profile -->
+    <string name="profile_signed_in_title">Angemeldet als</string>
+    <string name="profile_not_signed_in">Nicht angemeldet.</string>
+    <string name="profile_accounts_title">Konten</string>
+    <string name="profile_user">Benutzer</string>
+    <string name="profile_school">Schule</string>
+    <string name="profile_server">Server</string>
+    <string name="profile_person">Rolle</string>
+    <string name="profile_logout">Abmelden</string>
+    <string name="profile_add_account">Konto hinzufügen</string>
+    <string name="profile_remove_account">Konto entfernen</string>
+    <string name="profile_remove_dialog_title">Konto entfernen?</string>
+    <string name="profile_remove_dialog_text">„%1$s“ bei „%2$s“ wird abgemeldet und von diesem Gerät entfernt.</string>
+
+    <!-- Settings -->
+    <string name="settings_appearance">Erscheinungsbild</string>
+    <string name="settings_theme_mode">Modus</string>
+    <string name="settings_accent_color">Akzentfarbe</string>
+    <string name="settings_haptics">Haptisches Feedback</string>
+    <string name="settings_language">Sprache</string>
+    <string name="settings_language_system">System</string>
+    <string name="settings_timetable_colors">Stundenplan-Farben</string>
+    <string name="settings_default_subject_color">Standardfarbe für Fächer</string>
+    <string name="settings_card_text_color">Textfarbe der Karten</string>
+    <string name="settings_no_subjects">Noch keine Fächer gefunden. Öffne deinen Stundenplan, um die Farben deiner Fächer anzupassen.</string>
+    <string name="settings_scan_subjects">Fächer scannen</string>
+    <string name="settings_rescan_subjects">Fächer erneut scannen</string>
+    <string name="settings_custom">eigene Farbe</string>
+    <string name="settings_strike_cancelled">Ausfälle durchstreichen</string>
+    <string name="settings_strike_cancelled_desc">Entfallene Stunden werden rot durchgestrichen</string>
+
+    <!-- Theme -->
+    <string name="theme_mode_system">System</string>
+    <string name="theme_mode_light">Hell</string>
+    <string name="theme_mode_dark">Dunkel</string>
+    <string name="theme_preset_device">System</string>
+    <string name="theme_preset_orange">Orange</string>
+    <string name="theme_preset_blue">Blau</string>
+    <string name="theme_preset_green">Grün</string>
+    <string name="theme_preset_purple">Lila</string>
+    <string name="theme_preset_red">Rot</string>
+
+    <!-- Timetable -->
+    <string name="timetable_holiday">Ferien</string>
+    <string name="timetable_restricted">Gesperrt</string>
+    <string name="timetable_today">Heute</string>
+
+    <!-- Lesson details -->
+    <string name="lesson_cancelled">Entfällt</string>
+    <string name="lesson_changed">Geändert</string>
+    <string name="lesson_time">Uhrzeit</string>
+    <string name="lesson_teacher">Lehrkraft</string>
+    <string name="lesson_room">Raum</string>
+    <string name="lesson_date_today">%1$s (heute)</string>
+
+    <!-- Teachers / Rooms lists -->
+    <string name="teachers_empty">Noch keine Lehrkräfte gefunden.</string>
+    <string name="teachers_empty_hint">Öffne zuerst den Stundenplan, damit Daten geladen werden.</string>
+    <plurals name="teachers_count">
+        <item quantity="one">Alle Lehrkräfte (%1$d)</item>
+        <item quantity="other">Alle Lehrkräfte (%1$d)</item>
+    </plurals>
+    <string name="teachers_search_hint">Lehrkraft suchen…</string>
+    <string name="teachers_clear_search">Suche zurücksetzen</string>
+    <string name="rooms_coming_soon">Kommt bald...</string>
+
+    <!-- Errors / status messages -->
+    <string name="error_network">Keine Verbindung zum Untis-Server möglich.</string>
+    <string name="error_bad_credentials">Benutzername oder Passwort ist falsch.</string>
+    <string name="error_too_many_results">Deine Suche passt zu zu vielen Schulen.</string>
+    <string name="error_session_expired">Deine Sitzung ist abgelaufen.</string>
+    <string name="error_untis_generic">Untis-Fehler %1$d: %2$s</string>
+    <string name="error_unexpected">Unerwarteter Fehler: %1$s</string>
+    <string name="error_refresh_cached">Aktualisieren fehlgeschlagen - gespeicherter Plan wird angezeigt. %1$s</string>
+    <string name="error_refresh_cached_at">Aktualisieren fehlgeschlagen - gespeicherter Plan vom %1$s wird angezeigt. %2$s</string>
+    <string name="error_timegrid_missing">Deine Schule liefert kein Stundenraster. Die Stundenspalte bleibt daher ausgeblendet.</string>
+    <string name="error_update_check_failed">Update-Suche fehlgeschlagen: %1$s</string>
+    <string name="error_download_failed">Herunterladen fehlgeschlagen: %1$s</string>
+
+    <!-- Update dialog / about updates -->
+    <string name="update_available_title">Update verfügbar</string>
+    <string name="update_changelog">Änderungen</string>
+    <string name="update_no_changelog">Keine Änderungsliste verfügbar.</string>
+    <string name="update_downloading">Wird geladen… %1$d %%</string>
+    <string name="update_download_complete">Download abgeschlossen. Tippe auf „Installieren“ und bestätige den Systemdialog.</string>
+    <string name="update_download">Herunterladen</string>
+    <string name="update_later">Später</string>
+    <string name="update_not_now">Nicht jetzt</string>
+    <string name="updates_title">Updates</string>
+    <string name="updates_checking">Suche nach Updates…</string>
+    <string name="updates_up_to_date">Du verwendest bereits die neuste Version.</string>
+    <string name="updates_version_available">Version %1$s ist verfügbar!</string>
+    <string name="updates_downloading_version">Version %1$s wird heruntergeladen… %2$d %%</string>
+    <string name="updates_downloaded_ready">Version %1$s wurde heruntergeladen und kann installiert werden.</string>
+    <string name="updates_pending_ready">Das Update wurde heruntergeladen und kann installiert werden.</string>
+    <string name="updates_check_manually">Hier kannst du manuell nach Updates suchen.</string>
+    <string name="updates_check_for_updates">Nach Updates suchen</string>
+    <string name="updates_version">v%1$s</string>
+
+    <!-- About -->
+    <string name="about_project">Projekt</string>
+    <string name="about_source_code">Quellcode</string>
+    <string name="about_report_issue">Fehler melden</string>
+    <string name="about_report_issue_desc">Bugs &amp; Feature-Anfragen</string>
+    <string name="about_built_with">Gebaut mit</string>
+    <string name="about_lib_compose_desc">UI-Framework</string>
+    <string name="about_lib_okhttp_desc">HTTP-Client für die Untis-API</string>
+    <string name="about_lib_serialization_desc">JSON-Verarbeitung</string>
+    <string name="about_lib_material3_desc">Design mit dynamischen Farben</string>
+    <string name="about_license_title">Lizenz</string>
+    <string name="about_license_text">UntisX ist Open-Source Software unter der GNU GPL-3.0.</string>
+    <string name="about_unofficial_text">UntisX ist ein inoffizieller Client und steht in keinerlei Verbindung zu Untis.</string>
+    <string name="about_view_license">Lizenz ansehen</string>
+    <string name="about_credits_title">Credits</string>
+    <string name="about_credits_text">UntisX ist stark von BetterUntis inspiriert - dem Open-Source-Untis-Client für Android.</string>
+    <string name="about_by_lsx">von LSX Studios</string>
+    <string name="about_debug_title">Debug</string>
+    <string name="about_debug_session_id">Sitzungs-ID</string>
+    <string name="about_debug_person_id">Personen-ID</string>
+    <string name="about_debug_person_type">Rolle</string>
+    <string name="about_debug_klasse_id">Klassen-ID</string>
+    <string name="about_debug_school_login">Schul-Loginname</string>
+    <string name="about_debug_revealed_toast">Werte eingeblendet - tippe auf einen, um ihn zu kopieren.</string>
+    <string name="about_debug_copied_toast">„%1$s“ kopiert</string>
+
+    <!-- Color picker -->
+    <string name="color_picker_use_default">Standardfarbe verwenden</string>
+    <string name="color_picker_custom_hex">Eigener Hex-Code</string>
+    <string name="color_picker_invalid_hex">Das ist kein gültiger Hex-Code.</string>
+</resources>

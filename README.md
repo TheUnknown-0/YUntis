@@ -34,7 +34,7 @@ UntisX is in early development - expect bugs and incomplete features. If you fin
 
 Your username and password are sent exclusively to your school's Untis server and nowhere else. There is no analytics or tracking.
 
-The only external contact besides your Untis server is our update server (`lsx.sh/api/projects/untisx/<version/apk>`).
+The only external contact besides your Untis server is this project's releases for updates.
 
 ---
 

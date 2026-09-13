@@ -31,6 +31,8 @@ import sh.lsx.untisx.data.model.plusUntisWeeks
 import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisWeekStart
+import sh.lsx.untisx.R
+import sh.lsx.untisx.ui.util.UiText
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -41,12 +43,12 @@ import java.util.Locale
 class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     sealed interface LoadError {
-        val message: String
+        val text: UiText
 
-        data class Network(override val message: String) : LoadError
-        data class Auth(override val message: String) : LoadError
-        data class Server(override val message: String) : LoadError
-        data class Unknown(override val message: String) : LoadError
+        data class Network(override val text: UiText) : LoadError
+        data class Auth(override val text: UiText) : LoadError
+        data class Server(override val text: UiText) : LoadError
+        data class Unknown(override val text: UiText) : LoadError
     }
 
     companion object {
@@ -64,7 +66,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var error by mutableStateOf<LoadError?>(null)
         private set
-    var info by mutableStateOf<String?>(null)
+    var info by mutableStateOf<UiText?>(null)
         private set
     var refreshing by mutableStateOf(false)
         private set
@@ -78,7 +80,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var timegrid by mutableStateOf<List<TimegridDay>>(emptyList())
         private set
-    var timegridError by mutableStateOf<String?>(null)
+    var timegridError by mutableStateOf<UiText?>(null)
         private set
     var restrictedDays by mutableStateOf<Set<Int>>(emptySet())
         private set
@@ -335,14 +337,20 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun refreshFailureMessage(e: Exception): String {
-        val age = if (lastFetch > 0) {
-            val formatted = DateTimeFormatter.ofPattern("MMM d, HH:mm", Locale.ENGLISH)
-                .format(Instant.ofEpochMilli(lastFetch).atZone(ZoneId.systemDefault()))
-            " (from $formatted)"
-        } else ""
+    private fun refreshFailureMessage(e: Exception): UiText {
+        if (lastFetch > 0) {
+            val timestamp = UiText.Raw(
+                DateTimeFormatter.ofPattern("EEE, d. MMM, HH:mm", Locale.getDefault())
+                    .format(Instant.ofEpochMilli(lastFetch).atZone(ZoneId.systemDefault())),
+            )
 
-        return "Couldn't refresh - showing cached data$age. ${friendly(e)}"
+            return UiText.Res(
+                R.string.error_refresh_cached_at,
+                listOf(timestamp, friendly(e)),
+            )
+        }
+
+        return UiText.Res(R.string.error_refresh_cached, listOf(friendly(e)))
     }
 
     private data class WeekFetch(
@@ -502,7 +510,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         if (timegrid.isEmpty()) {
-            timegridError = "The server doesn't provide a school hour grid (tried getUserData2017 and getTimegrid). The hour column can't be shown."
+            timegridError = UiText.Res(R.string.error_timegrid_missing)
         }
 
         return emptyList()
@@ -606,11 +614,17 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         else -> LoadError.Unknown(friendly(e))
     }
 
-    private fun friendly(e: Exception): String = when (e) {
-        is UntisException.Network -> e.message!!
-        is UntisException.BadCredentials -> e.message!!
-        is UntisException.SessionExpired -> e.message!!
-        is UntisException.Api -> "Untis error ${e.code}: ${e.message}"
-        else -> "Unexpected error: ${e.message}"
+    private fun friendly(e: Exception): UiText = when (e) {
+        is UntisException.Network -> UiText.Res(R.string.error_network)
+        is UntisException.BadCredentials -> UiText.Res(R.string.error_bad_credentials)
+        is UntisException.SessionExpired -> UiText.Res(R.string.error_session_expired)
+        is UntisException.Api -> UiText.Res(
+            R.string.error_untis_generic,
+            listOf(UiText.Raw(e.code.toString()), UiText.Raw(e.message)),
+        )
+        else -> UiText.Res(
+            R.string.error_unexpected,
+            listOf(UiText.Raw(e.message ?: "")),
+        )
     }
 }

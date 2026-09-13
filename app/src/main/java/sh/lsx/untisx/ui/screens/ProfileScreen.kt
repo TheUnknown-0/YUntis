@@ -36,14 +36,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import sh.lsx.untisx.R
 import sh.lsx.untisx.data.TimetableCache
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.prefs.AuthPrefs
 import sh.lsx.untisx.ui.util.Haptics
+import sh.lsx.untisx.ui.util.personTypeName
+import sh.lsx.untisx.ui.util.uiTextString
 
 @Composable
 fun ProfileScreen(modifier: Modifier = Modifier) {
@@ -92,20 +96,20 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ProfileCard("Signed in") {
+        ProfileCard(stringResource(R.string.profile_signed_in_title)) {
             if (active == null) {
                 Text(
-                    text = "Not signed in.",
+                    text = stringResource(R.string.profile_not_signed_in),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                ProfileRow("User", active.user)
-                ProfileRow("School", active.displayName)
-                ProfileRow("Server", active.server)
+                ProfileRow(stringResource(R.string.profile_user), active.user)
+                ProfileRow(stringResource(R.string.profile_school), active.displayName)
+                ProfileRow(stringResource(R.string.profile_server), active.server)
                 ProfileRow(
-                    "Person",
-                    personTypeName(active.session.personType),
+                    stringResource(R.string.profile_person),
+                    uiTextString(personTypeName(active.session.personType)),
                 )
 
                 Spacer(Modifier.height(12.dp))
@@ -113,12 +117,12 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                 Button(onClick = Haptics.haptic {
                     active?.let(::removeAccountFully)
                 }) {
-                    Text("Logout")
+                    Text(stringResource(R.string.profile_logout))
                 }
             }
         }
 
-        ProfileCard("Accounts") {
+        ProfileCard(stringResource(R.string.profile_accounts_title)) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 accounts.forEach { account ->
                     val id = AccountPrefs.accountId(account)
@@ -157,7 +161,7 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                         IconButton(onClick = Haptics.haptic { removing = account }) {
                             Icon(
                                 imageVector = Icons.Outlined.Delete,
-                                contentDescription = "Remove account",
+                                contentDescription = stringResource(R.string.profile_remove_account),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -176,7 +180,7 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
 
                 Spacer(Modifier.size(6.dp))
 
-                Text("Add account")
+                Text(stringResource(R.string.profile_add_account))
             }
         }
     }
@@ -184,10 +188,14 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
     removing?.let { account ->
         AlertDialog(
             onDismissRequest = { removing = null },
-            title = { Text("Remove account") },
+            title = { Text(stringResource(R.string.profile_remove_dialog_title)) },
             text = {
                 Text(
-                    "Sign out \"${account.user}\" at \"${account.displayName}\" and remove it from this device?"
+                    stringResource(
+                        R.string.profile_remove_dialog_text,
+                        account.user,
+                        account.displayName,
+                    ),
                 )
             },
             confirmButton = {
@@ -195,12 +203,12 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                     removing = null
                     removeAccountFully(account)
                 }) {
-                    Text("Remove")
+                    Text(stringResource(R.string.remove))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { removing = null }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             },
         )
@@ -244,15 +252,10 @@ private fun ProfileRow(label: String, value: String) {
         )
 
         Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(0.6f),
-        )
-    }
-}
+             text = value,
+             style = MaterialTheme.typography.bodyMedium,
+             modifier = Modifier.weight(0.6f),
+         )
+     }
+ }
 
-private fun personTypeName(type: Int): String = when (type) {
-    2 -> "Teacher"
-    5 -> "Student"
-    else -> type.toString()
-}

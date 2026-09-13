@@ -14,7 +14,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import sh.lsx.untisx.R
 
 @Composable
 fun RoomsListScreen(
@@ -32,7 +34,7 @@ fun RoomsListScreen(
             Spacer(Modifier.height(12.dp))
 
             Text(
-                text = "Coming soon...",
+                text = stringResource(R.string.rooms_coming_soon),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -13,7 +13,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 internal val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
-internal val DAY_DATE_FORMAT = DateTimeFormatter.ofPattern("d. MMM", Locale.ENGLISH)
+internal val DAY_DATE_FORMAT = DateTimeFormatter.ofPattern("d. MMM", Locale.getDefault())
 
 internal val GUTTER_WIDTH = 48.dp
 internal val MINUTE_HEIGHT = 1.15.dp

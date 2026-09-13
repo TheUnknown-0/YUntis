@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -32,17 +33,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import sh.lsx.untisx.R
+import sh.lsx.untisx.data.AppLanguage
 import sh.lsx.untisx.data.AppTheme
+import sh.lsx.untisx.data.LanguagePrefs
 import sh.lsx.untisx.ui.components.ColorPickerDialog
+import sh.lsx.untisx.ui.components.LanguageSettingsContent
 import sh.lsx.untisx.ui.components.ThemeSettingsContent
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.tapHaptic
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     theme: AppTheme,
@@ -60,11 +68,13 @@ fun SettingsScreen(
     onCancelledStrike: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val timetableVm: TimetableViewModel = viewModel()
 
     var colorDialogFor by remember { mutableStateOf<String?>(null) }
     var pickDefaultColor by remember { mutableStateOf(false) }
     var pickTextColor by remember { mutableStateOf(false) }
+    var language by remember { mutableStateOf(LanguagePrefs.get(context)) }
 
     Column(
         modifier = modifier
@@ -82,7 +92,29 @@ fun SettingsScreen(
             ),
         ) {
             Column(Modifier.padding(18.dp)) {
-                Text("Appearance", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
+
+                Spacer(Modifier.height(12.dp))
+
+                LanguageSettingsContent(
+                    language = language,
+                    onChange = { newLanguage ->
+                        language = newLanguage
+                        LanguagePrefs.save(context, newLanguage)
+                    },
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ),
+        ) {
+            Column(Modifier.padding(18.dp)) {
+                Text(stringResource(R.string.settings_appearance), style = MaterialTheme.typography.titleMedium)
 
                 Spacer(Modifier.height(12.dp))
 
@@ -104,7 +136,7 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Haptic feedback",
+                    text = stringResource(R.string.settings_haptics),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f),
                 )
@@ -124,12 +156,12 @@ fun SettingsScreen(
             ),
         ) {
             Column(Modifier.padding(18.dp)) {
-                Text("Timetable colors", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_timetable_colors), style = MaterialTheme.typography.titleMedium)
 
                 Spacer(Modifier.height(6.dp))
 
                 ColorRow(
-                    label = "Default subject color",
+                    label = stringResource(R.string.settings_default_subject_color),
                     color = Color(defaultSubjectColor),
                     onClick = { pickDefaultColor = true },
                 )
@@ -137,7 +169,7 @@ fun SettingsScreen(
                 Spacer(Modifier.height(4.dp))
 
                 ColorRow(
-                    label = "Card text color",
+                    label = stringResource(R.string.settings_card_text_color),
                     color = Color(lessonTextColor),
                     onClick = { pickTextColor = true },
                 )
@@ -146,7 +178,7 @@ fun SettingsScreen(
 
                 if (knownSubjects.isEmpty()) {
                     Text(
-                        text = "No subjects scanned yet. Scan your timetable to customize subject colors.",
+                        text = stringResource(R.string.settings_no_subjects),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -154,7 +186,7 @@ fun SettingsScreen(
                     Spacer(Modifier.height(8.dp))
 
                     TextButton(onClick = Haptics.haptic { timetableVm.rescanSubjects() }) {
-                        Text("Scan subjects")
+                        Text(stringResource(R.string.settings_scan_subjects))
                     }
                 } else {
                     knownSubjects.forEach { name ->
@@ -191,7 +223,7 @@ fun SettingsScreen(
 
                             if (custom) {
                                 Text(
-                                    text = "custom",
+                                    text = stringResource(R.string.settings_custom),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary,
                                 )
@@ -202,7 +234,7 @@ fun SettingsScreen(
                     }
 
                     TextButton(onClick = Haptics.haptic { timetableVm.rescanSubjects() }) {
-                        Text("Rescan subjects")
+                        Text(stringResource(R.string.settings_rescan_subjects))
                     }
                 }
 
@@ -214,12 +246,12 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Strike through cancelled",
+                            text = stringResource(R.string.settings_strike_cancelled),
                             style = MaterialTheme.typography.bodyLarge,
                         )
 
                         Text(
-                            text = "Cut a red line through cancelled lessons",
+                            text = stringResource(R.string.settings_strike_cancelled_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -249,7 +281,7 @@ fun SettingsScreen(
 
     if (pickDefaultColor) {
         ColorPickerDialog(
-            title = "Default subject color",
+            title = stringResource(R.string.settings_default_subject_color),
             currentColor = defaultSubjectColor,
             allowUseDefault = false,
             onPick = { argb ->
@@ -262,7 +294,7 @@ fun SettingsScreen(
 
     if (pickTextColor) {
         ColorPickerDialog(
-            title = "Card text color",
+            title = stringResource(R.string.settings_card_text_color),
             currentColor = lessonTextColor,
             allowUseDefault = false,
             onPick = { argb ->

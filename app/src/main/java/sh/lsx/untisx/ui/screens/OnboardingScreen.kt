@@ -41,12 +41,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.launch
+import sh.lsx.untisx.R
+import sh.lsx.untisx.data.AppLanguage
 import sh.lsx.untisx.data.AppTheme
+import sh.lsx.untisx.data.LanguagePrefs
+import sh.lsx.untisx.ui.components.LanguageSettingsContent
 import sh.lsx.untisx.ui.components.ThemeSettingsContent
 import sh.lsx.untisx.ui.util.Haptics
 
@@ -65,6 +70,7 @@ fun OnboardingScreen(
     val scope = rememberCoroutineScope()
 
     var notifGranted by remember { mutableStateOf(isNotifGranted(context)) }
+    var language by remember { mutableStateOf(LanguagePrefs.get(context)) }
 
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -92,6 +98,11 @@ fun OnboardingScreen(
                         notifGranted = notifGranted,
                         onRequestNotifications = {
                             notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        },
+                        language = language,
+                        onLanguageChange = { newLanguage ->
+                            language = newLanguage
+                            LanguagePrefs.save(context, newLanguage)
                         },
                     )
 
@@ -121,7 +132,7 @@ fun OnboardingScreen(
                     TextButton(onClick = Haptics.haptic {
                         scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
                     }) {
-                        Text("Back")
+                        Text(stringResource(R.string.back))
                     }
                 } else {
                     Spacer(Modifier.size(0.dp))
@@ -140,11 +151,11 @@ fun OnboardingScreen(
                         },
                         enabled = stepComplete,
                     ) {
-                        Text("Next")
+                        Text(stringResource(R.string.next))
                     }
                 } else {
                     Button(onClick = Haptics.haptic(onFinish), enabled = stepComplete) {
-                        Text("Get started")
+                        Text(stringResource(R.string.onboarding_get_started))
                     }
                 }
             }
@@ -182,6 +193,8 @@ private fun PageIndicator(pageCount: Int, currentPage: Int, modifier: Modifier =
 private fun PermissionsPage(
     notifGranted: Boolean,
     onRequestNotifications: () -> Unit,
+    language: AppLanguage,
+    onLanguageChange: (AppLanguage) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -192,15 +205,15 @@ private fun PermissionsPage(
         verticalArrangement = Arrangement.Center,
     ) {
         Image(
-            painter = painterResource(sh.lsx.untisx.R.drawable.app_logo),
-            contentDescription = "UntisX logo",
+            painter = painterResource(R.drawable.app_logo),
+            contentDescription = stringResource(R.string.untisx_logo),
             modifier = Modifier.size(96.dp),
         )
 
         Spacer(Modifier.height(16.dp))
 
         Text(
-            text = "Welcome to UntisX",
+            text = stringResource(R.string.onboarding_welcome),
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center,
         )
@@ -208,7 +221,7 @@ private fun PermissionsPage(
         Spacer(Modifier.height(8.dp))
 
         Text(
-            text = "A better app for your timetable.",
+            text = stringResource(R.string.onboarding_tagline),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -225,14 +238,38 @@ private fun PermissionsPage(
         ) {
             Column(Modifier.padding(18.dp)) {
                 Text(
-                    text = "Notifications (optional)",
+                    text = stringResource(R.string.onboarding_language_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                LanguageSettingsContent(
+                    language = language,
+                    onChange = onLanguageChange,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ),
+        ) {
+            Column(Modifier.padding(18.dp)) {
+                Text(
+                    text = stringResource(R.string.onboarding_notifications_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
 
                 Spacer(Modifier.height(4.dp))
 
                 Text(
-                    text = "Get notified about schedule changes and other events.",
+                    text = stringResource(R.string.onboarding_notifications_text),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -241,13 +278,13 @@ private fun PermissionsPage(
 
                 if (notifGranted) {
                     Text(
-                        text = "Granted",
+                        text = stringResource(R.string.onboarding_notifications_granted),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
                 } else {
                     Button(onClick = Haptics.haptic(onRequestNotifications)) {
-                        Text("Allow notifications")
+                        Text(stringResource(R.string.onboarding_notifications_allow))
                     }
                 }
             }
@@ -264,14 +301,14 @@ private fun PermissionsPage(
         ) {
             Column(Modifier.padding(18.dp)) {
                 Text(
-                    text = "Internet access (required)",
+                    text = stringResource(R.string.onboarding_internet_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
 
                 Spacer(Modifier.height(4.dp))
 
                 Text(
-                    text = "UntisX talks to your school's Untis server to load your timetable. No account is created, your credentials are only stored on this device.",
+                    text = stringResource(R.string.onboarding_internet_text),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -295,7 +332,7 @@ private fun ThemePage(
         Spacer(Modifier.height(32.dp))
 
         Text(
-            text = "Make it yours",
+            text = stringResource(R.string.onboarding_theme_title),
             style = MaterialTheme.typography.headlineMedium,
         )
 

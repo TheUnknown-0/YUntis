@@ -38,11 +38,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import sh.lsx.untisx.data.model.Holiday
@@ -51,6 +53,7 @@ import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.plusUntisWeeks
 import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
+import sh.lsx.untisx.R
 import sh.lsx.untisx.ui.util.tapHaptic
 import java.time.Duration
 import java.time.LocalDate
@@ -60,6 +63,17 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
+internal enum class DayPlaceholder {
+    HOLIDAY,
+    RESTRICTED,
+}
+
+@Composable
+private fun DayPlaceholder.label(): String = when (this) {
+    DayPlaceholder.HOLIDAY -> stringResource(R.string.timetable_holiday)
+    DayPlaceholder.RESTRICTED -> stringResource(R.string.timetable_restricted)
+}
+
 @Composable
 fun TimetableScreen(
     vm: TimetableViewModel = viewModel(),
@@ -283,7 +297,10 @@ private fun DayHeader(
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH),
+            text = date.dayOfWeek.getDisplayName(
+                TextStyle.SHORT,
+                LocalConfiguration.current.locales[0],
+            ),
             style = MaterialTheme.typography.titleMedium,
             color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
@@ -332,8 +349,8 @@ private fun WeekGrid(
                 events = dayLessons.filter { it.entry.subject.isEmpty() },
                 placeholder = when {
                     !isWeekday || dayLessons.isNotEmpty() -> null
-                    isHoliday -> "Holiday"
-                    isRestricted -> "Restricted"
+                    isHoliday -> DayPlaceholder.HOLIDAY
+                    isRestricted -> DayPlaceholder.RESTRICTED
                     else -> null
                 },
                 dayStart = dayStart,
@@ -409,7 +426,7 @@ private fun DayColumn(
     isPast: Boolean,
     lessons: List<LessonDisplay>,
     events: List<LessonDisplay>,
-    placeholder: String?,
+    placeholder: DayPlaceholder?,
     dayStart: Int,
     dayEnd: Int,
     gridHeight: Dp,
@@ -463,12 +480,14 @@ private fun DayColumn(
             )
         }
 
-        placeholder?.let { label ->
+        placeholder?.let { type ->
+            val label = type.label()
+
             Column(
                 modifier = Modifier.align(Alignment.Center),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (label == "Holiday") {
+                if (type == DayPlaceholder.HOLIDAY) {
                     Box(
                         modifier = Modifier
                             .background(

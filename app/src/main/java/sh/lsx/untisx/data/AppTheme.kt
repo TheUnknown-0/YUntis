@@ -6,13 +6,13 @@ import androidx.core.content.edit
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
-enum class ThemePreset(val label: String, val seed: Int) {
-    DEVICE("System", 0),
-    ORANGE("Orange", 0xFFEF6C00.toInt()),
-    BLUE("Blue", 0xFF1976D2.toInt()),
-    GREEN("Green", 0xFF388E3C.toInt()),
-    PURPLE("Purple", 0xFF7B1FA2.toInt()),
-    RED("Red", 0xFFD32F2F.toInt()),
+enum class ThemePreset(val seed: Int) {
+    DEVICE(0),
+    ORANGE(0xFFEF6C00.toInt()),
+    BLUE(0xFF1976D2.toInt()),
+    GREEN(0xFF388E3C.toInt()),
+    PURPLE(0xFF7B1FA2.toInt()),
+    RED(0xFFD32F2F.toInt()),
 }
 
 data class AppTheme(

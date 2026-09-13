@@ -14,7 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import sh.lsx.untisx.R
 import sh.lsx.untisx.ui.util.Haptics
 
 @Composable
@@ -63,7 +65,7 @@ private fun Banner(
             )
 
             TextButton(onClick = Haptics.haptic(onRetry)) {
-                Text("Retry")
+                Text(stringResource(R.string.retry))
             }
         }
     }

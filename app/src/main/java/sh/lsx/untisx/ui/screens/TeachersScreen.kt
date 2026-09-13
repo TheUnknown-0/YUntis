@@ -32,8 +32,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import sh.lsx.untisx.R
 import sh.lsx.untisx.data.model.MasterDataItem
 
 @Composable
@@ -64,13 +67,13 @@ fun TeachersListScreen(
                 Spacer(Modifier.height(12.dp))
 
                 Text(
-                    text = "No teachers found yet.",
+                    text = stringResource(R.string.teachers_empty),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
                 Text(
-                    text = "Open the timetable first to load data.",
+                    text = stringResource(R.string.teachers_empty_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 )
@@ -91,7 +94,7 @@ fun TeachersListScreen(
         LazyColumn(modifier = Modifier.weight(1f)) {
             item {
                 Text(
-                    text = "All Teachers (${filteredTeachers.size})",
+                    text = pluralStringResource(R.plurals.teachers_count, filteredTeachers.size, filteredTeachers.size),
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
@@ -146,7 +149,7 @@ private fun SearchBar(
         onValueChange = onQueryChange,
         placeholder = {
             Text(
-                text = "Search teachers...",
+                text = stringResource(R.string.teachers_search_hint),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
@@ -162,7 +165,7 @@ private fun SearchBar(
                 IconButton(onClick = { onQueryChange("") }) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = "Clear search",
+                        contentDescription = stringResource(R.string.teachers_clear_search),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

@@ -37,17 +37,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import sh.lsx.untisx.R
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.School
 import sh.lsx.untisx.ui.util.Haptics
+import sh.lsx.untisx.ui.util.UiText
+import sh.lsx.untisx.ui.util.uiTextString
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,7 +71,7 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
     var password by remember { mutableStateOf("") }
     var signingIn by remember { mutableStateOf(false) }
     var signedIn by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<UiText?>(null) }
 
     val searchCache = remember { mutableMapOf<String, List<School>>() }
 
@@ -111,7 +115,7 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
             }
         } catch (e: UntisException.Network) {
             if (query == schoolQuery.trim()) {
-                error = e.message
+                error = UiText.Res(R.string.error_network)
                 suggestionsExpanded = false
             }
         } finally {
@@ -151,13 +155,19 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
                 error = null
                 onDone?.invoke()
             } catch (e: UntisException.Network) {
-                error = e.message
+                error = UiText.Res(R.string.error_network)
             } catch (e: UntisException.BadCredentials) {
-                error = e.message
+                error = UiText.Res(R.string.error_bad_credentials)
             } catch (e: UntisException.Api) {
-                error = "Untis error ${e.code}: ${e.message}"
+                error = UiText.Res(
+                    R.string.error_untis_generic,
+                    listOf(UiText.Raw(e.code.toString()), UiText.Raw(e.message)),
+                )
             } catch (e: Exception) {
-                error = "Unexpected error: ${e.message}"
+                error = UiText.Res(
+                    R.string.error_unexpected,
+                    listOf(UiText.Raw(e.message ?: "")),
+                )
             } finally {
                 signingIn = false
             }
@@ -175,15 +185,15 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
         verticalArrangement = Arrangement.Center,
     ) {
         Image(
-            painter = painterResource(sh.lsx.untisx.R.drawable.app_logo),
-            contentDescription = "UntisX logo",
+            painter = painterResource(R.drawable.app_logo),
+            contentDescription = stringResource(R.string.untisx_logo),
             modifier = Modifier.size(96.dp),
         )
 
         Spacer(Modifier.height(16.dp))
 
         Text(
-            text = "Connect your Account",
+            text = stringResource(R.string.login_connect_account),
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center,
         )
@@ -203,7 +213,7 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
             )
 
             Text(
-                text = "Your username and password are encrypted using the Android Keystore and stored only on this device. They are sent exclusively to your school's Untis server.",
+                text = stringResource(R.string.login_privacy),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -224,22 +234,22 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
                     }
                     error = null
                 },
-                label = { Text("Your school") },
+                label = { Text(stringResource(R.string.login_school_label)) },
                 singleLine = true,
                 enabled = !signedIn,
                 supportingText = when {
                     sel != null -> {
                         {
-                            Text("${sel.server}, \"${sel.loginName}\"")
+                            Text(stringResource(R.string.login_school_selected, sel.server, sel.loginName))
                         }
                     }
 
                     searching -> {
-                        { Text("Searching...") }
+                        { Text(stringResource(R.string.login_searching)) }
                     }
 
                     tooManyResults -> {
-                        { Text("Too many schools match - keep typing.") }
+                        { Text(stringResource(R.string.login_too_many_results)) }
                     }
 
                     else -> null
@@ -297,7 +307,7 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
                 user = it
                 error = null
             },
-            label = { Text("Username") },
+            label = { Text(stringResource(R.string.login_username)) },
             singleLine = true,
             enabled = !signedIn,
             modifier = Modifier.fillMaxWidth(),
@@ -311,7 +321,7 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
                 password = it
                 error = null
             },
-            label = { Text("Password") },
+            label = { Text(stringResource(R.string.login_password)) },
             singleLine = true,
             enabled = !signedIn,
             visualTransformation = PasswordVisualTransformation(),
@@ -321,7 +331,7 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
         error?.let { message ->
             Spacer(Modifier.height(8.dp))
             Text(
-                text = message,
+                text = uiTextString(message),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -331,7 +341,7 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
 
         if (signedIn) {
             Text(
-                text = "Signed in.",
+                text = stringResource(R.string.login_signed_in),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -340,7 +350,10 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
                 onClick = Haptics.haptic(::signIn),
                 enabled = !signingIn && sel != null && user.isNotBlank() && password.isNotBlank(),
             ) {
-                Text(if (signingIn) "Signing in..." else "Sign in")
+                Text(
+                    if (signingIn) stringResource(R.string.login_signing_in)
+                    else stringResource(R.string.login_sign_in),
+                )
             }
         }
     }

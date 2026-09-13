@@ -9,7 +9,9 @@ import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import sh.lsx.untisx.R
 import sh.lsx.untisx.UntisXApp
+import sh.lsx.untisx.ui.util.UiText
 import java.io.File
 
 sealed interface UpdateState {
@@ -32,7 +34,7 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var pendingInstall by mutableStateOf<UpdateState.Downloaded?>(null)
         private set
-    var transientError by mutableStateOf<String?>(null)
+    var transientError by mutableStateOf<UiText?>(null)
         private set
 
     fun clearTransientError() {
@@ -71,7 +73,10 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
                 }
             } catch (e: Exception) {
                 state = UpdateState.Idle
-                transientError = "Update check failed: ${e.message}"
+                transientError = UiText.Res(
+                    R.string.error_update_check_failed,
+                    listOf(UiText.Raw(e.message ?: "")),
+                )
             }
         }
     }
@@ -95,7 +100,10 @@ class UpdateViewModel(application: Application) : AndroidViewModel(application) 
                 state = UpdateState.Downloaded(info, file)
             } catch (e: Exception) {
                 state = UpdateState.Available(info)
-                transientError = "Download failed: ${e.message}"
+                transientError = UiText.Res(
+                    R.string.error_download_failed,
+                    listOf(UiText.Raw(e.message ?: "")),
+                )
             }
         }
     }

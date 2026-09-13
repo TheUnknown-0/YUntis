@@ -3,10 +3,10 @@ package sh.lsx.untisx
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -58,11 +58,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import sh.lsx.untisx.R
 import sh.lsx.untisx.data.AppTheme
+import sh.lsx.untisx.data.LanguagePrefs
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.prefs.AccountPrefs
@@ -85,12 +88,15 @@ import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.theme.UntisXTheme
 import sh.lsx.untisx.ui.util.LocalHapticsEnabled
 import sh.lsx.untisx.ui.util.tapHaptic
+import sh.lsx.untisx.ui.util.uiTextString
 import sh.lsx.untisx.update.UpdateViewModel
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        LanguagePrefs.apply(LanguagePrefs.get(this))
 
         setContent {
             AppRoot()
@@ -289,7 +295,7 @@ private fun MainApp(
                 ) {
                     Image(
                         painter = painterResource(R.drawable.app_logo),
-                        contentDescription = "UntisX Logo",
+                        contentDescription = stringResource(R.string.untisx_logo),
                         modifier = Modifier.size(40.dp),
                     )
 
@@ -304,7 +310,7 @@ private fun MainApp(
 
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = "Close",
+                        contentDescription = stringResource(R.string.close),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .size(32.dp)
@@ -317,11 +323,11 @@ private fun MainApp(
                 }
 
                 Spacer(Modifier.height(16.dp))
-                SidebarSection("Information")
+                SidebarSection(stringResource(R.string.nav_information))
 
                 SidebarItem(
                     icon = Icons.Outlined.Person,
-                    label = "Teachers",
+                    label = stringResource(R.string.teachers),
                     badge = allTeachers.size.toString(),
                     onClick = {
                         scope.launch { drawerState.close() }
@@ -331,7 +337,7 @@ private fun MainApp(
 
                 SidebarItem(
                     icon = Icons.Outlined.DateRange,
-                    label = "Rooms",
+                    label = stringResource(R.string.rooms),
                     badge = "...",
                     onClick = {
                         scope.launch { drawerState.close() }
@@ -340,11 +346,11 @@ private fun MainApp(
                 )
 
                 Spacer(Modifier.height(16.dp))
-                SidebarSection("Other")
+                SidebarSection(stringResource(R.string.nav_other))
 
                 SidebarItem(
                     icon = Icons.Outlined.Settings,
-                    label = "Settings",
+                    label = stringResource(R.string.settings),
                     onClick = {
                         scope.launch { drawerState.close() }
                         currentScreen = Screen.SETTINGS
@@ -353,7 +359,7 @@ private fun MainApp(
 
                 SidebarItem(
                     icon = Icons.Outlined.Info,
-                    label = "About",
+                    label = stringResource(R.string.about),
                     onClick = {
                         scope.launch { drawerState.close() }
                         currentScreen = Screen.ABOUT
@@ -364,13 +370,13 @@ private fun MainApp(
     ) {
         val isTimetable = currentScreen == Screen.TIMETABLE
         val title = when (currentScreen) {
-            Screen.PROFILE -> "Profile"
-            Screen.LESSON_DETAILS -> "Lesson"
-            Screen.TEACHERS -> "Teachers"
-            Screen.ROOMS -> "Rooms"
-            Screen.SETTINGS -> "Settings"
-            Screen.ABOUT -> "About"
-            else -> "Timetable"
+            Screen.PROFILE -> stringResource(R.string.profile)
+            Screen.LESSON_DETAILS -> stringResource(R.string.lesson)
+            Screen.TEACHERS -> stringResource(R.string.teachers)
+            Screen.ROOMS -> stringResource(R.string.rooms)
+            Screen.SETTINGS -> stringResource(R.string.settings)
+            Screen.ABOUT -> stringResource(R.string.about)
+            else -> stringResource(R.string.timetable)
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
@@ -387,7 +393,7 @@ private fun MainApp(
                         if (isTimetable) {
                             Icon(
                                 imageVector = Icons.Outlined.Menu,
-                                contentDescription = "Menu",
+                                contentDescription = stringResource(R.string.menu),
                                 tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier
                                     .size(40.dp)
@@ -403,7 +409,7 @@ private fun MainApp(
                         } else {
                             Icon(
                                 imageVector = Icons.Outlined.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.back),
                                 tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier
                                     .size(40.dp)
@@ -423,7 +429,7 @@ private fun MainApp(
                         if (isTimetable) {
                             Icon(
                                 imageVector = Icons.Outlined.Person,
-                                contentDescription = "Profile",
+                                contentDescription = stringResource(R.string.profile),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
                                     .size(40.dp)
@@ -536,20 +542,20 @@ private fun MainApp(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 updateVm.transientError?.let { message ->
-                    ErrorBanner(text = message, onRetry = updateVm::check)
+                    ErrorBanner(text = uiTextString(message), onRetry = updateVm::check)
                 }
 
                 if (isTimetable) {
                     timetableVm.error?.let { loadError ->
-                        ErrorBanner(text = loadError.message, onRetry = timetableVm::retry)
+                        ErrorBanner(text = uiTextString(loadError.text), onRetry = timetableVm::retry)
                     }
 
                     timetableVm.info?.let { message ->
-                        InfoBanner(text = message, onRetry = timetableVm::retry)
+                        InfoBanner(text = uiTextString(message), onRetry = timetableVm::retry)
                     }
 
                     timetableVm.timegridError?.let { message ->
-                        InfoBanner(text = message, onRetry = timetableVm::retryTimegrid)
+                        InfoBanner(text = uiTextString(message), onRetry = timetableVm::retryTimegrid)
                     }
                 }
             }

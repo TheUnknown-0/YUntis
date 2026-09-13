@@ -29,8 +29,10 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import sh.lsx.untisx.R
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
@@ -41,7 +43,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val DAY_NAME_FORMAT = DateTimeFormatter.ofPattern("EEEE, d. MMMM yyyy", Locale.ENGLISH)
+private val DAY_NAME_FORMAT = DateTimeFormatter.ofPattern("EEEE, d. MMMM yyyy", Locale.getDefault())
 
 @Composable
 fun LessonDetailsScreen(
@@ -100,14 +102,14 @@ fun LessonDetailsScreen(
         }
 
         when {
-            entry.cancelled -> Badge("Cancelled", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
-            entry.irregular -> Badge("Changed", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
+            entry.cancelled -> Badge(stringResource(R.string.lesson_cancelled), MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
+            entry.irregular -> Badge(stringResource(R.string.lesson_changed), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
         }
 
         DetailCard {
-            DetailRow("Time", AnnotatedString("${entry.startTime.toUntisLocalTime().format(TIME_FORMAT)} - ${entry.endTime.toUntisLocalTime().format(TIME_FORMAT)}"))
-            ElementRow("Teacher", entry.teacher, teachersById)
-            ElementRow("Room", entry.room, roomsById)
+            DetailRow(stringResource(R.string.lesson_time), AnnotatedString("${entry.startTime.toUntisLocalTime().format(TIME_FORMAT)} - ${entry.endTime.toUntisLocalTime().format(TIME_FORMAT)}"))
+            ElementRow(stringResource(R.string.lesson_teacher), entry.teacher, teachersById)
+            ElementRow(stringResource(R.string.lesson_room), entry.room, roomsById)
         }
 
         entry.lstext?.takeIf { it.isNotBlank() }?.let { info ->
@@ -170,10 +172,15 @@ private fun strikethroughChange(orig: String, current: String): AnnotatedString 
         append(current)
     }
 
+@Composable
 private fun formatLessonDate(date: LocalDate, entry: TimetableEntry): String {
     val dayName = DAY_NAME_FORMAT.format(date)
 
-    return if (date == LocalDate.now()) "$dayName (Today)" else dayName
+    return if (date == LocalDate.now()) {
+        stringResource(R.string.lesson_date_today, dayName)
+    } else {
+        dayName
+    }
 }
 
 @Composable
