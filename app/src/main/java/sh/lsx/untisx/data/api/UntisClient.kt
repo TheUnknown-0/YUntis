@@ -231,6 +231,75 @@ object UntisClient {
         )
     }
 
+    data class MasterData(
+        val subjects: List<MasterDataItem>,
+        val teachers: List<MasterDataItem>,
+        val rooms: List<MasterDataItem>,
+        val holidays: List<Holiday>,
+        val timegrid: List<TimegridDay>,
+    )
+
+    suspend fun fetchMasterData(auth: AuthData, password: String): MasterData = withContext(Dispatchers.IO) {
+        val result = userData(auth, password)
+        val master = result.jsonObject["masterData"]?.jsonObject
+
+        MasterData(
+            subjects = parseMasterItems(master?.get("subjects")),
+            teachers = parseUserDataTeachers(master?.get("teachers") as? JsonArray ?: JsonArray(emptyList())),
+            rooms = parseMasterItems(master?.get("rooms")),
+            holidays = parseUserDataHolidays(master?.get("holidays")),
+            timegrid = parseTimegridResponse(result),
+        ).also {
+            Log.d(
+                TAG,
+                "masterData -> subjects=${it.subjects.size} teachers=${it.teachers.size} " +
+                    "rooms=${it.rooms.size} holidays=${it.holidays.size} timegrid=${it.timegrid.size}",
+            )
+        }
+    }
+
+    private fun parseMasterItems(element: JsonElement?): List<MasterDataItem> {
+        val array = element as? JsonArray ?: return emptyList()
+
+        return array.mapNotNull { item ->
+            val obj = runCatching { item.jsonObject }.getOrNull() ?: return@mapNotNull null
+            val id = obj["id"]?.jsonPrimitive?.intOrNull ?: return@mapNotNull null
+            if (id <= 0) return@mapNotNull null
+
+            val name = obj["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+
+            MasterDataItem(
+                id = id,
+                name = name,
+                longName = obj["longName"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: name,
+                foreName = obj["foreName"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            )
+        }
+    }
+
+    private fun parseUserDataHolidays(element: JsonElement?): List<Holiday> {
+        val array = element as? JsonArray ?: return emptyList()
+
+        return array.mapNotNull { item ->
+            val obj = runCatching { item.jsonObject }.getOrNull() ?: return@mapNotNull null
+            val id = obj["id"]?.jsonPrimitive?.intOrNull ?: return@mapNotNull null
+
+            val name = obj["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            val start = parseIsoDate(obj["startDate"]?.jsonPrimitive?.contentOrNull.orEmpty())
+            val end = parseIsoDate(obj["endDate"]?.jsonPrimitive?.contentOrNull.orEmpty())
+
+            if (start == 0 || end == 0) return@mapNotNull null
+
+            Holiday(
+                id = id,
+                name = name,
+                longName = obj["longName"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: name,
+                startDate = start,
+                endDate = end,
+            )
+        }
+    }
+
     suspend fun fetchTimegridViaUserData(auth: AuthData, password: String): List<TimegridDay> = withContext(Dispatchers.IO) {
         parseTimegridResponse(userData(auth, password))
             .also { Log.d(TAG, "timegrid via getUserData2017 -> ${it.size} days") }

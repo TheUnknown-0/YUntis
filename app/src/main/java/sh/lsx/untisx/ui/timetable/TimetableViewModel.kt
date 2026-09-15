@@ -405,27 +405,43 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         val currentAuth = auth ?: return
 
         viewModelScope.launch {
-            coroutineScope {
-                val subjects = async { optional("getSubjects") { UntisClient.getSubjects(currentAuth) } }
-                val teachers = async { loadTeachers(currentAuth) }
-                val rooms = async { optional("getRooms") { UntisClient.getRooms(currentAuth) } }
-                val holidays = async { optional("getHolidays") { UntisClient.getHolidays(currentAuth) } }
-                val timegrid = async { optional("getTimegrid") { resolveTimegrid(currentAuth) } }
+            val master = optional("masterData") {
+                UntisClient.fetchMasterData(currentAuth, withPassword())
+            }
 
-                subjects.await()?.let { subjectsById = it.associateBy { item -> item.id } }
-                teachers.await()?.let { list ->
-                    if (list.isNotEmpty()) teachersById = list.associateBy { item -> item.id }
-                }
-                rooms.await()?.let { roomsById = it.associateBy { item -> item.id } }
-                holidays.await()?.let { this@TimetableViewModel.holidays = it }
-
-                val grid = timegrid.await()
-                if (!grid.isNullOrEmpty()) this@TimetableViewModel.timegrid = grid
+            if (master != null) {
+                if (master.subjects.isNotEmpty()) subjectsById = master.subjects.associateBy { it.id }
+                if (master.teachers.isNotEmpty()) teachersById = master.teachers.associateBy { it.id }
+                if (master.rooms.isNotEmpty()) roomsById = master.rooms.associateBy { it.id }
+                if (master.holidays.isNotEmpty()) holidays = master.holidays
+                if (master.timegrid.isNotEmpty()) timegrid = master.timegrid
+            } else {
+                loadStaticDataLegacy(currentAuth)
             }
 
             mergeTimetableElements()
             persistCache()
             scanSubjectsIfPossible()
+        }
+    }
+
+    private suspend fun loadStaticDataLegacy(currentAuth: AuthData) {
+        coroutineScope {
+            val subjects = async { optional("getSubjects") { UntisClient.getSubjects(currentAuth) } }
+            val teachers = async { loadTeachers(currentAuth) }
+            val rooms = async { optional("getRooms") { UntisClient.getRooms(currentAuth) } }
+            val holidays = async { optional("getHolidays") { UntisClient.getHolidays(currentAuth) } }
+            val timegrid = async { optional("getTimegrid") { resolveTimegrid(currentAuth) } }
+
+            subjects.await()?.let { subjectsById = it.associateBy { item -> item.id } }
+            teachers.await()?.let { list ->
+                if (list.isNotEmpty()) teachersById = list.associateBy { item -> item.id }
+            }
+            rooms.await()?.let { roomsById = it.associateBy { item -> item.id } }
+            holidays.await()?.let { this@TimetableViewModel.holidays = it }
+
+            val grid = timegrid.await()
+            if (!grid.isNullOrEmpty()) this@TimetableViewModel.timegrid = grid
         }
     }
 
