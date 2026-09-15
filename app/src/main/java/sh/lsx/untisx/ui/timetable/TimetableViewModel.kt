@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
@@ -26,6 +27,7 @@ import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.prefs.PasswordVault
 import sh.lsx.untisx.data.model.TimetableEntry
+import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimegridDay
 import sh.lsx.untisx.data.model.plusUntisWeeks
 import sh.lsx.untisx.data.model.toUntisDate
@@ -224,6 +226,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                     .sortedWith(compareBy({ it.date }, { it.startTime }))
 
                 addKnownSubjects(getApplication(), subjectNamesOf(weekCache[claimed] ?: emptyList()))
+                mergeTimetableElements()
 
                 synchronized(failedWeeks) { failedWeeks.remove(claimed) }
 
@@ -402,29 +405,76 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         val currentAuth = auth ?: return
 
         viewModelScope.launch {
-            try {
-                coroutineScope {
-                    val subjects = async { UntisClient.getSubjects(currentAuth) }
-                    val teachers = async { UntisClient.getTeachers(currentAuth) }
-                    val rooms = async { UntisClient.getRooms(currentAuth) }
-                    val holidays = async { UntisClient.getHolidays(currentAuth) }
-                    val timegrid = async { resolveTimegrid(currentAuth) }
+            coroutineScope {
+                val subjects = async { optional("getSubjects") { UntisClient.getSubjects(currentAuth) } }
+                val teachers = async { loadTeachers(currentAuth) }
+                val rooms = async { optional("getRooms") { UntisClient.getRooms(currentAuth) } }
+                val holidays = async { optional("getHolidays") { UntisClient.getHolidays(currentAuth) } }
+                val timegrid = async { optional("getTimegrid") { resolveTimegrid(currentAuth) } }
 
-                    this@TimetableViewModel.subjectsById = subjects.await().associateBy { it.id }
-                    this@TimetableViewModel.teachersById = teachers.await().associateBy { it.id }
-                    this@TimetableViewModel.roomsById = rooms.await().associateBy { it.id }
-                    this@TimetableViewModel.holidays = holidays.await()
-
-                    val grid = timegrid.await()
-                    if (grid.isNotEmpty()) this@TimetableViewModel.timegrid = grid
+                subjects.await()?.let { subjectsById = it.associateBy { item -> item.id } }
+                teachers.await()?.let { list ->
+                    if (list.isNotEmpty()) teachersById = list.associateBy { item -> item.id }
                 }
+                rooms.await()?.let { roomsById = it.associateBy { item -> item.id } }
+                holidays.await()?.let { this@TimetableViewModel.holidays = it }
 
-                persistCache()
-                scanSubjectsIfPossible()
-            } catch (e: Exception) {
-                Log.d(TAG, "static data failed: ${e.message}")
+                val grid = timegrid.await()
+                if (!grid.isNullOrEmpty()) this@TimetableViewModel.timegrid = grid
             }
+
+            mergeTimetableElements()
+            persistCache()
+            scanSubjectsIfPossible()
         }
+    }
+
+    private suspend fun <T> optional(label: String, block: suspend () -> T): T? =
+        try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.d(TAG, "static data: $label failed: ${e.message}")
+            null
+        }
+
+    private suspend fun loadTeachers(currentAuth: AuthData): List<MasterDataItem>? {
+        optional("getTeachers") { UntisClient.getTeachers(currentAuth) }
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+
+        return optional("getTeachers (user data)") {
+            UntisClient.fetchTeachersViaUserData(currentAuth, withPassword())
+        }
+    }
+
+    private fun mergeTimetableElements() {
+        subjectsById = mergeMissing(subjectsById) { it.subject }
+        teachersById = mergeMissing(teachersById) { it.teacher }
+        roomsById = mergeMissing(roomsById) { it.room }
+    }
+
+    private fun mergeMissing(
+        current: Map<Int, MasterDataItem>,
+        selector: (TimetableEntry) -> List<TimetableElement>,
+    ): Map<Int, MasterDataItem> {
+        val derived = weekCache.values
+            .asSequence()
+            .flatten()
+            .flatMap { entry -> selector(entry).asSequence() }
+            .filter { it.id > 0 && it.name.isNotBlank() }
+            .associate { it.id to MasterDataItem(id = it.id, name = it.name) }
+
+        if (derived.isEmpty()) return current
+
+        val merged = HashMap(current)
+
+        for ((id, item) in derived) {
+            if (merged[id]?.name.isNullOrBlank()) merged[id] = item
+        }
+
+        return merged
     }
 
     private fun scanSubjectsIfPossible() {

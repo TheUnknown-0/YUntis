@@ -214,10 +214,10 @@ object UntisClient {
         )
     }
 
-    suspend fun fetchTimegridViaUserData(auth: AuthData, password: String): List<TimegridDay> = withContext(Dispatchers.IO) {
+    private fun userData(auth: AuthData, password: String): JsonElement {
         val totp = internTotp(auth, password)
 
-        val result = executeRpc(
+        return executeRpc(
             totp.url,
             "getUserData2017",
             buildJsonArray {
@@ -229,9 +229,36 @@ object UntisClient {
                 })
             },
         )
-
-        parseTimegridResponse(result).also { Log.d(TAG, "timegrid via getUserData2017 -> ${it.size} days") }
     }
+
+    suspend fun fetchTimegridViaUserData(auth: AuthData, password: String): List<TimegridDay> = withContext(Dispatchers.IO) {
+        parseTimegridResponse(userData(auth, password))
+            .also { Log.d(TAG, "timegrid via getUserData2017 -> ${it.size} days") }
+    }
+
+    suspend fun fetchTeachersViaUserData(auth: AuthData, password: String): List<MasterDataItem> = withContext(Dispatchers.IO) {
+        val array = runCatching {
+            userData(auth, password).jsonObject["masterData"]?.jsonObject?.get("teachers")?.jsonArray
+        }.getOrNull() ?: return@withContext emptyList()
+
+        parseUserDataTeachers(array).also { Log.d(TAG, "teachers via getUserData2017 -> ${it.size}") }
+    }
+
+    private fun parseUserDataTeachers(array: JsonArray): List<MasterDataItem> =
+        array.mapNotNull { element ->
+            val obj = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
+            val id = obj["id"]?.jsonPrimitive?.intOrNull ?: return@mapNotNull null
+            if (id <= 0) return@mapNotNull null
+
+            val name = obj["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+
+            MasterDataItem(
+                id = id,
+                name = name,
+                longName = obj["lastName"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: name,
+                foreName = obj["firstName"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            )
+        }
 
     private fun parseTimegridResponse(result: JsonElement): List<TimegridDay> {
         val daysElement = runCatching {
