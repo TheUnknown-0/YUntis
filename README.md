@@ -14,6 +14,7 @@ An open-source timetable viewer for the Untis school system - built natively wit
 - **Subject colors** - every subject color can be customized
 - **Teachers & rooms** - the whole school at a glance
 - **Offline** - your timetable is cached locally and opens instantly
+- **Notifications** - alerts for cancellations and room/teacher changes, automatically silent during lessons, plus an overview of the upcoming school day
 - **In-app updates** - new versions install straight from the app
 - **Lightweight** - small, fast, no ads, no tracking
 
@@ -35,6 +36,8 @@ UntisX is in early development - expect bugs and incomplete features. If you fin
 Your username and password are sent exclusively to your school's Untis server and nowhere else. There is no analytics or tracking.
 
 The only external contact besides your Untis server is this project's releases for updates.
+
+If you enable notifications, UntisX periodically checks your timetable on your school's Untis server in the background (you can choose the interval and restrict it to Wi-Fi or school days). The data is compared locally on your device to detect changes - nothing is sent anywhere else.
 
 ---
 

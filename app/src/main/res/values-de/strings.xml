@@ -31,6 +31,7 @@
     <string name="onboarding_get_started">Los geht\'s</string>
     <string name="onboarding_welcome">Willkommen bei UntisX</string>
     <string name="onboarding_tagline">Eine bessere app für deinen Stundenplan.</string>
+    <string name="onboarding_permissions_title">Berechtigungen</string>
     <string name="onboarding_notifications_title">Benachrichtigungen (optional)</string>
     <string name="onboarding_notifications_text">Erhalte Benachrichtigungen bei Änderungen an deinem Stundenplan und weiteren Ereignissen.</string>
     <string name="onboarding_notifications_granted">Erlaubt</string>
@@ -70,13 +71,17 @@
     <string name="profile_remove_dialog_text">„%1$s“ bei „%2$s“ wird abgemeldet und von diesem Gerät entfernt.</string>
 
     <!-- Settings -->
+    <string name="settings_general">Allgemeines</string>
+    <string name="settings_general_desc">Sprache, haptisches Feedback, ...</string>
     <string name="settings_appearance">Erscheinungsbild</string>
+    <string name="settings_appearance_desc">Design &amp; Akzentfarbe</string>
     <string name="settings_theme_mode">Modus</string>
     <string name="settings_accent_color">Akzentfarbe</string>
     <string name="settings_haptics">Haptisches Feedback</string>
     <string name="settings_language">Sprache</string>
     <string name="settings_language_system">System</string>
     <string name="settings_timetable_colors">Stundenplan-Farben</string>
+    <string name="settings_timetable_desc">Stundenfarben und -darstellung</string>
     <string name="settings_default_subject_color">Standardfarbe für Fächer</string>
     <string name="settings_card_text_color">Textfarbe der Karten</string>
     <string name="settings_no_subjects">Noch keine Fächer gefunden. Öffne deinen Stundenplan, um die Farben deiner Fächer anzupassen.</string>
@@ -184,4 +189,54 @@
     <string name="color_picker_use_default">Standardfarbe verwenden</string>
     <string name="color_picker_custom_hex">Eigener Hex-Code</string>
     <string name="color_picker_invalid_hex">Das ist kein gültiger Hex-Code.</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_changes">Stundenplanänderungen</string>
+    <string name="notif_channel_changes_desc">Benachrichtigt über entfallene Stunden sowie Raum- oder Lehrerwechsel.</string>
+    <string name="notif_channel_changes_silent">Stundenplanänderungen (lautlos)</string>
+    <string name="notif_channel_changes_silent_desc">Wie Stundenplanänderungen, aber ohne Ton.</string>
+    <string name="notif_channel_overview">Stundenplan-Übersicht</string>
+    <string name="notif_channel_overview_desc">Informiert dich über den nächsten Schultag.</string>
+    <string name="notif_channel_overview_silent">Stundenplan-Übersicht (lautlos)</string>
+    <string name="notif_channel_overview_silent_desc">Wie die Stundenplan-Übersicht, aber ohne Ton.</string>
+    <string name="notif_change_cancelled_title">Stunde entfällt</string>
+    <string name="notif_change_room_title">Raumwechsel</string>
+    <string name="notif_change_teacher_title">Lehrerwechsel</string>
+    <string name="notif_change_cancelled_text">%1$s am %2$s, %3$s entfällt.</string>
+    <string name="notif_change_room_text">%1$s am %2$s, %3$s: Raum %4$s.</string>
+    <string name="notif_change_teacher_text">%1$s am %2$s, %3$s: Lehrer %4$s.</string>
+    <string name="notif_change_from_to">%1$s → %2$s</string>
+
+    <!-- Onboarding: exact alarms -->
+    <string name="onboarding_exact_alarm_title">Exakte Alarme (optional)</string>
+    <string name="onboarding_exact_alarm_text">Ermöglicht die Stundenplan-Übersicht exakt zu deiner gewählten Zeit.</string>
+    <string name="onboarding_exact_alarm_granted">Erlaubt</string>
+    <string name="onboarding_exact_alarm_allow">Exakte Alarme erlauben</string>
+
+    <!-- Notification settings -->
+    <string name="settings_notifications">Benachrichtigungen</string>
+    <string name="settings_notifications_desc">Stundenplanänderngen und -übersicht</string>
+    <string name="settings_notifications_master">Benachrichtigungen aktivieren</string>
+    <string name="settings_notifications_master_desc">UntisX erlauben, Benachrichtigungen zu senden.</string>
+    <string name="settings_notifications_permission_missing">Benachrichtigungen sind in den Systemeinstellungen deaktiviert.</string>
+    <string name="settings_notifications_grant">Benachrichtigungen erlauben</string>
+    <string name="settings_notifications_exact_alarm_desc">Exakte Alarme sind nicht erlaubt - die Übersicht kann sich verzögern.</string>
+    <string name="settings_notifications_exact_alarm_grant">Exakte Alarme erlauben</string>
+    <string name="settings_notifications_last_sync">Letzte Prüfung: %1$s</string>
+    <string name="settings_notifications_changes">Stundenplanänderungen</string>
+    <string name="settings_notifications_changes_enable">Auf Änderungen prüfen</string>
+    <string name="settings_notifications_type_cancelled">Entfallene Stunden</string>
+    <string name="settings_notifications_type_room">Raumwechsel</string>
+    <string name="settings_notifications_type_teacher">Lehrerwechsel</string>
+    <string name="settings_notifications_interval">Prüfintervall</string>
+    <string name="settings_notifications_silent">Lautlos</string>
+    <string name="settings_notifications_silent_desc">Kein Ton und keine Vibration.</string>
+    <string name="settings_notifications_silent_lessons">Lautlos während Stunden</string>
+    <string name="settings_notifications_silent_lessons_desc">Bleibt automatisch stumm, während du Unterricht hast.</string>
+    <string name="settings_notifications_overview">Nächster Schultag</string>
+    <string name="settings_notifications_overview_enable">Übersicht senden</string>
+    <string name="settings_notifications_overview_time">Uhrzeit</string>
+    <string name="settings_notifications_overview_time_desc">Vor 12:00 Uhr bekommst du die Stunden von heute, ab 12:00 Uhr die von morgen.</string>
+    <string name="settings_notifications_overview_detailed">Räume und Lehrer anzeigen</string>
+    <string name="settings_notifications_overview_show_changes">Änderungen anzeigen</string>
 </resources>

@@ -1,5 +1,4 @@
 package sh.lsx.untisx.ui.timetable
-import android.util.Log
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -52,7 +51,9 @@ import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.plusUntisWeeks
 import sh.lsx.untisx.data.model.toUntisDate
+import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
+import sh.lsx.untisx.data.model.toUntisWeekStart
 import sh.lsx.untisx.R
 import sh.lsx.untisx.ui.util.tapHaptic
 import java.time.Duration
@@ -60,12 +61,24 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.TextStyle
-import java.util.Locale
+import java.time.temporal.ChronoUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 internal enum class DayPlaceholder {
     HOLIDAY,
     RESTRICTED,
+}
+
+private fun focusPageFor(date: Int): Int {
+    if (date <= 0) return TimetableViewModel.CENTER
+
+    val target = runCatching { date.toUntisLocalDate().toUntisWeekStart() }.getOrNull()
+        ?: return TimetableViewModel.CENTER
+
+    val current = LocalDate.now().toUntisWeekStart()
+    val weeks = ChronoUnit.WEEKS.between(current, target).toInt()
+
+    return (TimetableViewModel.CENTER + weeks).coerceIn(0, TimetableViewModel.WEEK_SPAN - 1)
 }
 
 @Composable
@@ -82,6 +95,8 @@ fun TimetableScreen(
     textColor: Color = Color(0xFF212121),
     cancelledStrike: Boolean = true,
     onLessonClick: (TimetableEntry) -> Unit = {},
+    focusDate: Int = 0,
+    focusNonce: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val error = vm.error
@@ -93,9 +108,13 @@ fun TimetableScreen(
     }
 
     val pagerState = rememberPagerState(
-        initialPage = TimetableViewModel.CENTER,
+        initialPage = remember { focusPageFor(focusDate) },
         pageCount = { TimetableViewModel.WEEK_SPAN },
     )
+
+    LaunchedEffect(focusNonce) {
+        if (focusDate > 0) pagerState.scrollToPage(focusPageFor(focusDate))
+    }
 
     LaunchedEffect(pagerState.settledPage) {
         vm.ensureWeekPage(pagerState.settledPage)

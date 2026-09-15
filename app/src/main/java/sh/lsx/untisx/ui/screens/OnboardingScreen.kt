@@ -51,11 +51,13 @@ import sh.lsx.untisx.R
 import sh.lsx.untisx.data.AppLanguage
 import sh.lsx.untisx.data.AppTheme
 import sh.lsx.untisx.data.LanguagePrefs
+import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.ui.components.LanguageSettingsContent
-import sh.lsx.untisx.ui.components.ThemeSettingsContent
+import sh.lsx.untisx.ui.components.ThemeAccentSettingsContent
+import sh.lsx.untisx.ui.components.ThemeModeSettingsContent
 import sh.lsx.untisx.ui.util.Haptics
 
-private const val PAGE_COUNT = 3
+private const val PAGE_COUNT = 4
 
 @Composable
 fun OnboardingScreen(
@@ -94,11 +96,7 @@ fun OnboardingScreen(
                 modifier = Modifier.weight(1f),
             ) { page ->
                 when (page) {
-                    0 -> PermissionsPage(
-                        notifGranted = notifGranted,
-                        onRequestNotifications = {
-                            notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        },
+                    0 -> WelcomePage(
                         language = language,
                         onLanguageChange = { newLanguage ->
                             language = newLanguage
@@ -106,9 +104,16 @@ fun OnboardingScreen(
                         },
                     )
 
-                    1 -> LoginScreen()
+                    1 -> PermissionsPage(
+                        notifGranted = notifGranted,
+                        onRequestNotifications = {
+                            notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        },
+                    )
 
-                    2 -> ThemePage(
+                    2 -> LoginScreen()
+
+                    3 -> ThemePage(
                         theme = theme,
                         onChange = onThemeChange,
                     )
@@ -139,8 +144,8 @@ fun OnboardingScreen(
                 }
 
                 val stepComplete = when (pagerState.currentPage) {
-                    0 -> notifGranted
-                    1 -> loggedIn
+                    1 -> notifGranted
+                    2 -> loggedIn
                     else -> true
                 }
 
@@ -190,9 +195,7 @@ private fun PageIndicator(pageCount: Int, currentPage: Int, modifier: Modifier =
 }
 
 @Composable
-private fun PermissionsPage(
-    notifGranted: Boolean,
-    onRequestNotifications: () -> Unit,
+private fun WelcomePage(
     language: AppLanguage,
     onLanguageChange: (AppLanguage) -> Unit,
 ) {
@@ -207,14 +210,14 @@ private fun PermissionsPage(
         Image(
             painter = painterResource(R.drawable.app_logo),
             contentDescription = stringResource(R.string.untisx_logo),
-            modifier = Modifier.size(96.dp),
+            modifier = Modifier.size(196.dp),
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
 
         Text(
             text = stringResource(R.string.onboarding_welcome),
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineLarge,
             textAlign = TextAlign.Center,
         )
 
@@ -227,7 +230,7 @@ private fun PermissionsPage(
             textAlign = TextAlign.Center,
         )
 
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(86.dp))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -250,8 +253,29 @@ private fun PermissionsPage(
                 )
             }
         }
+    }
+}
 
-        Spacer(Modifier.height(12.dp))
+@Composable
+private fun PermissionsPage(
+    notifGranted: Boolean,
+    onRequestNotifications: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = stringResource(R.string.onboarding_permissions_title),
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center,
+        )
+
+        Spacer(Modifier.height(24.dp))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -292,6 +316,12 @@ private fun PermissionsPage(
 
         Spacer(Modifier.height(12.dp))
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ExactAlarmCard()
+
+            Spacer(Modifier.height(12.dp))
+        }
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -318,6 +348,58 @@ private fun PermissionsPage(
 }
 
 @Composable
+private fun ExactAlarmCard() {
+    val context = LocalContext.current
+    var granted by remember { mutableStateOf(NotificationScheduler.canScheduleExactAlarms(context)) }
+
+    LifecycleResumeEffect(Unit) {
+        granted = NotificationScheduler.canScheduleExactAlarms(context)
+        onPauseOrDispose { }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Text(
+                text = stringResource(R.string.onboarding_exact_alarm_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                text = stringResource(R.string.onboarding_exact_alarm_text),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            if (granted) {
+                Text(
+                    text = stringResource(R.string.onboarding_exact_alarm_granted),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                Button(
+                    onClick = Haptics.haptic {
+                        NotificationScheduler.openExactAlarmSettings(context)
+                    },
+                ) {
+                    Text(stringResource(R.string.onboarding_exact_alarm_allow))
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ThemePage(
     theme: AppTheme,
     onChange: (AppTheme) -> Unit,
@@ -328,9 +410,8 @@ private fun ThemePage(
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Spacer(Modifier.height(32.dp))
-
         Text(
             text = stringResource(R.string.onboarding_theme_title),
             style = MaterialTheme.typography.headlineMedium,
@@ -338,6 +419,44 @@ private fun ThemePage(
 
         Spacer(Modifier.height(24.dp))
 
-        ThemeSettingsContent(theme = theme, onChange = onChange)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ),
+        ) {
+            Column(Modifier.padding(18.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_theme_mode),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                ThemeModeSettingsContent(theme = theme, onChange = onChange)
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ),
+        ) {
+            Column(Modifier.padding(18.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_accent_color),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                ThemeAccentSettingsContent(theme = theme, onChange = onChange)
+            }
+        }
     }
 }

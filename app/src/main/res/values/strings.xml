@@ -31,6 +31,7 @@
     <string name="onboarding_get_started">Get started</string>
     <string name="onboarding_welcome">Welcome to UntisX</string>
     <string name="onboarding_tagline">A better app for your timetable.</string>
+    <string name="onboarding_permissions_title">Permissions</string>
     <string name="onboarding_notifications_title">Notifications (optional)</string>
     <string name="onboarding_notifications_text">Get notified about schedule changes and other events.</string>
     <string name="onboarding_notifications_granted">Granted</string>
@@ -70,13 +71,17 @@
     <string name="profile_remove_dialog_text">Sign out \"%1$s\" at \"%2$s\" and remove it from this device?</string>
 
     <!-- Settings -->
+    <string name="settings_general">General</string>
+    <string name="settings_general_desc">Language, haptics, ...</string>
     <string name="settings_appearance">Appearance</string>
+    <string name="settings_appearance_desc">Theme &amp; accent color</string>
     <string name="settings_theme_mode">Mode</string>
     <string name="settings_accent_color">Accent Color</string>
     <string name="settings_haptics">Haptic feedback</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_system">System</string>
     <string name="settings_timetable_colors">Timetable colors</string>
+    <string name="settings_timetable_desc">Lesson colors and layout</string>
     <string name="settings_default_subject_color">Default subject color</string>
     <string name="settings_card_text_color">Card text color</string>
     <string name="settings_no_subjects">No subjects scanned yet. Scan your timetable to customize subject colors.</string>
@@ -184,4 +189,54 @@
     <string name="color_picker_use_default">Use default color</string>
     <string name="color_picker_custom_hex">Custom hex</string>
     <string name="color_picker_invalid_hex">Invalid hex color.</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_changes">Schedule changes</string>
+    <string name="notif_channel_changes_desc">Notifies you about cancelled lessons, room or teacher changes.</string>
+    <string name="notif_channel_changes_silent">Schedule changes (silent)</string>
+    <string name="notif_channel_changes_silent_desc">Same as schedule changes, but without sound.</string>
+    <string name="notif_channel_overview">Timetable overview</string>
+    <string name="notif_channel_overview_desc">Tells you about the upcoming school day.</string>
+    <string name="notif_channel_overview_silent">Timetable overview (silent)</string>
+    <string name="notif_channel_overview_silent_desc">Same as timetable overview, but without sound.</string>
+    <string name="notif_change_cancelled_title">Lesson cancelled</string>
+    <string name="notif_change_room_title">Room change</string>
+    <string name="notif_change_teacher_title">Teacher change</string>
+    <string name="notif_change_cancelled_text">%1$s on %2$s, %3$s was cancelled.</string>
+    <string name="notif_change_room_text">%1$s on %2$s, %3$s: room %4$s.</string>
+    <string name="notif_change_teacher_text">%1$s on %2$s, %3$s: teacher %4$s.</string>
+    <string name="notif_change_from_to">%1$s → %2$s</string>
+
+    <!-- Onboarding: exact alarms -->
+    <string name="onboarding_exact_alarm_title">Exact alarms (optional)</string>
+    <string name="onboarding_exact_alarm_text">Lets UntisX deliver the timetable overview exactly at your chosen time.</string>
+    <string name="onboarding_exact_alarm_granted">Granted</string>
+    <string name="onboarding_exact_alarm_allow">Allow exact alarms</string>
+
+    <!-- Notification settings -->
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_desc">Schedule changes and overview</string>
+    <string name="settings_notifications_master">Enable notifications</string>
+    <string name="settings_notifications_master_desc">Allow UntisX to send notifications.</string>
+    <string name="settings_notifications_permission_missing">Notifications are disabled in the system settings.</string>
+    <string name="settings_notifications_grant">Allow notifications</string>
+    <string name="settings_notifications_exact_alarm_desc">Exact alarms are not allowed - the overview may be delayed.</string>
+    <string name="settings_notifications_exact_alarm_grant">Allow exact alarms</string>
+    <string name="settings_notifications_last_sync">Last sync: %1$s</string>
+    <string name="settings_notifications_changes">Schedule changes</string>
+    <string name="settings_notifications_changes_enable">Watch for changes</string>
+    <string name="settings_notifications_type_cancelled">Cancelled lessons</string>
+    <string name="settings_notifications_type_room">Room changes</string>
+    <string name="settings_notifications_type_teacher">Teacher changes</string>
+    <string name="settings_notifications_interval">Check interval</string>
+    <string name="settings_notifications_silent">Silent</string>
+    <string name="settings_notifications_silent_desc">No sound or vibration.</string>
+    <string name="settings_notifications_silent_lessons">Silent during lessons</string>
+    <string name="settings_notifications_silent_lessons_desc">Automatically stays silent while a lesson is in progress.</string>
+    <string name="settings_notifications_overview">Upcoming school day</string>
+    <string name="settings_notifications_overview_enable">Send overview</string>
+    <string name="settings_notifications_overview_time">Time</string>
+    <string name="settings_notifications_overview_time_desc">Before 12:00 you get the lessons for today, from 12:00 the lessons for tomorrow.</string>
+    <string name="settings_notifications_overview_detailed">Show rooms and teachers</string>
+    <string name="settings_notifications_overview_show_changes">Show changes</string>
 </resources>

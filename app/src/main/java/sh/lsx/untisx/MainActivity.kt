@@ -1,6 +1,7 @@
 package sh.lsx.untisx
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
@@ -46,6 +47,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -72,6 +74,8 @@ import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.ThemePrefs
+import sh.lsx.untisx.data.notifications.NotificationScheduler
+import sh.lsx.untisx.data.notifications.Notifications
 import sh.lsx.untisx.ui.components.UpdateDialog
 import sh.lsx.untisx.ui.screens.AboutScreen
 import sh.lsx.untisx.ui.screens.LessonDetailsScreen
@@ -79,8 +83,13 @@ import sh.lsx.untisx.ui.screens.ProfileScreen
 import sh.lsx.untisx.ui.screens.LoginScreen
 import sh.lsx.untisx.ui.screens.OnboardingScreen
 import sh.lsx.untisx.ui.screens.RoomsListScreen
-import sh.lsx.untisx.ui.screens.SettingsScreen
 import sh.lsx.untisx.ui.screens.TeachersListScreen
+import sh.lsx.untisx.ui.screens.settings.AppearanceSettingsScreen
+import sh.lsx.untisx.ui.screens.settings.GeneralSettingsScreen
+import sh.lsx.untisx.ui.screens.settings.NotificationSettingsScreen
+import sh.lsx.untisx.ui.screens.settings.SettingsCategory
+import sh.lsx.untisx.ui.screens.settings.SettingsOverviewScreen
+import sh.lsx.untisx.ui.screens.settings.TimetableSettingsScreen
 import sh.lsx.untisx.ui.timetable.ErrorBanner
 import sh.lsx.untisx.ui.timetable.InfoBanner
 import sh.lsx.untisx.ui.timetable.TimetableScreen
@@ -92,14 +101,35 @@ import sh.lsx.untisx.ui.util.uiTextString
 import sh.lsx.untisx.update.UpdateViewModel
 
 class MainActivity : AppCompatActivity() {
+
+    private var focusDate by mutableIntStateOf(0)
+    private var focusNonce by mutableIntStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         LanguagePrefs.apply(LanguagePrefs.get(this))
+        handleIntent(intent)
 
         setContent {
-            AppRoot()
+            AppRoot(focusDate = focusDate, focusNonce = focusNonce)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val date = intent?.getIntExtra(Notifications.EXTRA_FOCUS_DATE, 0) ?: 0
+
+        if (date > 0) {
+            focusDate = date
+            focusNonce++
         }
     }
 }
@@ -112,7 +142,10 @@ private fun prefsEdit(context: Context) =
     context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE).edit()
 
 @Composable
-private fun AppRoot() {
+private fun AppRoot(
+    focusDate: Int,
+    focusNonce: Int,
+) {
     val context = LocalContext.current
     var theme by remember { mutableStateOf(ThemePrefs.get(context)) }
     var onboardingDone by remember { mutableStateOf(readOnboardingDone(context)) }
@@ -175,6 +208,15 @@ private fun AppRoot() {
                 }
             }
 
+            LaunchedEffect(Unit) {
+                Notifications.ensureChannels(context)
+                NotificationScheduler.ensureAll(context)
+            }
+
+            LaunchedEffect(currentAuth) {
+                NotificationScheduler.ensureAll(context)
+            }
+
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
                     !onboardingDone -> OnboardingScreen(
@@ -205,6 +247,8 @@ private fun AppRoot() {
                         onLessonTextColor = { SubjectColorsPrefs.setTextColor(context, it) },
                         cancelledStrike = cancelledStrike,
                         onCancelledStrike = { SubjectColorsPrefs.setCancelledStrike(context, it) },
+                        focusDate = focusDate,
+                        focusNonce = focusNonce,
                     )
                 }
 
@@ -246,6 +290,8 @@ private fun MainApp(
     onLessonTextColor: (Int) -> Unit,
     cancelledStrike: Boolean,
     onCancelledStrike: (Boolean) -> Unit,
+    focusDate: Int,
+    focusNonce: Int,
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -256,13 +302,18 @@ private fun MainApp(
 
     var currentScreen by remember { mutableStateOf(Screen.TIMETABLE) }
     var selectedLesson by remember { mutableStateOf<TimetableEntry?>(null) }
+    var settingsCategory by remember { mutableStateOf<SettingsCategory?>(null) }
+
+    fun goBack() {
+        when {
+            drawerState.isOpen -> scope.launch { drawerState.close() }
+            currentScreen == Screen.SETTINGS && settingsCategory != null -> settingsCategory = null
+            else -> currentScreen = Screen.TIMETABLE
+        }
+    }
 
     BackHandler(enabled = drawerState.isOpen || currentScreen != Screen.TIMETABLE) {
-        if (drawerState.isOpen) {
-            scope.launch { drawerState.close() }
-        } else {
-            currentScreen = Screen.TIMETABLE
-        }
+        goBack()
     }
 
     val allTeachers = remember {
@@ -353,6 +404,7 @@ private fun MainApp(
                     label = stringResource(R.string.settings),
                     onClick = {
                         scope.launch { drawerState.close() }
+                        settingsCategory = null
                         currentScreen = Screen.SETTINGS
                     },
                 )
@@ -369,12 +421,15 @@ private fun MainApp(
         },
     ) {
         val isTimetable = currentScreen == Screen.TIMETABLE
+        val settingsTitle = settingsCategory?.let { stringResource(it.titleRes) }
+            ?: stringResource(R.string.settings)
+
         val title = when (currentScreen) {
             Screen.PROFILE -> stringResource(R.string.profile)
             Screen.LESSON_DETAILS -> stringResource(R.string.lesson)
             Screen.TEACHERS -> stringResource(R.string.teachers)
             Screen.ROOMS -> stringResource(R.string.rooms)
-            Screen.SETTINGS -> stringResource(R.string.settings)
+            Screen.SETTINGS -> settingsTitle
             Screen.ABOUT -> stringResource(R.string.about)
             else -> stringResource(R.string.timetable)
         }
@@ -414,7 +469,7 @@ private fun MainApp(
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(CircleShape)
-                                    .tapHaptic { currentScreen = Screen.TIMETABLE }
+                                    .tapHaptic { goBack() }
                                     .padding(8.dp),
                             )
                         }
@@ -450,24 +505,52 @@ private fun MainApp(
                             .padding(padding),
                     )
 
-                    Screen.SETTINGS -> SettingsScreen(
-                        theme = theme,
-                        onThemeChange = onThemeChange,
-                        hapticsEnabled = hapticsEnabled,
-                        onHapticsChange = onHapticsChange,
-                        knownSubjects = knownSubjects,
-                        subjectColors = subjectColors,
-                        onSubjectColor = onSubjectColor,
-                        defaultSubjectColor = defaultSubjectColor,
-                        onDefaultSubjectColor = onDefaultSubjectColor,
-                        lessonTextColor = lessonTextColor,
-                        onLessonTextColor = onLessonTextColor,
-                        cancelledStrike = cancelledStrike,
-                        onCancelledStrike = onCancelledStrike,
-                        modifier = Modifier
+                    Screen.SETTINGS -> {
+                        val settingsModifier = Modifier
                             .fillMaxSize()
-                            .padding(padding),
-                    )
+                            .padding(padding)
+
+                        val category = settingsCategory
+
+                        if (category == null) {
+                            SettingsOverviewScreen(
+                                onOpenCategory = { settingsCategory = it },
+                                modifier = settingsModifier,
+                            )
+                        } else {
+                            when (category) {
+                                SettingsCategory.GENERAL -> GeneralSettingsScreen(
+                                    hapticsEnabled = hapticsEnabled,
+                                    onHapticsChange = onHapticsChange,
+                                    modifier = settingsModifier,
+                                )
+
+                                SettingsCategory.APPEARANCE -> AppearanceSettingsScreen(
+                                    theme = theme,
+                                    onThemeChange = onThemeChange,
+                                    modifier = settingsModifier,
+                                )
+
+                                SettingsCategory.NOTIFICATIONS -> NotificationSettingsScreen(
+                                    modifier = settingsModifier,
+                                )
+
+                                SettingsCategory.TIMETABLE -> TimetableSettingsScreen(
+                                    vm = timetableVm,
+                                    knownSubjects = knownSubjects,
+                                    subjectColors = subjectColors,
+                                    onSubjectColor = onSubjectColor,
+                                    defaultSubjectColor = defaultSubjectColor,
+                                    onDefaultSubjectColor = onDefaultSubjectColor,
+                                    lessonTextColor = lessonTextColor,
+                                    onLessonTextColor = onLessonTextColor,
+                                    cancelledStrike = cancelledStrike,
+                                    onCancelledStrike = onCancelledStrike,
+                                    modifier = settingsModifier,
+                                )
+                            }
+                        }
+                    }
 
                     Screen.TEACHERS -> TeachersListScreen(
                         teachers = allTeachers,
@@ -506,6 +589,8 @@ private fun MainApp(
                         defaultColor = Color(defaultSubjectColor),
                         textColor = Color(lessonTextColor),
                         cancelledStrike = cancelledStrike,
+                        focusDate = focusDate,
+                        focusNonce = focusNonce,
                         onLessonClick = { entry ->
                             selectedLesson = entry
                             currentScreen = Screen.LESSON_DETAILS
@@ -521,6 +606,8 @@ private fun MainApp(
                         defaultColor = Color(defaultSubjectColor),
                         textColor = Color(lessonTextColor),
                         cancelledStrike = cancelledStrike,
+                        focusDate = focusDate,
+                        focusNonce = focusNonce,
                         onLessonClick = { entry ->
                             selectedLesson = entry
                             currentScreen = Screen.LESSON_DETAILS

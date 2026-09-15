@@ -42,6 +42,7 @@ import kotlinx.coroutines.launch
 import sh.lsx.untisx.R
 import sh.lsx.untisx.data.TimetableCache
 import sh.lsx.untisx.data.api.UntisClient
+import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.prefs.AuthPrefs
@@ -66,10 +67,13 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
 
     fun removeAccountFully(account: AuthData) {
         scope.launch {
+            val id = AccountPrefs.accountId(account)
+
             UntisClient.logout(account)
-            TimetableCache.clear(context, AccountPrefs.accountId(account))
-            AccountPrefs.removeAccount(context, AccountPrefs.accountId(account))
+            TimetableCache.clear(context, id)
+            AccountPrefs.removeAccount(context, id)
             AuthPrefs.clear(context)
+            NotificationScheduler.onAccountRemoved(context, id)
 
             refresh()
         }

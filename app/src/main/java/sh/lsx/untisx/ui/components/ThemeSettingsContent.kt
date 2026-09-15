@@ -40,34 +40,31 @@ private fun ThemePreset.label(): String = when (this) {
 }
 
 @Composable
-fun ThemeSettingsContent(
+fun ThemeModeSettingsContent(
+    theme: AppTheme,
+    onChange: (AppTheme) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
+        ThemeMode.entries.forEachIndexed { index, mode ->
+            SegmentedButton(
+                selected = theme.mode == mode,
+                onClick = Haptics.haptic { onChange(theme.copy(mode = mode)) },
+                shape = SegmentedButtonDefaults.itemShape(index, ThemeMode.entries.size),
+            ) {
+                Text(mode.label())
+            }
+        }
+    }
+}
+
+@Composable
+fun ThemeAccentSettingsContent(
     theme: AppTheme,
     onChange: (AppTheme) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        Text(stringResource(R.string.settings_theme_mode), style = MaterialTheme.typography.titleMedium)
-
-        Spacer(Modifier.height(12.dp))
-
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            ThemeMode.entries.forEachIndexed { index, mode ->
-                SegmentedButton(
-                    selected = theme.mode == mode,
-                    onClick = Haptics.haptic { onChange(theme.copy(mode = mode)) },
-                    shape = SegmentedButtonDefaults.itemShape(index, ThemeMode.entries.size),
-                ) {
-                    Text(mode.label())
-                }
-            }
-        }
-
-        Spacer(Modifier.height(18.dp))
-
-        Text(stringResource(R.string.settings_accent_color), style = MaterialTheme.typography.titleMedium)
-
-        Spacer(Modifier.height(6.dp))
-
         ThemePreset.entries.forEach { preset ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -81,5 +78,28 @@ fun ThemeSettingsContent(
                 Text(preset.label())
             }
         }
+    }
+}
+
+@Composable
+fun ThemeSettingsContent(
+    theme: AppTheme,
+    onChange: (AppTheme) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(stringResource(R.string.settings_theme_mode), style = MaterialTheme.typography.titleMedium)
+
+        Spacer(Modifier.height(12.dp))
+
+        ThemeModeSettingsContent(theme = theme, onChange = onChange)
+
+        Spacer(Modifier.height(18.dp))
+
+        Text(stringResource(R.string.settings_accent_color), style = MaterialTheme.typography.titleMedium)
+
+        Spacer(Modifier.height(6.dp))
+
+        ThemeAccentSettingsContent(theme = theme, onChange = onChange)
     }
 }
