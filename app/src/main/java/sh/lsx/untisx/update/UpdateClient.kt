@@ -2,6 +2,9 @@ package sh.lsx.untisx.update
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
@@ -13,6 +16,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.security.MessageDigest
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class UpdateInfo(
@@ -172,6 +176,11 @@ object UpdateClient {
                     if (!temporary.renameTo(target)) {
                         throw IllegalStateException("Could not finalize update download")
                     }
+
+                    if (!verifySignature(context, target)) {
+                        target.delete()
+                        throw IllegalStateException("Update signature does not match the installed app")
+                    }
                 } catch (e: Exception) {
                     temporary.delete()
                     throw e
@@ -182,6 +191,47 @@ object UpdateClient {
         } finally {
             pruneOldApks(File(context.cacheDir, "updates"))
         }
+    }
+
+    private fun verifySignature(context: Context, apk: File): Boolean {
+        val expected = installedCertificateSha256(context) ?: return false
+        val actual = archiveCertificateSha256(context, apk) ?: return false
+
+        return expected == actual
+    }
+
+    private fun installedCertificateSha256(context: Context): String? =
+        context.packageManager.getPackageInfo(context.packageName, signatureFlags)
+            .certificateSha256()
+
+    private fun archiveCertificateSha256(context: Context, apk: File): String? {
+        val info = context.packageManager.getPackageArchiveInfo(apk.absolutePath, signatureFlags)
+            ?: return null
+
+        if (info.packageName != context.packageName) return null
+
+        return info.certificateSha256()
+    }
+
+    @Suppress("DEPRECATION")
+    private val signatureFlags: Int
+        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
+
+    @Suppress("DEPRECATION")
+    private fun PackageInfo.certificateSha256(): String? {
+        val signer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            signingInfo?.apkContentsSigners?.firstOrNull()
+        } else {
+            signatures?.firstOrNull()
+        } ?: return null
+
+        val digest = MessageDigest.getInstance("SHA-256").digest(signer.toByteArray())
+
+        return digest.joinToString("") { "%02x".format(it) }
     }
 
     private fun pruneOldApks(dir: File?) {
