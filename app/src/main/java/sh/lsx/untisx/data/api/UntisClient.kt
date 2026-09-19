@@ -26,6 +26,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import sh.lsx.untisx.data.model.AuthResult
+import sh.lsx.untisx.data.model.DayMessage
 import sh.lsx.untisx.data.model.JsonRpcRequest
 import sh.lsx.untisx.data.model.JsonRpcResponse
 import sh.lsx.untisx.data.prefs.AuthData
@@ -37,6 +38,7 @@ import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.TimegridDay
 import sh.lsx.untisx.data.model.TimegridUnit
+import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.security.generateTotp
 import java.io.IOException
 import java.time.LocalDate
@@ -62,6 +64,8 @@ object UntisClient {
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
+
+    private val DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -410,6 +414,234 @@ object UntisClient {
         parseInternTimetable(result).also { Log.d(TAG, "getTimetable2017 $from-$to -> ${it.size} periods") }
     }
 
+    data class PeriodNotes(
+        val topic: String?,
+        val notes: List<String>,
+    )
+
+    data class LessonDetail(
+        val info: String?,
+        val substitution: String?,
+        val topic: String?,
+        val notes: List<String>,
+    )
+
+    private var cachedJwt: String? = null
+    private var cachedJwtAt = 0L
+
+    private fun mobileJwt(auth: AuthData, password: String): String? {
+        val now = System.currentTimeMillis()
+
+        cachedJwt?.let { if (now - cachedJwtAt < 10 * 60 * 1000) return it }
+
+        return try {
+            val host = auth.server.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
+            val url = "https://$host/WebUntis/api/mobile/v2/${auth.loginName}/authentication"
+            val payload = buildJsonObject {
+                put("username", auth.user)
+                put("password", password)
+            }
+
+            http.newCall(
+                Request.Builder().url(url)
+                    .post(json.encodeToString(payload).toRequestBody("application/json".toMediaType()))
+                    .build(),
+            ).execute().use { response ->
+                if (!response.isSuccessful) return null
+
+                val jwt = runCatching {
+                    json.parseToJsonElement(response.body?.string().orEmpty())
+                        .jsonObject["jwt"]?.jsonPrimitive?.contentOrNull
+                }.getOrNull()
+
+                if (jwt != null) {
+                    cachedJwt = jwt
+                    cachedJwtAt = now
+                }
+
+                jwt
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "mobile jwt failed: ${e.message}")
+            null
+        }
+    }
+
+    private suspend fun fallbackLessonDetail(
+        auth: AuthData,
+        password: String,
+        entryId: Int,
+    ): LessonDetail? =
+        fetchPeriodNotes(auth, password, entryId)
+            ?.let { LessonDetail(info = null, substitution = null, topic = it.topic, notes = it.notes) }
+
+    suspend fun fetchLessonDetails(
+        auth: AuthData,
+        password: String,
+        entryId: Int,
+        date: LocalDate,
+        startTime: Int,
+        endTime: Int,
+    ): LessonDetail? = withContext(Dispatchers.IO) {
+        val jwt = mobileJwt(auth, password) ?: return@withContext fallbackLessonDetail(auth, password, entryId)
+
+        val session = auth.session
+
+        val (elementId, elementType) = when {
+            session.personType == 5 && session.personId != 0 -> session.personId to 5
+            session.klasseId != 0 -> session.klasseId to 1
+            else -> session.personId to 5
+        }
+
+        val start = date.atTime(startTime.toUntisLocalTime()).format(DATE_TIME_FORMAT)
+        val end = date.atTime(endTime.toUntisLocalTime()).format(DATE_TIME_FORMAT)
+        val host = auth.server.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
+
+        val url = "https://$host/WebUntis/api/rest/view/v2/calendar-entry/detail" +
+            "?elementId=$elementId&elementType=$elementType" +
+            "&startDateTime=$start&endDateTime=$end" +
+            "&initialSelectedPeriodId=$entryId&initialIsBlockSelected=false"
+
+        val body = try {
+            http.newCall(
+                Request.Builder().url(url)
+                    .header("Authorization", "Bearer $jwt")
+                    .header("Accept", "application/json")
+                    .get()
+                    .build(),
+            ).execute().use { response ->
+                if (!response.isSuccessful) {
+                    cachedJwt = null
+                    null
+                } else {
+                    response.body?.string()
+                }
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "lesson detail failed: ${e.message}")
+            null
+        }
+
+        val detail = body?.let { parseLessonDetail(it, entryId) }
+
+        detail?.also { Log.d(TAG, "lesson detail $entryId -> info=${it.info != null} topic=${it.topic != null} notes=${it.notes.size}") }
+            ?: fallbackLessonDetail(auth, password, entryId)
+    }
+
+    private fun parseLessonDetail(body: String, entryId: Int): LessonDetail? {
+        val entries = runCatching {
+            json.parseToJsonElement(body).jsonObject["calendarEntries"]?.jsonArray.orEmpty()
+        }.getOrNull() ?: return null
+
+        if (entries.isEmpty()) return null
+
+        val entry = entries
+            .firstOrNull { it.jsonObject["id"]?.jsonPrimitive?.intOrNull == entryId }
+            ?.jsonObject
+            ?: entries.first().jsonObject
+
+        val notes = listOfNotNull(
+            entry["notesAll"]?.jsonPrimitive?.contentOrNull,
+            entry["notesStaff"]?.jsonPrimitive?.contentOrNull,
+        )
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+
+        return LessonDetail(
+            info = entry["lessonInfo"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() },
+            substitution = entry["substText"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() },
+            topic = entry["teachingContent"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() },
+            notes = notes,
+        )
+    }
+
+    suspend fun fetchMessagesOfDay(
+        auth: AuthData,
+        password: String,
+        date: LocalDate,
+    ): List<DayMessage> = withContext(Dispatchers.IO) {
+        val totp = internTotp(auth, password)
+
+        val result = executeRpc(
+            totp.url,
+            "getMessagesOfDay2017",
+            buildJsonArray {
+                add(buildJsonObject {
+                    put("date", date.format(DateTimeFormatter.ISO_LOCAL_DATE))
+                    put("auth", totp.credentials())
+                })
+            },
+        )
+
+        parseMessagesOfDay(result).also { Log.d(TAG, "getMessagesOfDay2017 $date -> ${it.size} messages") }
+    }
+
+    private fun parseMessagesOfDay(result: JsonElement): List<DayMessage> =
+        runCatching {
+            result.jsonObject["messages"]?.jsonArray.orEmpty().mapNotNull { element ->
+                val obj = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
+                val body = obj["body"]?.jsonPrimitive?.contentOrNull?.let(::stripHtml).orEmpty()
+
+                if (body.isBlank()) return@mapNotNull null
+
+                DayMessage(
+                    id = obj["id"]?.jsonPrimitive?.intOrNull ?: 0,
+                    subject = obj["subject"]?.jsonPrimitive?.contentOrNull?.let(::stripHtml).orEmpty(),
+                    body = body,
+                )
+            }
+        }.getOrDefault(emptyList())
+
+    private fun stripHtml(text: String): String =
+        text
+            .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+            .replace(Regex("<[^>]+>"), "")
+            .replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .trim()
+
+    suspend fun fetchPeriodNotes(
+        auth: AuthData,
+        password: String,
+        ttId: Int,
+    ): PeriodNotes? = withContext(Dispatchers.IO) {
+        val totp = internTotp(auth, password)
+
+        val result = executeRpc(
+            totp.url,
+            "getPeriodData2017",
+            buildJsonArray {
+                add(buildJsonObject {
+                    put("ttIds", buildJsonArray { add(JsonPrimitive(ttId)) })
+                    put("auth", totp.credentials())
+                })
+            },
+        )
+
+        parsePeriodNotes(result, ttId).also { Log.d(TAG, "getPeriodData2017 $ttId -> topic=${it?.topic != null} notes=${it?.notes?.size}") }
+    }
+
+    private fun parsePeriodNotes(result: JsonElement, ttId: Int): PeriodNotes? {
+        val data = runCatching {
+            result.jsonObject["dataByTTId"]?.jsonObject?.get(ttId.toString())?.jsonObject
+        }.getOrNull() ?: return null
+
+        val topic = runCatching {
+            data["topic"]?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+        }.getOrNull()
+
+        val notes = runCatching {
+            data["classRegEvents"]?.jsonArray.orEmpty().mapNotNull { element ->
+                runCatching { element.jsonObject }.getOrNull()
+                    ?.get("text")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+            }
+        }.getOrDefault(emptyList())
+
+        if (topic == null && notes.isEmpty()) return null
+
+        return PeriodNotes(topic = topic, notes = notes)
+    }
+
     private fun parseInternTimetable(result: JsonElement): List<TimetableEntry> {
         val periods = runCatching {
             result.jsonObject["timetable"]?.jsonObject?.get("periods")?.jsonArray
@@ -439,8 +671,9 @@ object UntisClient {
             .mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
 
         val text = runCatching { period["text"]?.jsonObject }.getOrNull()
-        val lstext = text?.get("substitution")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
-            ?: text?.get("info")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+        val substitution = text?.get("substitution")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+        val info = text?.get("info")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+        val lessonText = text?.get("lesson")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
 
         return TimetableEntry(
             id = period["id"]?.jsonPrimitive?.intOrNull ?: 0,
@@ -456,7 +689,10 @@ object UntisClient {
                 states.any { it.equals("IRREGULAR", ignoreCase = true) } -> "irregular"
                 else -> null
             },
-            lstext = lstext,
+            lstext = substitution ?: info,
+            info = info,
+            substText = substitution,
+            lessonText = lessonText,
         )
     }
 

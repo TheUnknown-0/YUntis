@@ -29,10 +29,19 @@ data class TimetableEntry(
     @SerialName("ro") val room: List<TimetableElement> = emptyList(),
     val code: String? = null,
     val lstext: String? = null,
+    val info: String? = null,
+    val substText: String? = null,
+    val lessonText: String? = null,
     val activityType: String? = null,
 ) {
     val cancelled: Boolean get() = code == "cancelled"
     val irregular: Boolean get() = code == "irregular"
+
+    val isEvent: Boolean get() = subject.isEmpty()
+
+    val eventTitle: String?
+        get() = listOfNotNull(lstext, lessonText, info, substText)
+            .firstOrNull { it.isNotBlank() }
 }
 
 @Serializable
@@ -65,6 +74,13 @@ data class Holiday(
     @SerialName("longName") val longName: String = "",
     val startDate: Int = 0,
     val endDate: Int = 0,
+)
+
+@Serializable
+data class DayMessage(
+    val id: Int = 0,
+    val subject: String = "",
+    val body: String = "",
 )
 
 fun LocalDate.toUntisDate(): Int = year * 10000 + monthValue * 100 + dayOfMonth

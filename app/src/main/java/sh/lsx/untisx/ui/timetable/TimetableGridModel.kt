@@ -138,14 +138,14 @@ internal fun mergeEventSpans(entries: List<TimetableEntry>): List<Pair<Int, Int>
         val last = spans.lastOrNull()
         val gap = last?.let { minutesOf(entry.startTime) - minutesOf(it.second) } ?: Int.MAX_VALUE
         val sameEvent = last != null &&
-            !entry.lstext.isNullOrBlank() &&
-            entry.lstext == last.third &&
+            !entry.eventTitle.isNullOrBlank() &&
+            entry.eventTitle == last.third &&
             gap <= 30
 
         if (sameEvent) {
             spans[spans.size - 1] = last.copy(second = maxOf(last.second, entry.endTime))
         } else {
-            spans.add(Triple(entry.startTime, entry.endTime, entry.lstext))
+            spans.add(Triple(entry.startTime, entry.endTime, entry.eventTitle))
         }
     }
 

@@ -114,6 +114,29 @@
     <string name="lesson_teacher">Lehrkraft</string>
     <string name="lesson_room">Raum</string>
     <string name="lesson_date_today">%1$s (heute)</string>
+    <string name="lesson_info">Stunden-Information</string>
+    <string name="lesson_substitution">Vertretungstext</string>
+    <string name="lesson_topic">Thema</string>
+    <string name="lesson_notes">Notizen</string>
+    <string name="lesson_notes_loading">Notizen werden geladen...</string>
+
+    <!-- Events -->
+    <string name="events">Termine</string>
+    <string name="events_messages">Mitteilungen</string>
+    <string name="events_upcoming">Kommende Termine</string>
+    <string name="events_holidays">Ferien</string>
+    <string name="events_all_day">Ganztägig</string>
+    <string name="events_untitled">Termin</string>
+    <string name="events_date_range">%1$s - %2$s</string>
+    <string name="events_tomorrow">Morgen</string>
+    <string name="events_holiday_tomorrow">Beginnt morgen</string>
+    <string name="events_holiday_running">Läuft bis %1$s</string>
+    <string name="events_empty">Keine bevorstehenden Termine.</string>
+    <string name="events_empty_hint">Termine deiner Schule erscheinen hier.</string>
+    <plurals name="events_holiday_days">
+        <item quantity="one">Noch %1$d Tag</item>
+        <item quantity="other">Noch %1$d Tage</item>
+    </plurals>
 
     <!-- Teachers / Rooms lists -->
     <string name="teachers_empty">Noch keine Lehrkräfte gefunden.</string>

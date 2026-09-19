@@ -5,6 +5,7 @@ import android.util.Log
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import sh.lsx.untisx.data.model.DayMessage
 import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
@@ -17,7 +18,7 @@ object TimetableCache {
 
     private const val LEGACY_FILE_NAME = "timetable_cache.json"
     private const val FILE_PREFIX = "timetable_cache_"
-    private const val VERSION = 2
+    private const val VERSION = 6
     private const val TAG = "TimetableCache"
 
     private val json = Json {
@@ -34,6 +35,10 @@ object TimetableCache {
         val holidays: List<Holiday> = emptyList(),
         val timegrid: List<TimegridDay> = emptyList(),
         val restrictedDays: Set<Int> = emptySet(),
+        val events: List<TimetableEntry> = emptyList(),
+        val eventsFetchedAt: Long = 0,
+        val messages: List<DayMessage> = emptyList(),
+        val messagesFetchedAt: Long = 0,
         val lastFetch: Long = 0,
         val version: Int = 0,
     )

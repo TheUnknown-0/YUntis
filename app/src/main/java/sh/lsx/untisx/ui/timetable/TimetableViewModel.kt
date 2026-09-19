@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -23,6 +24,7 @@ import sh.lsx.untisx.data.TimetableCache
 import sh.lsx.untisx.data.api.SessionManager
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.api.UntisException
+import sh.lsx.untisx.data.model.DayMessage
 import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.prefs.PasswordVault
@@ -53,6 +55,19 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         data class Unknown(override val text: UiText) : LoadError
     }
 
+    sealed interface NotesState {
+        data object Loading : NotesState
+
+        data class Loaded(
+            val info: String?,
+            val substitution: String?,
+            val topic: String?,
+            val notes: List<String>,
+        ) : NotesState
+
+        data object Unavailable : NotesState
+    }
+
     companion object {
         const val WEEK_SPAN = 104
         const val CENTER = WEEK_SPAN / 2
@@ -60,6 +75,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         private const val TAG = "TimetableViewModel"
         private const val SCAN_FROM_MONTHS = 1L
         private const val SCAN_TO_MONTHS = 11L
+        private const val EVENTS_AHEAD_MONTHS = 6L
     }
 
     var weeks by mutableStateOf<Map<Int, List<TimetableEntry>>>(emptyMap())
@@ -86,13 +102,30 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var restrictedDays by mutableStateOf<Set<Int>>(emptySet())
         private set
+    var events by mutableStateOf<List<TimetableEntry>>(emptyList())
+        private set
+    var eventsLoading by mutableStateOf(false)
+        private set
+    var eventsError by mutableStateOf<UiText?>(null)
+        private set
+    var eventsFetchedAt by mutableLongStateOf(0L)
+        private set
+    var dayMessages by mutableStateOf<List<DayMessage>>(emptyList())
+        private set
+    var messagesFetchedAt by mutableLongStateOf(0L)
+        private set
+    var lessonNotes by mutableStateOf<NotesState?>(null)
+        private set
 
     private var auth: AuthData? = null
     private var staticDataLoaded = false
     private var subjectsScanned = false
+    private var eventsRequested = false
     private val weekCache = HashMap<Int, List<TimetableEntry>>()
     private val failedWeeks = HashSet<Int>()
     private val flightLock = Mutex()
+    private val notesCache = HashMap<Int, NotesState.Loaded>()
+    private var notesRequestId = 0
     private var lastFetch = 0L
 
     init {
@@ -124,6 +157,133 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         ensureWeekOffset(offset, force = true) {
             refreshing = false
         }
+    }
+
+    fun ensureEvents(force: Boolean = false) {
+        val messagesStale = messagesFetchedAt <= 0L ||
+            Instant.ofEpochMilli(messagesFetchedAt).atZone(ZoneId.systemDefault()).toLocalDate() != LocalDate.now()
+
+        if (!force && (eventsRequested || eventsFetchedAt > 0L) && !messagesStale) {
+            eventsError = null
+            return
+        }
+
+        eventsRequested = true
+        refreshEvents()
+    }
+
+    fun refreshEvents() {
+        if (eventsLoading) return
+
+        eventsLoading = true
+        eventsError = null
+
+        viewModelScope.launch {
+            try {
+                val currentAuth = requireAuth()
+                val from = LocalDate.now()
+                val to = from.plusMonths(EVENTS_AHEAD_MONTHS)
+
+                val fetched = fetchEvents(currentAuth, from, to)
+                Log.d(TAG, "events fetch -> ${fetched.size} periods, ${fetched.count { it.isEvent }} events")
+
+                events = mergeConsecutiveEvents(
+                    fetched
+                        .filter { it.isEvent }
+                        .sortedWith(compareBy({ it.date }, { it.startTime })),
+                )
+
+                eventsFetchedAt = System.currentTimeMillis()
+
+                dayMessages = fetchMessages(currentAuth)
+                messagesFetchedAt = System.currentTimeMillis()
+
+                persistCache()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.d(TAG, "events fetch failed: ${e.message}")
+                eventsError = friendly(e)
+            } finally {
+                eventsLoading = false
+            }
+        }
+    }
+
+    fun loadLessonNotes(entry: TimetableEntry) {
+        val id = entry.id
+
+        if (id <= 0) {
+            lessonNotes = NotesState.Unavailable
+            return
+        }
+
+        notesCache[id]?.let {
+            lessonNotes = it
+            return
+        }
+
+        lessonNotes = NotesState.Loading
+        val requestId = ++notesRequestId
+
+        viewModelScope.launch {
+            val result = try {
+                val currentAuth = requireAuth()
+                val detail = UntisClient.fetchLessonDetails(
+                    auth = currentAuth,
+                    password = withPassword(),
+                    entryId = id,
+                    date = entry.date.toUntisLocalDate(),
+                    startTime = entry.startTime,
+                    endTime = entry.endTime,
+                )
+
+                if (detail == null) {
+                    NotesState.Unavailable
+                } else {
+                    NotesState.Loaded(
+                        info = detail.info,
+                        substitution = detail.substitution,
+                        topic = detail.topic,
+                        notes = detail.notes,
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.d(TAG, "lesson detail $id failed: ${e.message}")
+                NotesState.Unavailable
+            }
+
+            if (requestId != notesRequestId) return@launch
+
+            if (result is NotesState.Loaded) notesCache[id] = result
+
+            lessonNotes = result
+        }
+    }
+
+    private fun mergeConsecutiveEvents(entries: List<TimetableEntry>): List<TimetableEntry> {
+        val merged = ArrayList<TimetableEntry>(entries.size)
+
+        for (entry in entries) {
+            val last = merged.lastOrNull()
+
+            if (
+                last != null &&
+                last.date == entry.date &&
+                last.startTime == entry.startTime &&
+                last.endTime == entry.endTime &&
+                last.eventTitle == entry.eventTitle &&
+                last.room == entry.room
+            ) {
+                continue
+            }
+
+            merged.add(entry)
+        }
+
+        return merged
     }
 
     fun retry() {
@@ -196,6 +356,10 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         holidays = cached.holidays
         timegrid = cached.timegrid
         restrictedDays = cached.restrictedDays
+        events = cached.events
+        eventsFetchedAt = cached.eventsFetchedAt
+        dayMessages = cached.messages
+        messagesFetchedAt = cached.messagesFetchedAt
     }
 
     private fun ensureWeekOffset(
@@ -399,6 +563,106 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         return WeekFetch(all, latest, allRefused = succeeded == 0, refusedDays = refused)
+    }
+
+    private suspend fun fetchMessages(auth: AuthData): List<DayMessage> {
+        val password = try {
+            withPassword()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.d(TAG, "messages fetch failed: ${e.message}")
+            return dayMessages
+        }
+
+        val today = LocalDate.now()
+        val found = LinkedHashMap<Int, DayMessage>()
+        var anySuccess = false
+
+        for (daysBack in 0..2) {
+            val date = today.minusDays(daysBack.toLong())
+
+            try {
+                val messages = UntisClient.fetchMessagesOfDay(auth, password, date)
+                anySuccess = true
+
+                messages.forEach { message ->
+                    val key = if (message.id != 0) message.id else message.body.hashCode()
+                    found.putIfAbsent(key, message)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.d(TAG, "messages $date failed: ${e.message}")
+            }
+        }
+
+        return if (anySuccess) found.values.toList() else dayMessages
+    }
+
+    private suspend fun fetchEvents(
+        auth: AuthData,
+        from: LocalDate,
+        to: LocalDate,
+    ): List<TimetableEntry> {        val internal = try {
+            UntisClient.getTimetableIntern(auth, withPassword(), from, to)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.d(TAG, "events via mobile API failed: ${e.message}")
+            null
+        }
+
+        if (!internal.isNullOrEmpty()) return internal
+
+        try {
+            val (entries, fresh) = SessionManager.withValidSession(getApplication(), auth) { a ->
+                UntisClient.getTimetable(
+                    auth = a,
+                    startDate = from.toUntisDate(),
+                    endDate = to.toUntisDate(),
+                )
+            }
+
+            if (fresh != null) persistSession(fresh)
+
+            return entries
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.d(TAG, "events via public API failed: ${e.message}")
+        }
+
+        return fetchEventsByMonth(auth, from, to)
+    }
+
+    private suspend fun fetchEventsByMonth(
+        auth: AuthData,
+        from: LocalDate,
+        to: LocalDate,
+    ): List<TimetableEntry> {
+        val all = ArrayList<TimetableEntry>()
+        var latest = auth
+        var cursor = from
+
+        while (!cursor.isAfter(to)) {
+            val chunkEnd = minOf(cursor.plusMonths(1).minusDays(1), to)
+
+            val (entries, fresh) = SessionManager.withValidSession(getApplication(), latest) { a ->
+                UntisClient.getTimetable(
+                    auth = a,
+                    startDate = cursor.toUntisDate(),
+                    endDate = chunkEnd.toUntisDate(),
+                )
+            }
+
+            if (fresh != null) latest = fresh
+
+            all += entries
+            cursor = chunkEnd.plusDays(1)
+        }
+
+        return all
     }
 
     private fun loadStaticData() {
@@ -661,6 +925,10 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             holidays = holidays.ifEmpty { previous?.holidays.orEmpty() },
             timegrid = timegrid.ifEmpty { previous?.timegrid.orEmpty() },
             restrictedDays = restrictedDays,
+            events = if (eventsFetchedAt > 0L) events else previous?.events.orEmpty(),
+            eventsFetchedAt = if (eventsFetchedAt > 0L) eventsFetchedAt else previous?.eventsFetchedAt ?: 0L,
+            messages = if (messagesFetchedAt > 0L) dayMessages else previous?.messages.orEmpty(),
+            messagesFetchedAt = if (messagesFetchedAt > 0L) messagesFetchedAt else previous?.messagesFetchedAt ?: 0L,
             lastFetch = when {
                 lastFetch > 0L -> lastFetch
                 previous != null -> previous.lastFetch

@@ -266,7 +266,7 @@ private fun WeekPage(
 }
 
 @Composable
-private fun rememberToday(): LocalDate {
+internal fun rememberToday(): LocalDate {
     var today by remember { mutableStateOf(LocalDate.now()) }
 
     LaunchedEffect(Unit) {

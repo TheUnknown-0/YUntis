@@ -39,6 +39,7 @@ import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.ui.timetable.TIME_FORMAT
+import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -54,6 +55,7 @@ fun LessonDetailsScreen(
     color: Color,
     textColor: Color,
     modifier: Modifier = Modifier,
+    notes: TimetableViewModel.NotesState? = null,
 ) {
     val subjectEl = entry.subject.firstOrNull()
     val subjectName = subjectEl
@@ -112,14 +114,88 @@ fun LessonDetailsScreen(
             ElementRow(stringResource(R.string.lesson_room), entry.room, roomsById)
         }
 
-        entry.lstext?.takeIf { it.isNotBlank() }?.let { info ->
+        val loaded = notes as? TimetableViewModel.NotesState.Loaded
+
+        (loaded?.info ?: entry.lessonText)?.takeIf { it.isNotBlank() }?.let { info ->
             DetailCard {
+                Text(
+                    text = stringResource(R.string.lesson_info),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
                 Text(
                     text = info,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
+        }
+
+        (loaded?.substitution ?: entry.lstext)?.takeIf { it.isNotBlank() }?.let { info ->
+            DetailCard {
+                Text(
+                    text = stringResource(R.string.lesson_substitution),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Text(
+                    text = info,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+
+        when (notes) {
+            is TimetableViewModel.NotesState.Loading -> {
+                DetailCard {
+                    Text(
+                        text = stringResource(R.string.lesson_notes_loading),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            is TimetableViewModel.NotesState.Loaded -> {
+                notes.topic?.let { topic ->
+                    DetailCard {
+                        Text(
+                            text = stringResource(R.string.lesson_topic),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+
+                        Text(
+                            text = topic,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+
+                if (notes.notes.isNotEmpty()) {
+                    DetailCard {
+                        Text(
+                            text = stringResource(R.string.lesson_notes),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+
+                        notes.notes.forEach { note ->
+                            Text(
+                                text = note,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+            }
+
+            else -> Unit
         }
     }
 }

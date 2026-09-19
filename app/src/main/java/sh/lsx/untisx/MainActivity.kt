@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -78,6 +79,7 @@ import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.data.notifications.Notifications
 import sh.lsx.untisx.ui.components.UpdateDialog
 import sh.lsx.untisx.ui.screens.AboutScreen
+import sh.lsx.untisx.ui.screens.EventsScreen
 import sh.lsx.untisx.ui.screens.LessonDetailsScreen
 import sh.lsx.untisx.ui.screens.ProfileScreen
 import sh.lsx.untisx.ui.screens.LoginScreen
@@ -267,6 +269,7 @@ private enum class Screen {
     TIMETABLE,
     PROFILE,
     LESSON_DETAILS,
+    EVENTS,
     TEACHERS,
     ROOMS,
     SETTINGS,
@@ -377,6 +380,17 @@ private fun MainApp(
                 SidebarSection(stringResource(R.string.nav_information))
 
                 SidebarItem(
+                    icon = Icons.Outlined.DateRange,
+                    label = stringResource(R.string.events),
+                    badge = timetableVm.dayMessages.size.takeIf { it > 0 }?.toString(),
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        timetableVm.ensureEvents()
+                        currentScreen = Screen.EVENTS
+                    },
+                )
+
+                SidebarItem(
                     icon = Icons.Outlined.Person,
                     label = stringResource(R.string.teachers),
                     badge = allTeachers.size.toString(),
@@ -387,7 +401,7 @@ private fun MainApp(
                 )
 
                 SidebarItem(
-                    icon = Icons.Outlined.DateRange,
+                    icon = Icons.Outlined.Place,
                     label = stringResource(R.string.rooms),
                     badge = "...",
                     onClick = {
@@ -427,6 +441,7 @@ private fun MainApp(
         val title = when (currentScreen) {
             Screen.PROFILE -> stringResource(R.string.profile)
             Screen.LESSON_DETAILS -> stringResource(R.string.lesson)
+            Screen.EVENTS -> stringResource(R.string.events)
             Screen.TEACHERS -> stringResource(R.string.teachers)
             Screen.ROOMS -> stringResource(R.string.rooms)
             Screen.SETTINGS -> settingsTitle
@@ -557,6 +572,18 @@ private fun MainApp(
                         modifier = Modifier.padding(padding),
                     )
 
+                    Screen.EVENTS -> EventsScreen(
+                        events = timetableVm.events,
+                        holidays = timetableVm.holidays,
+                        messages = timetableVm.dayMessages,
+                        roomsById = timetableVm.roomsById,
+                        loading = timetableVm.eventsLoading,
+                        onRefresh = timetableVm::refreshEvents,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                    )
+
                     Screen.ROOMS -> RoomsListScreen(
                         modifier = Modifier.padding(padding),
                     )
@@ -579,6 +606,7 @@ private fun MainApp(
                                     ?.let { timetableVm.subjectsById[it.id]?.name?.takeIf { name -> name.isNotBlank() } ?: it.name }
                             ]?.let { Color(it) } ?: Color(defaultSubjectColor),
                             textColor = Color(lessonTextColor),
+                            notes = timetableVm.lessonNotes,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(padding),
@@ -593,6 +621,7 @@ private fun MainApp(
                         focusNonce = focusNonce,
                         onLessonClick = { entry ->
                             selectedLesson = entry
+                            timetableVm.loadLessonNotes(entry)
                             currentScreen = Screen.LESSON_DETAILS
                         },
                         modifier = Modifier
@@ -610,6 +639,7 @@ private fun MainApp(
                         focusNonce = focusNonce,
                         onLessonClick = { entry ->
                             selectedLesson = entry
+                            timetableVm.loadLessonNotes(entry)
                             currentScreen = Screen.LESSON_DETAILS
                         },
                         modifier = Modifier
@@ -643,6 +673,12 @@ private fun MainApp(
 
                     timetableVm.timegridError?.let { message ->
                         InfoBanner(text = uiTextString(message), onRetry = timetableVm::retryTimegrid)
+                    }
+                }
+
+                if (currentScreen == Screen.EVENTS) {
+                    timetableVm.eventsError?.let { message ->
+                        ErrorBanner(text = uiTextString(message), onRetry = timetableVm::refreshEvents)
                     }
                 }
             }
