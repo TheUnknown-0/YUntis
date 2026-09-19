@@ -90,6 +90,19 @@
     <string name="settings_custom">custom</string>
     <string name="settings_strike_cancelled">Strike through cancelled</string>
     <string name="settings_strike_cancelled_desc">Cut a red line through cancelled lessons</string>
+    <string name="settings_backup">Backup</string>
+    <string name="settings_backup_desc">Export or import your settings as a JSON file. Accounts and passwords are not included.</string>
+    <string name="settings_backup_export">Export settings</string>
+    <string name="settings_backup_export_desc">Save all customizations to a file.</string>
+    <string name="settings_backup_export_success">Settings exported.</string>
+    <string name="settings_backup_export_failed">Export failed.</string>
+    <string name="settings_backup_import">Import settings</string>
+    <string name="settings_backup_import_desc">Load settings from a backup file.</string>
+    <string name="settings_backup_import_confirm_title">Import settings?</string>
+    <string name="settings_backup_import_confirm_text">Your current customizations (colors, theme, language, etc.) will be overwritten.</string>
+    <string name="settings_backup_import_success">Settings imported.</string>
+    <string name="settings_backup_import_failed">This file is not a valid UntisX settings backup.</string>
+    <string name="settings_backup_import_version">This backup was created by a newer app version.</string>
 
     <!-- Theme -->
     <string name="theme_mode_system">System</string>

@@ -90,6 +90,19 @@
     <string name="settings_custom">eigene Farbe</string>
     <string name="settings_strike_cancelled">Ausfälle durchstreichen</string>
     <string name="settings_strike_cancelled_desc">Entfallene Stunden werden rot durchgestrichen</string>
+    <string name="settings_backup">Backup</string>
+    <string name="settings_backup_desc">Einstellungen als JSON-Datei exportieren/importieren. Konten und Passwörter werden nicht gespeichert.</string>
+    <string name="settings_backup_export">Einstellungen exportieren</string>
+    <string name="settings_backup_export_desc">Speichert alle Anpassungen in eine Datei.</string>
+    <string name="settings_backup_export_success">Einstellungen exportiert.</string>
+    <string name="settings_backup_export_failed">Export fehlgeschlagen.</string>
+    <string name="settings_backup_import">Einstellungen importieren</string>
+    <string name="settings_backup_import_desc">Einstellungen aus einer Backup-Datei laden.</string>
+    <string name="settings_backup_import_confirm_title">Einstellungen importieren?</string>
+    <string name="settings_backup_import_confirm_text">Deine aktuellen Anpassungen (Farben, Design, Sprache, ...) werden überschrieben.</string>
+    <string name="settings_backup_import_success">Einstellungen importiert.</string>
+    <string name="settings_backup_import_failed">Diese Datei ist kein gültiges UntisX-Backup.</string>
+    <string name="settings_backup_import_version">Dieses Backup stammt aus einer neueren App-Version.</string>
 
     <!-- Theme -->
     <string name="theme_mode_system">System</string>

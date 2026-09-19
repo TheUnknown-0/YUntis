@@ -1,0 +1,231 @@
+package sh.lsx.untisx.data
+
+import android.content.Context
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import sh.lsx.untisx.data.notifications.NotificationPrefs
+import sh.lsx.untisx.data.notifications.NotificationScheduler
+import sh.lsx.untisx.data.prefs.HapticsPrefs
+import java.util.Locale
+
+@Serializable
+data class GeneralSettingsBackup(
+    val language: String? = null,
+    val haptics: Boolean? = null,
+)
+
+@Serializable
+data class AppearanceSettingsBackup(
+    val themeMode: String? = null,
+    val themePreset: String? = null,
+)
+
+@Serializable
+data class NotificationSettingsBackup(
+    val enabled: Boolean? = null,
+    val changesEnabled: Boolean? = null,
+    val cancelled: Boolean? = null,
+    val room: Boolean? = null,
+    val teacher: Boolean? = null,
+    val changesSilent: Boolean? = null,
+    val silentDuringLessons: Boolean? = null,
+    val syncIntervalMinutes: Int? = null,
+    val overviewEnabled: Boolean? = null,
+    val overviewMinute: Int? = null,
+    val overviewShowChanges: Boolean? = null,
+    val overviewDetailed: Boolean? = null,
+    val overviewSilent: Boolean? = null,
+)
+
+@Serializable
+data class TimetableSettingsBackup(
+    val subjectColors: Map<String, String>? = null,
+    val knownSubjects: List<String>? = null,
+    val defaultSubjectColor: String? = null,
+    val lessonTextColor: String? = null,
+    val cancelledStrike: Boolean? = null,
+)
+
+@Serializable
+data class SettingsBackup(
+    val type: String = SettingsBackupCodec.TYPE,
+    val version: Int = SettingsBackupCodec.CURRENT_VERSION,
+    val appVersion: String = "",
+    val exportedAt: Long = 0,
+    val general: GeneralSettingsBackup? = null,
+    val appearance: AppearanceSettingsBackup? = null,
+    val notifications: NotificationSettingsBackup? = null,
+    val timetable: TimetableSettingsBackup? = null,
+)
+
+object SettingsBackupCodec {
+
+    const val TYPE = "untisx-settings"
+    const val CURRENT_VERSION = 1
+
+    private val json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
+
+    sealed interface DecodeResult {
+        data class Valid(val backup: SettingsBackup) : DecodeResult
+        data object Invalid : DecodeResult
+        data object UnsupportedVersion : DecodeResult
+    }
+
+    fun encode(backup: SettingsBackup): String = json.encodeToString(backup)
+
+    fun decode(text: String): DecodeResult {
+        val backup = runCatching { json.decodeFromString<SettingsBackup>(text) }.getOrNull()
+            ?: return DecodeResult.Invalid
+
+        if (backup.type != TYPE) return DecodeResult.Invalid
+        if (backup.version > CURRENT_VERSION) return DecodeResult.UnsupportedVersion
+
+        return DecodeResult.Valid(backup)
+    }
+}
+
+sealed interface SettingsImportResult {
+    data object Success : SettingsImportResult
+    data object InvalidFile : SettingsImportResult
+    data object UnsupportedVersion : SettingsImportResult
+    data class Failed(val message: String?) : SettingsImportResult
+}
+
+object SettingsBackupManager {
+
+    fun export(context: Context): String = SettingsBackupCodec.encode(read(context))
+
+    fun import(context: Context, text: String): SettingsImportResult =
+        when (val decoded = SettingsBackupCodec.decode(text)) {
+            is SettingsBackupCodec.DecodeResult.Invalid -> SettingsImportResult.InvalidFile
+            is SettingsBackupCodec.DecodeResult.UnsupportedVersion -> SettingsImportResult.UnsupportedVersion
+            is SettingsBackupCodec.DecodeResult.Valid -> runCatching {
+                apply(context, decoded.backup)
+            }.fold(
+                onSuccess = { SettingsImportResult.Success },
+                onFailure = { SettingsImportResult.Failed(it.message) },
+            )
+        }
+
+    private fun read(context: Context): SettingsBackup {
+        val theme = ThemePrefs.get(context)
+
+        return SettingsBackup(
+            appVersion = appVersion(context),
+            exportedAt = System.currentTimeMillis(),
+            general = GeneralSettingsBackup(
+                language = LanguagePrefs.get(context).name,
+                haptics = HapticsPrefs.isEnabled(context),
+            ),
+            appearance = AppearanceSettingsBackup(
+                themeMode = theme.mode.name,
+                themePreset = theme.preset.name,
+            ),
+            notifications = NotificationSettingsBackup(
+                enabled = NotificationPrefs.isEnabled(context),
+                changesEnabled = NotificationPrefs.areChangesEnabled(context),
+                cancelled = NotificationPrefs.notifyCancelled(context),
+                room = NotificationPrefs.notifyRoomChange(context),
+                teacher = NotificationPrefs.notifyTeacherChange(context),
+                changesSilent = NotificationPrefs.changesSilent(context),
+                silentDuringLessons = NotificationPrefs.silentDuringLessons(context),
+                syncIntervalMinutes = NotificationPrefs.syncIntervalMinutes(context),
+                overviewEnabled = NotificationPrefs.isOverviewEnabled(context),
+                overviewMinute = NotificationPrefs.overviewMinute(context),
+                overviewShowChanges = NotificationPrefs.overviewShowChanges(context),
+                overviewDetailed = NotificationPrefs.overviewDetailed(context),
+                overviewSilent = NotificationPrefs.overviewSilent(context),
+            ),
+            timetable = TimetableSettingsBackup(
+                subjectColors = SubjectColorsPrefs.getColors(context).mapValues { colorToHex(it.value) },
+                knownSubjects = SubjectColorsPrefs.getKnown(context),
+                defaultSubjectColor = colorToHex(SubjectColorsPrefs.getDefaultColor(context)),
+                lessonTextColor = colorToHex(SubjectColorsPrefs.getTextColor(context)),
+                cancelledStrike = SubjectColorsPrefs.isCancelledStrike(context),
+            ),
+        )
+    }
+
+    private fun apply(context: Context, backup: SettingsBackup) {
+        backup.general?.let { general ->
+            general.language
+                ?.let { name -> AppLanguage.entries.firstOrNull { it.name == name } }
+                ?.let { LanguagePrefs.save(context, it) }
+
+            general.haptics?.let { HapticsPrefs.setEnabled(context, it) }
+        }
+
+        backup.appearance?.let { appearance ->
+            val current = ThemePrefs.get(context)
+            val mode = appearance.themeMode
+                ?.let { name -> ThemeMode.entries.firstOrNull { it.name == name } }
+                ?: current.mode
+            val preset = appearance.themePreset
+                ?.let { name -> ThemePreset.entries.firstOrNull { it.name == name } }
+                ?: current.preset
+
+            ThemePrefs.save(context, AppTheme(mode = mode, preset = preset))
+        }
+
+        backup.notifications?.let { notifications ->
+            notifications.enabled?.let { NotificationPrefs.setEnabled(context, it) }
+            notifications.changesEnabled?.let { NotificationPrefs.setChangesEnabled(context, it) }
+            notifications.cancelled?.let { NotificationPrefs.setNotifyCancelled(context, it) }
+            notifications.room?.let { NotificationPrefs.setNotifyRoomChange(context, it) }
+            notifications.teacher?.let { NotificationPrefs.setNotifyTeacherChange(context, it) }
+            notifications.changesSilent?.let { NotificationPrefs.setChangesSilent(context, it) }
+            notifications.silentDuringLessons?.let { NotificationPrefs.setSilentDuringLessons(context, it) }
+            notifications.syncIntervalMinutes?.let { NotificationPrefs.setSyncIntervalMinutes(context, it) }
+            notifications.overviewEnabled?.let { NotificationPrefs.setOverviewEnabled(context, it) }
+            notifications.overviewMinute?.let { NotificationPrefs.setOverviewMinute(context, it) }
+            notifications.overviewShowChanges?.let { NotificationPrefs.setOverviewShowChanges(context, it) }
+            notifications.overviewDetailed?.let { NotificationPrefs.setOverviewDetailed(context, it) }
+            notifications.overviewSilent?.let { NotificationPrefs.setOverviewSilent(context, it) }
+
+            NotificationScheduler.ensureAll(context)
+        }
+
+        backup.timetable?.let { timetable ->
+            timetable.subjectColors?.forEach { (name, hex) ->
+                hexToColor(hex)?.let { SubjectColorsPrefs.setColor(context, name, it) }
+            }
+
+            timetable.knownSubjects?.let { SubjectColorsPrefs.setKnown(context, it) }
+            timetable.defaultSubjectColor
+                ?.let(::hexToColor)
+                ?.let { SubjectColorsPrefs.setDefaultColor(context, it) }
+            timetable.lessonTextColor
+                ?.let(::hexToColor)
+                ?.let { SubjectColorsPrefs.setTextColor(context, it) }
+            timetable.cancelledStrike?.let { SubjectColorsPrefs.setCancelledStrike(context, it) }
+        }
+    }
+
+    private fun appVersion(context: Context): String = runCatching {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    }.getOrNull().orEmpty()
+}
+
+internal fun colorToHex(argb: Int): String {
+    val alpha = (argb ushr 24) and 0xFF
+
+    return if (alpha == 0xFF) {
+        String.format(Locale.ROOT, "#%06X", argb and 0xFFFFFF)
+    } else {
+        String.format(Locale.ROOT, "#%08X", argb)
+    }
+}
+
+internal fun hexToColor(hex: String): Int? {
+    val clean = hex.trim().removePrefix("#")
+
+    return when (clean.length) {
+        6 -> clean.toLongOrNull(16)?.toInt()?.or(0xFF000000.toInt())
+        8 -> clean.toLongOrNull(16)?.toInt()
+        else -> null
+    }
+}
