@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -35,6 +36,7 @@ import sh.lsx.untisx.data.model.plusUntisWeeks
 import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisWeekStart
+import sh.lsx.untisx.data.model.toVisibleWeekStart
 import sh.lsx.untisx.R
 import sh.lsx.untisx.ui.util.UiText
 import java.time.Instant
@@ -79,6 +81,8 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     var weeks by mutableStateOf<Map<Int, List<TimetableEntry>>>(emptyMap())
+        private set
+    var lastPage by mutableIntStateOf(CENTER)
         private set
     var loadingWeeks by mutableStateOf<Set<Int>>(emptySet())
         private set
@@ -148,6 +152,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     fun offsetToPage(offset: Int): Int = offset + CENTER
 
     fun ensureWeekPage(page: Int) {
+        lastPage = page
         ensureWeekOffset(pageToOffset(page))
     }
 
@@ -334,7 +339,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     private fun applyCached(cached: TimetableCache.Data) {
         lastFetch = cached.lastFetch
 
-        val currentMonday = LocalDate.now().toUntisWeekStart()
+        val currentMonday = LocalDate.now().toVisibleWeekStart()
 
         for ((key, entries) in cached.weeks) {
             val monday = key.toIntOrNull()
@@ -380,7 +385,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             var success = false
 
             try {
-                val monday = LocalDate.now().plusUntisWeeks(claimed.toLong())
+                val monday = LocalDate.now().toVisibleWeekStart().plusUntisWeeks(claimed.toLong())
                 val (entries, fresh, allRefused, refusedDays) = fetchWeekForOffset(claimed, monday)
 
                 if (fresh != null) persistSession(fresh)
@@ -917,7 +922,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
         val data = TimetableCache.Data(
             weeks = weekCache.mapKeys { (offset, _) ->
-                LocalDate.now().plusUntisWeeks(offset.toLong()).toUntisWeekStart().toUntisDate().toString()
+                LocalDate.now().toVisibleWeekStart().plusUntisWeeks(offset.toLong()).toUntisWeekStart().toUntisDate().toString()
             },
             subjects = subjectsById.values.toList().ifEmpty { previous?.subjects.orEmpty() },
             teachers = teachersById.values.toList().ifEmpty { previous?.teachers.orEmpty() },

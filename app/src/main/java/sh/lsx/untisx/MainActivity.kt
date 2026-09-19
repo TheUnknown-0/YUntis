@@ -115,7 +115,7 @@ class MainActivity : AppCompatActivity() {
         handleIntent(intent)
 
         setContent {
-            AppRoot(focusDate = focusDate, focusNonce = focusNonce)
+            AppRoot(focusDate = focusDate, focusNonce = focusNonce, onFocusConsumed = ::consumeFocus)
         }
     }
 
@@ -134,6 +134,10 @@ class MainActivity : AppCompatActivity() {
             focusNonce++
         }
     }
+
+    private fun consumeFocus() {
+        focusDate = 0
+    }
 }
 
 private fun readOnboardingDone(context: Context): Boolean =
@@ -147,6 +151,7 @@ private fun prefsEdit(context: Context) =
 private fun AppRoot(
     focusDate: Int,
     focusNonce: Int,
+    onFocusConsumed: () -> Unit,
 ) {
     val context = LocalContext.current
     var theme by remember { mutableStateOf(ThemePrefs.get(context)) }
@@ -251,6 +256,7 @@ private fun AppRoot(
                         onCancelledStrike = { SubjectColorsPrefs.setCancelledStrike(context, it) },
                         focusDate = focusDate,
                         focusNonce = focusNonce,
+                        onFocusConsumed = onFocusConsumed,
                     )
                 }
 
@@ -295,6 +301,7 @@ private fun MainApp(
     onCancelledStrike: (Boolean) -> Unit,
     focusDate: Int,
     focusNonce: Int,
+    onFocusConsumed: () -> Unit,
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -619,6 +626,7 @@ private fun MainApp(
                         cancelledStrike = cancelledStrike,
                         focusDate = focusDate,
                         focusNonce = focusNonce,
+                        onFocusConsumed = onFocusConsumed,
                         onLessonClick = { entry ->
                             selectedLesson = entry
                             timetableVm.loadLessonNotes(entry)
@@ -637,6 +645,7 @@ private fun MainApp(
                         cancelledStrike = cancelledStrike,
                         focusDate = focusDate,
                         focusNonce = focusNonce,
+                        onFocusConsumed = onFocusConsumed,
                         onLessonClick = { entry ->
                             selectedLesson = entry
                             timetableVm.loadLessonNotes(entry)

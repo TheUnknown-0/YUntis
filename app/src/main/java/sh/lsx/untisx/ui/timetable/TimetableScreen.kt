@@ -54,6 +54,7 @@ import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.model.toUntisWeekStart
+import sh.lsx.untisx.data.model.toVisibleWeekStart
 import sh.lsx.untisx.R
 import sh.lsx.untisx.ui.util.tapHaptic
 import java.time.Duration
@@ -75,7 +76,7 @@ private fun focusPageFor(date: Int): Int {
     val target = runCatching { date.toUntisLocalDate().toUntisWeekStart() }.getOrNull()
         ?: return TimetableViewModel.CENTER
 
-    val current = LocalDate.now().toUntisWeekStart()
+    val current = LocalDate.now().toVisibleWeekStart()
     val weeks = ChronoUnit.WEEKS.between(current, target).toInt()
 
     return (TimetableViewModel.CENTER + weeks).coerceIn(0, TimetableViewModel.WEEK_SPAN - 1)
@@ -97,6 +98,7 @@ fun TimetableScreen(
     onLessonClick: (TimetableEntry) -> Unit = {},
     focusDate: Int = 0,
     focusNonce: Int = 0,
+    onFocusConsumed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val error = vm.error
@@ -108,12 +110,15 @@ fun TimetableScreen(
     }
 
     val pagerState = rememberPagerState(
-        initialPage = remember { focusPageFor(focusDate) },
+        initialPage = vm.lastPage.coerceIn(0, TimetableViewModel.WEEK_SPAN - 1),
         pageCount = { TimetableViewModel.WEEK_SPAN },
     )
 
     LaunchedEffect(focusNonce) {
-        if (focusDate > 0) pagerState.scrollToPage(focusPageFor(focusDate))
+        if (focusDate > 0) {
+            pagerState.scrollToPage(focusPageFor(focusDate))
+            onFocusConsumed()
+        }
     }
 
     LaunchedEffect(pagerState.settledPage) {
@@ -176,7 +181,7 @@ fun TimetableScreen(
                         teachersById = vm.teachersById,
                         roomsById = vm.roomsById,
                         holidays = vm.holidays,
-                        weekStart = LocalDate.now().plusUntisWeeks(pageOffset.toLong()),
+                        weekStart = LocalDate.now().toVisibleWeekStart().plusUntisWeeks(pageOffset.toLong()),
                         dayStart = grid.dayStart,
                         dayEnd = grid.dayEnd,
                         gridHeight = grid.height,

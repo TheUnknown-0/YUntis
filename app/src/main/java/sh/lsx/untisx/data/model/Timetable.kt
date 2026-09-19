@@ -92,6 +92,16 @@ fun Int.toUntisLocalTime(): LocalTime = LocalTime.of(this / 100, this % 100)
 
 fun LocalDate.toUntisWeekStart(): LocalDate = with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
+fun LocalDate.toVisibleWeekStart(): LocalDate {
+    val monday = toUntisWeekStart()
+
+    return if (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY) {
+        monday.plusWeeks(1)
+    } else {
+        monday
+    }
+}
+
 fun LocalDate.plusUntisWeeks(weeks: Long): LocalDate {
     val monday = toUntisWeekStart()
     return monday.plusWeeks(weeks)
