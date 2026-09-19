@@ -151,6 +151,25 @@
         <item quantity="other">Noch %1$d Tage</item>
     </plurals>
 
+    <!-- Statistics -->
+    <string name="stats">Statistiken</string>
+    <string name="stats_days_collected">%1$d von %2$d Schultagen erfasst</string>
+    <string name="stats_last_updated">Aktualisiert: %1$s</string>
+    <string name="stats_total">Stunden insgesamt</string>
+    <string name="stats_taught">Stattgefunden</string>
+    <string name="stats_cancelled">Ausfälle</string>
+    <string name="stats_changes">Änderungen</string>
+    <string name="stats_cancel_rate">Ausfallquote</string>
+    <string name="stats_cancel_change_rate">Ausfall- &amp; Änderungsquote</string>
+    <string name="stats_period_year">Schuljahr</string>
+    <string name="stats_by_subject">Stunden pro Fach</string>
+    <string name="stats_load_history">Bisherige Daten laden</string>
+    <string name="stats_load_history_desc">Alle Schultage seit Beginn des aktuellen Schuljahres laden.</string>
+    <string name="stats_up_to_date">Alle verfügbaren Daten sind geladen.</string>
+    <string name="stats_loading_week">Woche %1$d/%2$d...</string>
+    <string name="stats_empty">Noch keine Statistik vorhanden.</string>
+    <string name="stats_empty_hint">Tippe auf „Bisherige Daten laden“, um das aktuelle Schuljahr zu erfassen.</string>
+
     <!-- Teachers / Rooms lists -->
     <string name="teachers_empty">Noch keine Lehrkräfte gefunden.</string>
     <string name="teachers_empty_hint">Öffne zuerst den Stundenplan, damit Daten geladen werden.</string>

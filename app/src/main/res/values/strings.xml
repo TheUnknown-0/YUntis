@@ -151,6 +151,25 @@
         <item quantity="other">Starts in %1$d days</item>
     </plurals>
 
+    <!-- Statistics -->
+    <string name="stats">Statistics</string>
+    <string name="stats_days_collected">%1$d of %2$d school days collected</string>
+    <string name="stats_last_updated">Updated: %1$s</string>
+    <string name="stats_total">Lessons total</string>
+    <string name="stats_taught">Held</string>
+    <string name="stats_cancelled">Cancelled</string>
+    <string name="stats_changes">Changed</string>
+    <string name="stats_cancel_rate">Cancellation rate</string>
+    <string name="stats_cancel_change_rate">Cancel &amp; Changes rate</string>
+    <string name="stats_period_year">School year</string>
+    <string name="stats_by_subject">Lessons by subject</string>
+    <string name="stats_load_history">Load past data</string>
+    <string name="stats_load_history_desc">Fetch every school day since the start of the current school year.</string>
+    <string name="stats_up_to_date">All available data is loaded.</string>
+    <string name="stats_loading_week">Week %1$d/%2$d...</string>
+    <string name="stats_empty">No statistics yet.</string>
+    <string name="stats_empty_hint">Tap \"Load past data\" to collect the current school year.</string>
+
     <!-- Teachers / Rooms lists -->
     <string name="teachers_empty">No teachers found yet.</string>
     <string name="teachers_empty_hint">Open the timetable first to load data.</string>

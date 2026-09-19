@@ -83,6 +83,14 @@ data class DayMessage(
     val body: String = "",
 )
 
+@Serializable
+data class SchoolYear(
+    val id: Int = 0,
+    val name: String = "",
+    val startDate: Int = 0,
+    val endDate: Int = 0,
+)
+
 fun LocalDate.toUntisDate(): Int = year * 10000 + monthValue * 100 + dayOfMonth
 
 fun Int.toUntisLocalDate(): LocalDate =

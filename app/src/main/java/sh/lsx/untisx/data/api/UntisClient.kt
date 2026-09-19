@@ -34,6 +34,7 @@ import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.School
 import sh.lsx.untisx.data.model.SchoolSearchResult
+import sh.lsx.untisx.data.model.SchoolYear
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.TimegridDay
@@ -425,6 +426,64 @@ object UntisClient {
         val topic: String?,
         val notes: List<String>,
     )
+
+    suspend fun fetchCurrentSchoolYear(auth: AuthData, password: String): SchoolYear? = withContext(Dispatchers.IO) {
+        val jwt = mobileJwt(auth, password)
+
+        if (jwt != null) {
+            val host = auth.server.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
+            val url = "https://$host/WebUntis/api/rest/view/v1/app/data"
+
+            try {
+                http.newCall(
+                    Request.Builder().url(url)
+                        .header("Authorization", "Bearer $jwt")
+                        .header("Accept", "application/json")
+                        .get()
+                        .build(),
+                ).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val body = response.body?.string().orEmpty()
+                        val parsed = runCatching { parseSchoolYear(body) }.getOrNull()
+
+                        if (parsed != null) {
+                            Log.d(TAG, "school year -> ${parsed.name} ${parsed.startDate}-${parsed.endDate}")
+                            return@withContext parsed
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "school year via app data failed: ${e.message}")
+            }
+        }
+
+        try {
+            json.decodeFromJsonElement<SchoolYear>(rpcCall(auth, "getCurrentSchoolyear"))
+                .takeIf { it.startDate > 0 }
+                .also { Log.d(TAG, "school year via getCurrentSchoolyear -> ${it?.name}") }
+        } catch (e: Exception) {
+            Log.d(TAG, "school year via json-rpc failed: ${e.message}")
+            null
+        }
+    }
+
+    private fun parseSchoolYear(body: String): SchoolYear? {
+        val year = runCatching {
+            json.parseToJsonElement(body).jsonObject["currentSchoolYear"]?.jsonObject
+        }.getOrNull() ?: return null
+
+        val start = parseIsoDate(year["dateRange"]?.jsonObject?.get("start")?.jsonPrimitive?.contentOrNull.orEmpty())
+        val end = parseIsoDate(year["dateRange"]?.jsonObject?.get("end")?.jsonPrimitive?.contentOrNull.orEmpty())
+
+        if (start == 0 || end == 0) return null
+
+        return SchoolYear(
+            id = year["id"]?.jsonPrimitive?.intOrNull ?: 0,
+            name = year["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            startDate = start,
+            endDate = end,
+        )
+    }
 
     private var cachedJwt: String? = null
     private var cachedJwtAt = 0L

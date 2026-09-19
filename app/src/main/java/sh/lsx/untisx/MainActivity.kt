@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DateRange
@@ -66,7 +67,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import sh.lsx.untisx.R
 import sh.lsx.untisx.data.AppTheme
 import sh.lsx.untisx.data.LanguagePrefs
 import sh.lsx.untisx.data.model.TimetableEntry
@@ -85,6 +85,7 @@ import sh.lsx.untisx.ui.screens.ProfileScreen
 import sh.lsx.untisx.ui.screens.LoginScreen
 import sh.lsx.untisx.ui.screens.OnboardingScreen
 import sh.lsx.untisx.ui.screens.RoomsListScreen
+import sh.lsx.untisx.ui.screens.StatsScreen
 import sh.lsx.untisx.ui.screens.TeachersListScreen
 import sh.lsx.untisx.ui.screens.settings.AppearanceSettingsScreen
 import sh.lsx.untisx.ui.screens.settings.GeneralSettingsScreen
@@ -278,6 +279,7 @@ private enum class Screen {
     EVENTS,
     TEACHERS,
     ROOMS,
+    STATS,
     SETTINGS,
     ABOUT,
 }
@@ -417,6 +419,16 @@ private fun MainApp(
                     },
                 )
 
+                SidebarItem(
+                    icon = Icons.AutoMirrored.Outlined.List,
+                    label = stringResource(R.string.stats),
+                    badge = timetableVm.currentYearLessonCount().takeIf { it > 0 }?.toString(),
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        currentScreen = Screen.STATS
+                    },
+                )
+
                 Spacer(Modifier.height(16.dp))
                 SidebarSection(stringResource(R.string.nav_other))
 
@@ -451,6 +463,7 @@ private fun MainApp(
             Screen.EVENTS -> stringResource(R.string.events)
             Screen.TEACHERS -> stringResource(R.string.teachers)
             Screen.ROOMS -> stringResource(R.string.rooms)
+            Screen.STATS -> stringResource(R.string.stats)
             Screen.SETTINGS -> settingsTitle
             Screen.ABOUT -> stringResource(R.string.about)
             else -> stringResource(R.string.timetable)
@@ -595,6 +608,19 @@ private fun MainApp(
                         modifier = Modifier.padding(padding),
                     )
 
+                    Screen.STATS -> StatsScreen(
+                        yearStats = timetableVm.currentYearStats(),
+                        schoolYear = timetableVm.statsSchoolYear(),
+                        subjectsById = timetableVm.subjectsById,
+                        loading = timetableVm.statsLoading,
+                        progress = timetableVm.statsProgress,
+                        upToDate = timetableVm.statsUpToDate,
+                        onLoadHistory = timetableVm::loadHistoricalStats,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                    )
+
                     Screen.ABOUT -> AboutScreen(
                         auth = auth,
                         modifier = Modifier
@@ -688,6 +714,12 @@ private fun MainApp(
                 if (currentScreen == Screen.EVENTS) {
                     timetableVm.eventsError?.let { message ->
                         ErrorBanner(text = uiTextString(message), onRetry = timetableVm::refreshEvents)
+                    }
+                }
+
+                if (currentScreen == Screen.STATS) {
+                    timetableVm.statsError?.let { message ->
+                        ErrorBanner(text = uiTextString(message), onRetry = timetableVm::loadHistoricalStats)
                     }
                 }
             }

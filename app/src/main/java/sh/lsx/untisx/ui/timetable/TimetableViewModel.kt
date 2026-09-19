@@ -21,6 +21,9 @@ import kotlinx.coroutines.sync.withLock
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.SubjectColorsPrefs
+import sh.lsx.untisx.data.StatsData
+import sh.lsx.untisx.data.StatsStore
+import sh.lsx.untisx.data.SchoolYearStats
 import sh.lsx.untisx.data.TimetableCache
 import sh.lsx.untisx.data.api.SessionManager
 import sh.lsx.untisx.data.api.UntisClient
@@ -28,6 +31,7 @@ import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.DayMessage
 import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
+import sh.lsx.untisx.data.model.SchoolYear
 import sh.lsx.untisx.data.prefs.PasswordVault
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.TimetableElement
@@ -120,6 +124,18 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var lessonNotes by mutableStateOf<NotesState?>(null)
         private set
+    var stats by mutableStateOf<StatsData?>(null)
+        private set
+    var statsLoading by mutableStateOf(false)
+        private set
+    var statsProgress by mutableStateOf<Pair<Int, Int>?>(null)
+        private set
+    var statsError by mutableStateOf<UiText?>(null)
+        private set
+    var statsUpToDate by mutableStateOf(false)
+        private set
+
+    private var statsYear: SchoolYear? = null
 
     private var auth: AuthData? = null
     private var staticDataLoaded = false
@@ -137,6 +153,10 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             val account = AccountPrefs.getActive(getApplication())
             val cached = account?.let {
                 withContext(Dispatchers.IO) { TimetableCache.load(getApplication(), AccountPrefs.accountId(it)) }
+            }
+
+            stats = account?.let {
+                withContext(Dispatchers.IO) { StatsStore.load(getApplication(), AccountPrefs.accountId(it)) }
             }
 
             if (cached != null) {
@@ -291,6 +311,149 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         return merged
     }
 
+    fun currentYearStats(): SchoolYearStats? = StatsStore.currentYear(stats, statsYear)
+
+    fun currentYearLessonCount(): Int =
+        currentYearStats()?.days?.values?.sumOf { it.lessons } ?: 0
+
+    fun statsSchoolYear(): SchoolYear? = statsYear
+
+    fun loadHistoricalStats() {
+        if (statsLoading) return
+
+        statsLoading = true
+        statsError = null
+
+        viewModelScope.launch {
+            try {
+                val currentAuth = requireAuth()
+                val year = resolveStatsYear(currentAuth)
+                statsYear = year
+
+                val today = LocalDate.now()
+                val start = year.startDate.toUntisLocalDate()
+                val end = if (year.endDate > 0) {
+                    runCatching { year.endDate.toUntisLocalDate() }.getOrDefault(start.plusYears(1).minusDays(1))
+                } else {
+                    start.plusYears(1).minusDays(1)
+                }
+                val lastDay = minOf(today, end)
+
+                if (lastDay >= start) {
+                    val counted = StatsStore.countedDays(stats, year)
+                    val accountId = AccountPrefs.accountId(currentAuth)
+
+                    val weeks = generateSequence(start.toUntisWeekStart()) { it.plusWeeks(1) }
+                        .takeWhile { it <= lastDay }
+                        .filter { weekStart ->
+                            (0..6).any { offset ->
+                                val date = weekStart.plusDays(offset.toLong())
+                                date >= start && date <= lastDay && date.toUntisDate() !in counted
+                            }
+                        }
+                        .toList()
+
+                    statsUpToDate = weeks.isEmpty()
+                    statsProgress = 0 to weeks.size
+
+                    for ((index, weekStart) in weeks.withIndex()) {
+                        val entries = fetchStatsWeek(currentAuth, weekStart)
+
+                        stats = StatsStore.recordWeek(
+                            context = getApplication(),
+                            accountId = accountId,
+                            year = year,
+                            weekStart = weekStart,
+                            entries = entries,
+                            today = today,
+                        )
+
+                        statsProgress = index + 1 to weeks.size
+                    }
+                }
+
+                stats = StatsStore.load(getApplication(), AccountPrefs.accountId(currentAuth))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.d(TAG, "stats backfill failed: ${e.message}")
+                statsError = friendly(e)
+            } finally {
+                statsLoading = false
+                statsProgress = null
+            }
+        }
+    }
+
+    private suspend fun resolveStatsYear(auth: AuthData): SchoolYear {
+        statsYear?.let { return it }
+
+        val today = LocalDate.now()
+        val stored = stats?.years?.values
+            ?.filter { it.startDate > 0 && it.endDate > 0 }
+            ?.filter { today.toUntisDate() in it.startDate..it.endDate }
+            ?.maxByOrNull { it.startDate }
+
+        if (stored != null) {
+            return SchoolYear(
+                id = 0,
+                name = stored.name,
+                startDate = stored.startDate,
+                endDate = stored.endDate,
+            ).also { statsYear = it }
+        }
+
+        val password = runCatching { withPassword() }.getOrNull()
+
+        return (password?.let { UntisClient.fetchCurrentSchoolYear(auth, it) }
+            ?: StatsStore.fallbackYear(today))
+            .also { statsYear = it }
+    }
+
+    private suspend fun recordStatsWeek(
+        monday: LocalDate,
+        entries: List<TimetableEntry>,
+        refusedDates: List<Int>,
+    ) {
+        val currentAuth = auth ?: return
+        val year = resolveStatsYear(currentAuth)
+
+        stats = StatsStore.recordWeek(
+            context = getApplication(),
+            accountId = AccountPrefs.accountId(currentAuth),
+            year = year,
+            weekStart = monday,
+            entries = entries,
+            today = LocalDate.now(),
+            skipDates = refusedDates.toSet(),
+        )
+    }
+
+    private suspend fun fetchStatsWeek(
+        auth: AuthData,
+        weekStart: LocalDate,
+    ): List<TimetableEntry> {
+        try {
+            return UntisClient.getTimetableIntern(auth, withPassword(), weekStart, weekStart.plusDays(6))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.d(TAG, "stats week via mobile API failed: ${e.message}")
+        }
+
+        val (entries, fresh) = SessionManager.withValidSession(getApplication(), auth) { a ->
+            UntisClient.getTimetable(
+                auth = a,
+                startDate = weekStart.toUntisDate(),
+                endDate = weekStart.plusDays(6).toUntisDate(),
+            )
+        }
+
+        if (fresh != null) persistSession(fresh)
+
+        return entries
+    }
+
     fun retry() {
         error = null
         info = null
@@ -389,6 +552,14 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 val (entries, fresh, allRefused, refusedDays) = fetchWeekForOffset(claimed, monday)
 
                 if (fresh != null) persistSession(fresh)
+
+                try {
+                    recordStatsWeek(monday, entries, refusedDays)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.d(TAG, "stats week record failed: ${e.message}")
+                }
 
                 weekCache[claimed] = entries
                     .let(::mergeConsecutiveLessons)
