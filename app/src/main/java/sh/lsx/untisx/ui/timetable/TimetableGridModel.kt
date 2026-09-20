@@ -6,14 +6,12 @@ import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.TimegridDay
-import sh.lsx.untisx.data.model.toUntisLocalDate
+import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.model.toUntisWeekStart
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 internal val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
-internal val DAY_DATE_FORMAT = DateTimeFormatter.ofPattern("d. MMM", Locale.getDefault())
 
 internal val GUTTER_WIDTH = 48.dp
 internal val MINUTE_HEIGHT = 1.15.dp
@@ -75,13 +73,14 @@ internal fun resolveOriginals(
 }
 
 internal fun computeWeekDays(entries: Collection<TimetableEntry>): List<LocalDate> {
-    if (entries.isEmpty()) return emptyList()
+    val dates = entries.mapNotNull { it.date.toUntisLocalDateOrNull() }
 
-    val monday = entries.minOf { it.date }.toUntisLocalDate().toUntisWeekStart()
-    val dataDays = entries.map { it.date }.distinct().sorted().map { it.toUntisLocalDate() }
+    if (dates.isEmpty()) return emptyList()
+
+    val monday = dates.min().toUntisWeekStart()
     val base = (0..4).map { monday.plusDays(it.toLong()) }
 
-    return base + dataDays.filter { it > monday.plusDays(4) }.distinct()
+    return base + dates.filter { it > monday.plusDays(4) }.distinct().sorted()
 }
 
 internal fun gridMetricsFrom(slots: List<HourMarker>): GridMetrics {

@@ -1,5 +1,6 @@
 package sh.lsx.untisx.ui.screens.settings
 
+import android.content.Context
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +33,10 @@ import sh.lsx.untisx.ui.components.LanguageSettingsContent
 import sh.lsx.untisx.ui.components.SettingsActionRow
 import sh.lsx.untisx.ui.components.SettingsSectionCard
 import sh.lsx.untisx.ui.components.SettingsSwitchRow
+import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 @Composable
@@ -40,6 +46,7 @@ fun GeneralSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var language by remember { mutableStateOf(LanguagePrefs.get(context)) }
     var pendingImport by remember { mutableStateOf<Uri?>(null) }
 
@@ -48,17 +55,21 @@ fun GeneralSettingsScreen(
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
 
-        val success = runCatching {
-            context.contentResolver.openOutputStream(uri)?.use { stream ->
-                stream.write(SettingsBackupManager.export(context).toByteArray(Charsets.UTF_8))
-            } ?: error("Could not open output stream")
-        }.isSuccess
+        scope.launch {
+            val success = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        stream.write(SettingsBackupManager.export(context).toByteArray(Charsets.UTF_8))
+                    } ?: error("Could not open output stream")
+                }.isSuccess
+            }
 
-        Toast.makeText(
-            context,
-            if (success) R.string.settings_backup_export_success else R.string.settings_backup_export_failed,
-            Toast.LENGTH_SHORT,
-        ).show()
+            Toast.makeText(
+                context,
+                if (success) R.string.settings_backup_export_success else R.string.settings_backup_export_failed,
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
     }
 
     val importLauncher = rememberLauncherForActivityResult(
@@ -118,13 +129,17 @@ fun GeneralSettingsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val result = runCatching {
-                            context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
-                        }.getOrNull()?.let { SettingsBackupManager.import(context, it) }
-                            ?: SettingsImportResult.InvalidFile
-
-                        Toast.makeText(context, importMessage(result), Toast.LENGTH_SHORT).show()
                         pendingImport = null
+
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                context.readBackup(uri)
+                                    ?.let { SettingsBackupManager.import(context, it) }
+                                    ?: SettingsImportResult.InvalidFile
+                            }
+
+                            Toast.makeText(context, importMessage(result), Toast.LENGTH_SHORT).show()
+                        }
                     },
                 ) {
                     Text(stringResource(R.string.apply))
@@ -138,6 +153,27 @@ fun GeneralSettingsScreen(
         )
     }
 }
+
+private const val MAX_BACKUP_BYTES = 2 * 1024 * 1024
+
+private fun Context.readBackup(uri: Uri): String? = runCatching {
+    contentResolver.openInputStream(uri)?.use { stream ->
+        val sink = ByteArrayOutputStream()
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var total = 0
+        var read: Int
+
+        while (stream.read(buffer).also { read = it } != -1) {
+            total += read
+
+            if (total > MAX_BACKUP_BYTES) return@runCatching null
+
+            sink.write(buffer, 0, read)
+        }
+
+        String(sink.toByteArray(), Charsets.UTF_8)
+    }
+}.getOrNull()
 
 private fun defaultBackupFileName(): String = "untisx-settings-${LocalDate.now()}.json"
 

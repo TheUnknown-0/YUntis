@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.edit
 import androidx.core.os.LocaleListCompat
 import sh.lsx.untisx.UntisXApp
+import java.util.Locale
 
 enum class AppLanguage(val tag: String) {
     SYSTEM(""),
@@ -41,4 +42,12 @@ object LanguagePrefs {
 
         AppCompatDelegate.setApplicationLocales(locales)
     }
+}
+
+fun Context.appLocale(): Locale {
+    val language = LanguagePrefs.get(this)
+
+    if (language != AppLanguage.SYSTEM) return Locale.forLanguageTag(language.tag)
+
+    return resources.configuration.locales.get(0) ?: Locale.getDefault()
 }

@@ -29,6 +29,7 @@ import sh.lsx.untisx.data.model.AuthResult
 import sh.lsx.untisx.data.model.DayMessage
 import sh.lsx.untisx.data.model.JsonRpcRequest
 import sh.lsx.untisx.data.model.JsonRpcResponse
+import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
@@ -44,6 +45,7 @@ import sh.lsx.untisx.data.security.generateTotp
 import java.io.IOException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -61,6 +63,9 @@ object UntisClient {
     private const val CLIENT_NAME = "UntisX"
     private const val TAG = "UntisClient"
 
+    private const val SECRET_TTL_MS = 6 * 60 * 60 * 1000L
+    private const val JWT_TTL_MS = 10 * 60 * 1000L
+
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
@@ -74,6 +79,21 @@ object UntisClient {
         .build()
     private val nextId = AtomicInteger(1)
 
+    private val sharedSecrets = ConcurrentHashMap<String, CachedSecret>()
+    private val jwts = ConcurrentHashMap<String, CachedJwt>()
+
+    private data class CachedSecret(val secret: String, val at: Long)
+    private data class CachedJwt(val jwt: String, val at: Long)
+
+    private fun log(message: String) {
+        Log.d(TAG, message)
+    }
+
+    fun clearSessionCache(accountId: String) {
+        sharedSecrets.remove(accountId)
+        jwts.remove(accountId)
+    }
+
     suspend fun searchSchools(query: String): List<School> = withContext(Dispatchers.IO) {
         val params = buildJsonArray {
             add(
@@ -86,12 +106,18 @@ object UntisClient {
 
         try {
             val result = executeRpc(SCHOOL_SEARCH_URL, "searchSchool", params)
-            val schools = json.decodeFromJsonElement<SchoolSearchResult>(result).schools
 
-            Log.d(TAG, "school search -> ${schools.size} schools")
+            val schools = runCatching {
+                json.decodeFromJsonElement<SchoolSearchResult>(result).schools
+            }.getOrElse {
+                log("school search returned an unparseable response")
+                return@withContext emptyList()
+            }
+
+            log("school search -> ${schools.size} schools")
             schools.take(20)
         } catch (e: UntisException.Api) {
-            Log.d(TAG, "school search API error ${e.code}")
+            log("school search API error ${e.code}")
             if (e.code == -6003) throw UntisException.TooManyResults
             emptyList()
         }
@@ -112,7 +138,7 @@ object UntisClient {
 
     suspend fun logout(auth: AuthData) = withContext(Dispatchers.IO) {
         runCatching { rpcCall(auth, "logout") }
-            .onFailure { Log.d(TAG, "server logout failed") }
+            .onFailure { log("server logout failed") }
         Unit
     }
 
@@ -146,9 +172,13 @@ object UntisClient {
 
         val url = buildUrl(auth.server, auth.loginName).toString()
 
-        json.decodeFromJsonElement<List<TimetableEntry>>(
+        val entries = json.decodeFromJsonElement<List<TimetableEntry>>(
             executeRpc(url, "getTimetable", params, session.sessionId),
-        ).also { Log.d(TAG, "getTimetable $startDate-$endDate -> ${it.size} lessons") }
+        ).filter { it.date != 0 }
+
+        log("getTimetable -> ${entries.size} lessons")
+
+        entries
     }
 
     suspend fun getSubjects(auth: AuthData): List<MasterDataItem> = masterData(auth, "getSubjects")
@@ -160,14 +190,14 @@ object UntisClient {
     suspend fun getHolidays(auth: AuthData): List<Holiday> = withContext(Dispatchers.IO) {
         json.decodeFromJsonElement<List<Holiday>>(
             rpcCall(auth, "getHolidays"),
-        ).also { Log.d(TAG, "getHolidays -> ${it.size} items") }
+        ).also { log("getHolidays -> ${it.size} items") }
     }
 
     private suspend fun masterData(auth: AuthData, method: String): List<MasterDataItem> =
         withContext(Dispatchers.IO) {
             json.decodeFromJsonElement<List<MasterDataItem>>(
                 rpcCall(auth, method),
-            ).also { Log.d(TAG, "$method -> ${it.size} items") }
+            ).also { log("$method -> ${it.size} items") }
         }
 
     private fun rpcCall(
@@ -181,22 +211,49 @@ object UntisClient {
         auth.session.sessionId,
     )
 
-    private class InternTotp(
-        val url: String,
-        val user: String,
-        val otp: Long,
-        val clientTime: Long,
-    ) {
-        fun credentials(): JsonObject = buildJsonObject {
-            put("user", user)
-            put("otp", otp)
-            put("clientTime", clientTime)
+    private fun internalRpc(
+        auth: AuthData,
+        password: String,
+        method: String,
+        params: (credentials: JsonObject) -> JsonArray,
+    ): JsonElement {
+        val url = buildInternalRpcUrl(auth.server, auth.loginName).toString()
+        val key = AccountPrefs.accountId(auth)
+
+        fun call(secret: String): JsonElement {
+            val now = System.currentTimeMillis()
+
+            val credentials = buildJsonObject {
+                put("user", auth.user)
+                put("otp", generateTotp(secret, now))
+                put("clientTime", now)
+            }
+
+            return executeRpc(url, method, params(credentials))
+        }
+
+        val cached = sharedSecrets[key]?.takeIf { System.currentTimeMillis() - it.at < SECRET_TTL_MS }
+
+        if (cached == null) return call(fetchSharedSecret(auth, password, url, key))
+
+        return try {
+            call(cached.secret)
+        } catch (e: UntisException.Network) {
+            throw e
+        } catch (e: UntisException) {
+            log("'$method' rejected the cached secret -> requesting a new one")
+
+            sharedSecrets.remove(key)
+            call(fetchSharedSecret(auth, password, url, key))
         }
     }
 
-    private fun internTotp(auth: AuthData, password: String): InternTotp {
-        val url = buildInternalRpcUrl(auth.server, auth.loginName).toString()
-
+    private fun fetchSharedSecret(
+        auth: AuthData,
+        password: String,
+        url: String,
+        key: String,
+    ): String {
         val secret = executeRpc(
             url,
             "getAppSharedSecret",
@@ -209,32 +266,22 @@ object UntisClient {
         ).jsonPrimitive.contentOrNull
             ?: throw UntisException.Api(-1, "No app shared secret.")
 
-        val now = System.currentTimeMillis()
+        sharedSecrets[key] = CachedSecret(secret, System.currentTimeMillis())
 
-        return InternTotp(
-            url = url,
-            user = auth.user,
-            otp = generateTotp(secret, now),
-            clientTime = now,
-        )
+        return secret
     }
 
-    private fun userData(auth: AuthData, password: String): JsonElement {
-        val totp = internTotp(auth, password)
-
-        return executeRpc(
-            totp.url,
-            "getUserData2017",
+    private fun userData(auth: AuthData, password: String): JsonElement =
+        internalRpc(auth, password, "getUserData2017") { credentials ->
             buildJsonArray {
                 add(buildJsonObject {
                     put("elementId", 0)
                     put("deviceOs", "A")
                     put("deviceOsVersion", "")
-                    put("auth", totp.credentials())
+                    put("auth", credentials)
                 })
-            },
-        )
-    }
+            }
+        }
 
     data class MasterData(
         val subjects: List<MasterDataItem>,
@@ -255,11 +302,8 @@ object UntisClient {
             holidays = parseUserDataHolidays(master?.get("holidays")),
             timegrid = parseTimegridResponse(result),
         ).also {
-            Log.d(
-                TAG,
-                "masterData -> subjects=${it.subjects.size} teachers=${it.teachers.size} " +
-                    "rooms=${it.rooms.size} holidays=${it.holidays.size} timegrid=${it.timegrid.size}",
-            )
+            log("masterData -> subjects=${it.subjects.size} teachers=${it.teachers.size} " +
+                    "rooms=${it.rooms.size} holidays=${it.holidays.size} timegrid=${it.timegrid.size}",)
         }
     }
 
@@ -307,7 +351,7 @@ object UntisClient {
 
     suspend fun fetchTimegridViaUserData(auth: AuthData, password: String): List<TimegridDay> = withContext(Dispatchers.IO) {
         parseTimegridResponse(userData(auth, password))
-            .also { Log.d(TAG, "timegrid via getUserData2017 -> ${it.size} days") }
+            .also { log("timegrid via getUserData2017 -> ${it.size} days") }
     }
 
     suspend fun fetchTeachersViaUserData(auth: AuthData, password: String): List<MasterDataItem> = withContext(Dispatchers.IO) {
@@ -315,7 +359,7 @@ object UntisClient {
             userData(auth, password).jsonObject["masterData"]?.jsonObject?.get("teachers")?.jsonArray
         }.getOrNull() ?: return@withContext emptyList()
 
-        parseUserDataTeachers(array).also { Log.d(TAG, "teachers via getUserData2017 -> ${it.size}") }
+        parseUserDataTeachers(array).also { log("teachers via getUserData2017 -> ${it.size}") }
     }
 
     private fun parseUserDataTeachers(array: JsonArray): List<MasterDataItem> =
@@ -386,7 +430,6 @@ object UntisClient {
         from: LocalDate,
         to: LocalDate,
     ): List<TimetableEntry> = withContext(Dispatchers.IO) {
-        val totp = internTotp(auth, password)
         val session = auth.session
 
         val (elementId, elementType) = when {
@@ -395,9 +438,7 @@ object UntisClient {
             else -> session.personId to "STUDENT"
         }
 
-        val result = executeRpc(
-            totp.url,
-            "getTimetable2017",
+        val result = internalRpc(auth, password, "getTimetable2017") { credentials ->
             buildJsonArray {
                 add(buildJsonObject {
                     put("id", elementId)
@@ -407,12 +448,12 @@ object UntisClient {
                     put("masterDataTimestamp", 0)
                     put("timetableTimestamp", 0)
                     put("timetableTimestamps", buildJsonArray {})
-                    put("auth", totp.credentials())
+                    put("auth", credentials)
                 })
-            },
-        )
+            }
+        }
 
-        parseInternTimetable(result).also { Log.d(TAG, "getTimetable2017 $from-$to -> ${it.size} periods") }
+        parseInternTimetable(result).also { log("getTimetable2017 -> ${it.size} periods") }
     }
 
     data class PeriodNotes(
@@ -447,22 +488,22 @@ object UntisClient {
                         val parsed = runCatching { parseSchoolYear(body) }.getOrNull()
 
                         if (parsed != null) {
-                            Log.d(TAG, "school year -> ${parsed.name} ${parsed.startDate}-${parsed.endDate}")
+                            log("school year -> id=${parsed.id}")
                             return@withContext parsed
                         }
                     }
                 }
             } catch (e: Exception) {
-                Log.d(TAG, "school year via app data failed: ${e.message}")
+                log("school year via app data failed: ${e.javaClass.simpleName}")
             }
         }
 
         try {
             json.decodeFromJsonElement<SchoolYear>(rpcCall(auth, "getCurrentSchoolyear"))
                 .takeIf { it.startDate > 0 }
-                .also { Log.d(TAG, "school year via getCurrentSchoolyear -> ${it?.name}") }
+                .also { log("school year via getCurrentSchoolyear -> ok=${it != null}") }
         } catch (e: Exception) {
-            Log.d(TAG, "school year via json-rpc failed: ${e.message}")
+            log("school year via json-rpc failed: ${e.javaClass.simpleName}")
             null
         }
     }
@@ -485,13 +526,11 @@ object UntisClient {
         )
     }
 
-    private var cachedJwt: String? = null
-    private var cachedJwtAt = 0L
-
     private fun mobileJwt(auth: AuthData, password: String): String? {
+        val key = AccountPrefs.accountId(auth)
         val now = System.currentTimeMillis()
 
-        cachedJwt?.let { if (now - cachedJwtAt < 10 * 60 * 1000) return it }
+        jwts[key]?.let { if (now - it.at < JWT_TTL_MS) return it.jwt }
 
         return try {
             val host = auth.server.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
@@ -514,14 +553,13 @@ object UntisClient {
                 }.getOrNull()
 
                 if (jwt != null) {
-                    cachedJwt = jwt
-                    cachedJwtAt = now
+                    jwts[key] = CachedJwt(jwt, now)
                 }
 
                 jwt
             }
         } catch (e: Exception) {
-            Log.d(TAG, "mobile jwt failed: ${e.message}")
+            log("mobile jwt failed: ${e.javaClass.simpleName}")
             null
         }
     }
@@ -570,20 +608,20 @@ object UntisClient {
                     .build(),
             ).execute().use { response ->
                 if (!response.isSuccessful) {
-                    cachedJwt = null
+                    jwts.remove(AccountPrefs.accountId(auth))
                     null
                 } else {
                     response.body?.string()
                 }
             }
         } catch (e: Exception) {
-            Log.d(TAG, "lesson detail failed: ${e.message}")
+            log("lesson detail failed: ${e.javaClass.simpleName}")
             null
         }
 
         val detail = body?.let { parseLessonDetail(it, entryId) }
 
-        detail?.also { Log.d(TAG, "lesson detail $entryId -> info=${it.info != null} topic=${it.topic != null} notes=${it.notes.size}") }
+        detail?.also { log("lesson detail -> info=${it.info != null} topic=${it.topic != null} notes=${it.notes.size}") }
             ?: fallbackLessonDetail(auth, password, entryId)
     }
 
@@ -619,20 +657,16 @@ object UntisClient {
         password: String,
         date: LocalDate,
     ): List<DayMessage> = withContext(Dispatchers.IO) {
-        val totp = internTotp(auth, password)
-
-        val result = executeRpc(
-            totp.url,
-            "getMessagesOfDay2017",
+        val result = internalRpc(auth, password, "getMessagesOfDay2017") { credentials ->
             buildJsonArray {
                 add(buildJsonObject {
                     put("date", date.format(DateTimeFormatter.ISO_LOCAL_DATE))
-                    put("auth", totp.credentials())
+                    put("auth", credentials)
                 })
-            },
-        )
+            }
+        }
 
-        parseMessagesOfDay(result).also { Log.d(TAG, "getMessagesOfDay2017 $date -> ${it.size} messages") }
+        parseMessagesOfDay(result).also { log("getMessagesOfDay2017 -> ${it.size} messages") }
     }
 
     private fun parseMessagesOfDay(result: JsonElement): List<DayMessage> =
@@ -664,20 +698,16 @@ object UntisClient {
         password: String,
         ttId: Int,
     ): PeriodNotes? = withContext(Dispatchers.IO) {
-        val totp = internTotp(auth, password)
-
-        val result = executeRpc(
-            totp.url,
-            "getPeriodData2017",
+        val result = internalRpc(auth, password, "getPeriodData2017") { credentials ->
             buildJsonArray {
                 add(buildJsonObject {
                     put("ttIds", buildJsonArray { add(JsonPrimitive(ttId)) })
-                    put("auth", totp.credentials())
+                    put("auth", credentials)
                 })
-            },
-        )
+            }
+        }
 
-        parsePeriodNotes(result, ttId).also { Log.d(TAG, "getPeriodData2017 $ttId -> topic=${it?.topic != null} notes=${it?.notes?.size}") }
+        parsePeriodNotes(result, ttId).also { log("getPeriodData2017 -> topic=${it?.topic != null} notes=${it?.notes?.size}") }
     }
 
     private fun parsePeriodNotes(result: JsonElement, ttId: Int): PeriodNotes? {
@@ -708,7 +738,7 @@ object UntisClient {
 
         return periods.mapNotNull { period ->
             runCatching { parseInternPeriod(period.jsonObject) }.getOrNull()
-        }
+        }.filter { it.date != 0 }
     }
 
     private fun parseInternPeriod(period: JsonObject): TimetableEntry {
@@ -775,7 +805,7 @@ object UntisClient {
 
         json.decodeFromJsonElement<List<TimegridDay>>(
             executeRpc(url, "getTimegrid", buildJsonObject {}, auth.session.sessionId),
-        ).also { Log.d(TAG, "timegrid via internal getTimegrid -> ${it.size} days") }
+        ).also { log("timegrid via internal getTimegrid -> ${it.size} days") }
     }
 
     suspend fun fetchTimegridRpc(auth: AuthData): List<TimegridDay> = withContext(Dispatchers.IO) {
@@ -798,7 +828,7 @@ object UntisClient {
         }
 
         json.decodeFromJsonElement<List<TimegridDay>>(days)
-            .also { Log.d(TAG, "timegrid via getTimegrid -> ${it.size} days") }
+            .also { log("timegrid via getTimegrid -> ${it.size} days") }
     }
 
     private fun buildUrl(server: String, loginName: String): HttpUrl =
@@ -845,7 +875,7 @@ object UntisClient {
                 val rpc = response.body?.string()?.let { runCatching { json.decodeFromString<JsonRpcResponse>(it) }.getOrNull() }
 
                 rpc?.error?.let { err ->
-                    Log.d(TAG, "rpc '$method' error ${err.code}")
+                    log("rpc '$method' error ${err.code}")
 
                     throw when (err.code) {
                         -8500 -> UntisException.BadCredentials
@@ -855,19 +885,19 @@ object UntisClient {
                 }
 
                 if (!response.isSuccessful) {
-                    Log.d(TAG, "rpc '$method' http ${response.code}")
+                    log("rpc '$method' http ${response.code}")
                     throw UntisException.Network
                 }
 
                 if (rpc == null) {
-                    Log.d(TAG, "rpc '$method' returned an unparseable response")
+                    log("rpc '$method' returned an unparseable response")
                     throw UntisException.Network
                 }
 
                 rpc.result ?: throw UntisException.Api(-1, "Empty result.")
             }
         } catch (e: IOException) {
-            Log.d(TAG, "rpc '$method' network failure")
+            log("rpc '$method' network failure")
             throw UntisException.Network
         }
     }

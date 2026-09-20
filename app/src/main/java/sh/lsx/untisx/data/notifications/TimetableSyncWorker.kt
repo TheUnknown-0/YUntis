@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import sh.lsx.untisx.data.TimetableCache
+import kotlinx.coroutines.CancellationException
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisWeekStart
@@ -89,8 +90,10 @@ class TimetableSyncWorker(
             NotificationPrefs.setLastSyncAt(context, System.currentTimeMillis())
 
             Result.success()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            Log.d(TAG, "sync failed: ${e.message}")
+            Log.d(TAG, "sync failed: ${e.javaClass.simpleName}")
 
             if (runAttemptCount < 3) Result.retry() else Result.success()
         }

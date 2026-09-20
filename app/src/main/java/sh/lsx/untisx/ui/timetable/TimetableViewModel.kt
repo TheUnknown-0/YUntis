@@ -11,7 +11,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -21,6 +25,7 @@ import kotlinx.coroutines.sync.withLock
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.SubjectColorsPrefs
+import sh.lsx.untisx.data.appLocale
 import sh.lsx.untisx.data.StatsData
 import sh.lsx.untisx.data.StatsStore
 import sh.lsx.untisx.data.SchoolYearStats
@@ -39,6 +44,7 @@ import sh.lsx.untisx.data.model.TimegridDay
 import sh.lsx.untisx.data.model.plusUntisWeeks
 import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalDate
+import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.model.toUntisWeekStart
 import sh.lsx.untisx.data.model.toVisibleWeekStart
 import sh.lsx.untisx.R
@@ -48,7 +54,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 
 class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -148,9 +153,16 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     private var notesRequestId = 0
     private var lastFetch = 0L
 
+    private val backgroundJob = SupervisorJob(viewModelScope.coroutineContext[Job])
+    private val backgroundScope = CoroutineScope(viewModelScope.coroutineContext + backgroundJob)
+
+    fun cancelBackgroundWork() {
+        backgroundJob.cancelChildren()
+    }
+
     init {
-        viewModelScope.launch {
-            val account = AccountPrefs.getActive(getApplication())
+        backgroundScope.launch {
+            val account = withContext(Dispatchers.IO) { AccountPrefs.getActive(getApplication()) }
             val cached = account?.let {
                 withContext(Dispatchers.IO) { TimetableCache.load(getApplication(), AccountPrefs.accountId(it)) }
             }
@@ -160,7 +172,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             if (cached != null) {
-                Log.d(TAG, "cache loaded: ${cached.weeks.size} weeks, lastFetch=${cached.lastFetch}")
+                Log.d(TAG, "cache loaded: ${cached.weeks.size} weeks")
                 applyCached(cached)
             }
 
@@ -169,7 +181,6 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun pageToOffset(page: Int): Int = page - CENTER
-    fun offsetToPage(offset: Int): Int = offset + CENTER
 
     fun ensureWeekPage(page: Int) {
         lastPage = page
@@ -203,7 +214,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         eventsLoading = true
         eventsError = null
 
-        viewModelScope.launch {
+        backgroundScope.launch {
             try {
                 val currentAuth = requireAuth()
                 val from = LocalDate.now()
@@ -227,7 +238,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.d(TAG, "events fetch failed: ${e.message}")
+                Log.d(TAG, "events fetch failed: ${e.javaClass.simpleName}")
                 eventsError = friendly(e)
             } finally {
                 eventsLoading = false
@@ -237,8 +248,9 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadLessonNotes(entry: TimetableEntry) {
         val id = entry.id
+        val date = entry.date.toUntisLocalDateOrNull()
 
-        if (id <= 0) {
+        if (id <= 0 || date == null) {
             lessonNotes = NotesState.Unavailable
             return
         }
@@ -251,14 +263,14 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         lessonNotes = NotesState.Loading
         val requestId = ++notesRequestId
 
-        viewModelScope.launch {
+        backgroundScope.launch {
             val result = try {
                 val currentAuth = requireAuth()
                 val detail = UntisClient.fetchLessonDetails(
                     auth = currentAuth,
                     password = withPassword(),
                     entryId = id,
-                    date = entry.date.toUntisLocalDate(),
+                    date = date,
                     startTime = entry.startTime,
                     endTime = entry.endTime,
                 )
@@ -276,7 +288,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.d(TAG, "lesson detail $id failed: ${e.message}")
+                Log.d(TAG, "lesson detail failed: ${e.javaClass.simpleName}")
                 NotesState.Unavailable
             }
 
@@ -324,7 +336,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         statsLoading = true
         statsError = null
 
-        viewModelScope.launch {
+        backgroundScope.launch {
             try {
                 val currentAuth = requireAuth()
                 val year = resolveStatsYear(currentAuth)
@@ -359,24 +371,28 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                     for ((index, weekStart) in weeks.withIndex()) {
                         val entries = fetchStatsWeek(currentAuth, weekStart)
 
-                        stats = StatsStore.recordWeek(
-                            context = getApplication(),
-                            accountId = accountId,
-                            year = year,
-                            weekStart = weekStart,
-                            entries = entries,
-                            today = today,
-                        )
+                        stats = withContext(Dispatchers.IO) {
+                            StatsStore.recordWeek(
+                                context = getApplication(),
+                                accountId = accountId,
+                                year = year,
+                                weekStart = weekStart,
+                                entries = entries,
+                                today = today,
+                            )
+                        }
 
                         statsProgress = index + 1 to weeks.size
                     }
                 }
 
-                stats = StatsStore.load(getApplication(), AccountPrefs.accountId(currentAuth))
+                stats = withContext(Dispatchers.IO) {
+                    StatsStore.load(getApplication(), AccountPrefs.accountId(currentAuth))
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.d(TAG, "stats backfill failed: ${e.message}")
+                Log.d(TAG, "stats backfill failed: ${e.javaClass.simpleName}")
                 statsError = friendly(e)
             } finally {
                 statsLoading = false
@@ -418,15 +434,17 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         val currentAuth = auth ?: return
         val year = resolveStatsYear(currentAuth)
 
-        stats = StatsStore.recordWeek(
-            context = getApplication(),
-            accountId = AccountPrefs.accountId(currentAuth),
-            year = year,
-            weekStart = monday,
-            entries = entries,
-            today = LocalDate.now(),
-            skipDates = refusedDates.toSet(),
-        )
+        stats = withContext(Dispatchers.IO) {
+            StatsStore.recordWeek(
+                context = getApplication(),
+                accountId = AccountPrefs.accountId(currentAuth),
+                year = year,
+                weekStart = monday,
+                entries = entries,
+                today = LocalDate.now(),
+                skipDates = refusedDates.toSet(),
+            )
+        }
     }
 
     private suspend fun fetchStatsWeek(
@@ -438,7 +456,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.d(TAG, "stats week via mobile API failed: ${e.message}")
+            Log.d(TAG, "stats week via mobile API failed: ${e.javaClass.simpleName}")
         }
 
         val (entries, fresh) = SessionManager.withValidSession(getApplication(), auth) { a ->
@@ -535,7 +553,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         force: Boolean = false,
         onDone: ((Boolean) -> Unit)? = null,
     ) {
-        viewModelScope.launch {
+        backgroundScope.launch {
             if (!force && weekCache.containsKey(offset)) return@launch
 
             val claimed = flightLock.withLock {
@@ -558,7 +576,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Log.d(TAG, "stats week record failed: ${e.message}")
+                    Log.d(TAG, "stats week record failed: ${e.javaClass.simpleName}")
                 }
 
                 weekCache[claimed] = entries
@@ -602,8 +620,10 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                     staticDataLoaded = true
                     loadStaticData()
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Log.d(TAG, "week $claimed failed")
+                Log.d(TAG, "week $claimed failed: ${e.javaClass.simpleName}")
                 synchronized(failedWeeks) { failedWeeks.add(claimed) }
 
                 if (force && weekCache.isNotEmpty()) {
@@ -619,14 +639,21 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun requireAuth(): AuthData = auth
-            ?: AccountPrefs.getActive(getApplication())?.also { auth = it }
+    private suspend fun requireAuth(): AuthData {
+        auth?.let { return it }
+
+        val stored = withContext(Dispatchers.IO) { AccountPrefs.getActive(getApplication()) }
             ?: throw UntisException.BadCredentials
 
-    private fun withPassword(): String {
+        auth = stored
+
+        return stored
+    }
+
+    private suspend fun withPassword(): String {
         val id = AccountPrefs.accountId(requireAuth())
 
-        return PasswordVault.retrieve(getApplication(), id)
+        return withContext(Dispatchers.IO) { PasswordVault.retrieve(getApplication(), id) }
             ?: throw UntisException.BadCredentials
     }
 
@@ -645,6 +672,8 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                     currentAuth,
                     allRefused = false,
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.d(TAG, "mobile API failed for week $claimed")
                 weekViaLegacy(currentAuth, monday)
@@ -683,7 +712,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     private fun refreshFailureMessage(e: Exception): UiText {
         if (lastFetch > 0) {
             val timestamp = UiText.Raw(
-                DateTimeFormatter.ofPattern("EEE, d. MMM, HH:mm", Locale.getDefault())
+                DateTimeFormatter.ofPattern("EEE, d. MMM, HH:mm", getApplication<Application>().appLocale())
                     .format(Instant.ofEpochMilli(lastFetch).atZone(ZoneId.systemDefault())),
             )
 
@@ -747,7 +776,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.d(TAG, "messages fetch failed: ${e.message}")
+            Log.d(TAG, "messages fetch failed: ${e.javaClass.simpleName}")
             return dayMessages
         }
 
@@ -769,7 +798,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.d(TAG, "messages $date failed: ${e.message}")
+                Log.d(TAG, "messages fetch failed: ${e.javaClass.simpleName}")
             }
         }
 
@@ -780,12 +809,13 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         auth: AuthData,
         from: LocalDate,
         to: LocalDate,
-    ): List<TimetableEntry> {        val internal = try {
+    ): List<TimetableEntry> {
+        val internal = try {
             UntisClient.getTimetableIntern(auth, withPassword(), from, to)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.d(TAG, "events via mobile API failed: ${e.message}")
+            Log.d(TAG, "events via mobile API failed: ${e.javaClass.simpleName}")
             null
         }
 
@@ -806,7 +836,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.d(TAG, "events via public API failed: ${e.message}")
+            Log.d(TAG, "events via public API failed: ${e.javaClass.simpleName}")
         }
 
         return fetchEventsByMonth(auth, from, to)
@@ -844,7 +874,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     private fun loadStaticData() {
         val currentAuth = auth ?: return
 
-        viewModelScope.launch {
+        backgroundScope.launch {
             val master = optional("masterData") {
                 UntisClient.fetchMasterData(currentAuth, withPassword())
             }
@@ -891,7 +921,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.d(TAG, "static data: $label failed: ${e.message}")
+            Log.d(TAG, "static data: $label failed: ${e.javaClass.simpleName}")
             null
         }
 
@@ -945,7 +975,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
         addKnownSubjects(context, subjectNamesOf(weekCache.values.flatten()))
 
-        viewModelScope.launch {
+        backgroundScope.launch {
             val ranges = listOf(
                 SCAN_FROM_MONTHS to SCAN_TO_MONTHS,
                 0L to SCAN_TO_MONTHS,
@@ -973,12 +1003,12 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 } catch (e: UntisException.Api) {
                     if (e.code != -8507) {
-                        Log.d(TAG, "subject scan failed: ${e.message}")
+                        Log.d(TAG, "subject scan failed: ${e.javaClass.simpleName}")
                         subjectsScanned = false
                         return@launch
                     }
                 } catch (e: Exception) {
-                    Log.d(TAG, "subject scan failed: ${e.message}")
+                    Log.d(TAG, "subject scan failed: ${e.javaClass.simpleName}")
                     subjectsScanned = false
                     return@launch
                 }
@@ -990,7 +1020,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun resolveTimegrid(currentAuth: AuthData): List<TimegridDay> {
-        val password = { withPassword() }
+        val password: suspend () -> String = { withPassword() }
 
         val attempts: List<Pair<String, suspend () -> List<TimegridDay>>> = listOf(
             "getUserData2017" to { UntisClient.fetchTimegridViaUserData(currentAuth, password()) },
@@ -1001,6 +1031,8 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         for ((name, attempt) in attempts) {
             val days = try {
                 attempt()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.d(TAG, "timegrid via $name failed")
                 null
@@ -1027,7 +1059,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
         val currentAuth = auth ?: return
 
-        viewModelScope.launch {
+        backgroundScope.launch {
             val days = resolveTimegrid(currentAuth)
 
             if (days.isNotEmpty()) {
@@ -1086,34 +1118,40 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         weeks = weekCache.toMap()
     }
 
-    private fun persistCache() {
+    private suspend fun persistCache() {
         val currentAuth = auth ?: return
-        val accountId = AccountPrefs.accountId(currentAuth)
-        val previous = TimetableCache.load(getApplication(), accountId)
 
-        val data = TimetableCache.Data(
-            weeks = weekCache.mapKeys { (offset, _) ->
-                LocalDate.now().toVisibleWeekStart().plusUntisWeeks(offset.toLong()).toUntisWeekStart().toUntisDate().toString()
-            },
-            subjects = subjectsById.values.toList().ifEmpty { previous?.subjects.orEmpty() },
-            teachers = teachersById.values.toList().ifEmpty { previous?.teachers.orEmpty() },
-            rooms = roomsById.values.toList().ifEmpty { previous?.rooms.orEmpty() },
-            holidays = holidays.ifEmpty { previous?.holidays.orEmpty() },
-            timegrid = timegrid.ifEmpty { previous?.timegrid.orEmpty() },
-            restrictedDays = restrictedDays,
-            events = if (eventsFetchedAt > 0L) events else previous?.events.orEmpty(),
-            eventsFetchedAt = if (eventsFetchedAt > 0L) eventsFetchedAt else previous?.eventsFetchedAt ?: 0L,
-            messages = if (messagesFetchedAt > 0L) dayMessages else previous?.messages.orEmpty(),
-            messagesFetchedAt = if (messagesFetchedAt > 0L) messagesFetchedAt else previous?.messagesFetchedAt ?: 0L,
-            lastFetch = when {
-                lastFetch > 0L -> lastFetch
-                previous != null -> previous.lastFetch
-                else -> System.currentTimeMillis()
-            },
-        )
+        val data = withContext(Dispatchers.IO) {
+            val accountId = AccountPrefs.accountId(currentAuth)
+            val previous = TimetableCache.load(getApplication(), accountId)
+
+            TimetableCache.Data(
+                weeks = weekCache.mapKeys { (offset, _) ->
+                    LocalDate.now().toVisibleWeekStart()
+                        .plusUntisWeeks(offset.toLong())
+                        .toUntisWeekStart()
+                        .toUntisDate()
+                        .toString()
+                },
+                subjects = subjectsById.values.toList().ifEmpty { previous?.subjects.orEmpty() },
+                teachers = teachersById.values.toList().ifEmpty { previous?.teachers.orEmpty() },
+                rooms = roomsById.values.toList().ifEmpty { previous?.rooms.orEmpty() },
+                holidays = holidays.ifEmpty { previous?.holidays.orEmpty() },
+                timegrid = timegrid.ifEmpty { previous?.timegrid.orEmpty() },
+                restrictedDays = restrictedDays,
+                events = if (eventsFetchedAt > 0L) events else previous?.events.orEmpty(),
+                eventsFetchedAt = if (eventsFetchedAt > 0L) eventsFetchedAt else previous?.eventsFetchedAt ?: 0L,
+                messages = if (messagesFetchedAt > 0L) dayMessages else previous?.messages.orEmpty(),
+                messagesFetchedAt = if (messagesFetchedAt > 0L) messagesFetchedAt else previous?.messagesFetchedAt ?: 0L,
+                lastFetch = when {
+                    lastFetch > 0L -> lastFetch
+                    previous != null -> previous.lastFetch
+                    else -> System.currentTimeMillis()
+                },
+            ).also { TimetableCache.save(getApplication(), accountId, it) }
+        }
 
         lastFetch = data.lastFetch
-        TimetableCache.save(getApplication(), accountId, data)
     }
 
     private fun classify(e: Exception): LoadError = when (e) {

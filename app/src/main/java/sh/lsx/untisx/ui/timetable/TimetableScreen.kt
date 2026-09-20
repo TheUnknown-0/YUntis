@@ -56,6 +56,7 @@ import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.model.toUntisWeekStart
 import sh.lsx.untisx.data.model.toVisibleWeekStart
 import sh.lsx.untisx.R
+import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.util.tapHaptic
 import java.time.Duration
 import java.time.LocalDate
@@ -315,6 +316,8 @@ private fun DayHeader(
     isToday: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val dateFormat = rememberDateFormat("d. MMM")
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -331,7 +334,7 @@ private fun DayHeader(
         )
 
         Text(
-            text = DAY_DATE_FORMAT.format(date),
+            text = dateFormat.format(date),
             style = MaterialTheme.typography.bodyMedium,
             color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,

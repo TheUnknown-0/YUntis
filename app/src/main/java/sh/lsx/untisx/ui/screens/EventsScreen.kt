@@ -40,16 +40,12 @@ import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
-import sh.lsx.untisx.ui.timetable.DAY_DATE_FORMAT
 import sh.lsx.untisx.ui.timetable.TIME_FORMAT
+import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.timetable.rememberToday
 import sh.lsx.untisx.ui.timetable.resolveNames
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.util.Locale
-
-private val EVENT_DAY_FORMAT = DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.getDefault())
 
 private fun Int.tryLocalDate(): LocalDate? = runCatching { toUntisLocalDate() }.getOrNull()
 
@@ -225,11 +221,13 @@ private fun DayLabel(
     today: LocalDate,
     modifier: Modifier = Modifier,
 ) {
+    val dayFormat = rememberDateFormat("EEE, d. MMM")
+
     val text = when (date) {
         null -> "?"
         today -> stringResource(R.string.timetable_today)
         today.plusDays(1) -> stringResource(R.string.events_tomorrow)
-        else -> EVENT_DAY_FORMAT.format(date)
+        else -> dayFormat.format(date)
     }
 
     Text(
@@ -330,8 +328,8 @@ private fun HolidayCard(
                     Text(
                         text = stringResource(
                             R.string.events_date_range,
-                            DAY_DATE_FORMAT.format(start),
-                            DAY_DATE_FORMAT.format(end),
+                            rememberDateFormat("d. MMM").format(start),
+                            rememberDateFormat("d. MMM").format(end),
                         ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -359,9 +357,10 @@ private fun holidayCountdown(
     today: LocalDate,
 ): String {
     val days = ChronoUnit.DAYS.between(today, start)
+    val dateFormat = rememberDateFormat("d. MMM")
 
     return when {
-        days <= 0L -> stringResource(R.string.events_holiday_running, DAY_DATE_FORMAT.format(end))
+        days <= 0L -> stringResource(R.string.events_holiday_running, dateFormat.format(end))
         days == 1L -> stringResource(R.string.events_holiday_tomorrow)
         else -> pluralStringResource(R.plurals.events_holiday_days, days.toInt(), days)
     }

@@ -29,10 +29,9 @@ import sh.lsx.untisx.data.notifications.NotificationPrefs
 import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.data.notifications.Notifications
 import sh.lsx.untisx.ui.util.Haptics
+import sh.lsx.untisx.ui.util.rememberDateFormat
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
@@ -313,9 +312,10 @@ private fun snapInterval(minutes: Int): Int {
     return snapped
 }
 
+@Composable
 private fun formatTimestamp(timestamp: Long): String {
     if (timestamp <= 0L) return "–"
 
-    return DateTimeFormatter.ofPattern("d. MMM, HH:mm", Locale.getDefault())
+    return rememberDateFormat("d. MMM, HH:mm")
         .format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
 }

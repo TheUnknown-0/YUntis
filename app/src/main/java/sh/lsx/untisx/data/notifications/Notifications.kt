@@ -12,10 +12,9 @@ import sh.lsx.untisx.MainActivity
 import sh.lsx.untisx.R
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDate
+import sh.lsx.untisx.data.appLocale
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import java.time.format.DateTimeFormatter
-import java.util.Locale
-import kotlin.math.absoluteValue
 
 object Notifications {
 
@@ -28,6 +27,7 @@ object Notifications {
 
     private const val OVERVIEW_ID = 2001
     private const val INDIVIDUAL_BASE = 10_000
+    private const val CHANGE_ID_RANGE = 100_000
 
     private val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
 
@@ -81,7 +81,7 @@ object Notifications {
         val channel = channel(CHANNEL_CHANGES, CHANNEL_CHANGES_SILENT, silent)
         val manager = NotificationManagerCompat.from(context)
 
-        changes.forEachIndexed { index, change ->
+        changes.forEach { change ->
             val notification = baseBuilder(context, channel)
                 .setContentTitle(title(context, change))
                 .setContentText(text(context, change))
@@ -89,7 +89,7 @@ object Notifications {
                 .setContentIntent(contentIntent(context, change.entry.date))
                 .build()
 
-            manager.notify(INDIVIDUAL_BASE + (change.hashCode().absoluteValue % 10_000) + index, notification)
+            manager.notify(changeNotificationId(change), notification)
         }
     }
 
@@ -121,6 +121,15 @@ object Notifications {
         NotificationManagerCompat.from(context).cancelAll()
     }
 
+    private fun changeNotificationId(change: ScheduleChange): Int {
+        val key = "${change.entry.date}|${change.entry.startTime}|${change.type}"
+
+        var hash = 17
+        for (character in key) hash = hash * 31 + character.code
+
+        return INDIVIDUAL_BASE + (hash and 0x7FFFFFFF) % CHANGE_ID_RANGE
+    }
+
     private fun baseBuilder(context: Context, channel: String): NotificationCompat.Builder =
         NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_notification)
@@ -137,7 +146,7 @@ object Notifications {
         ChangeType.CANCELLED -> context.getString(
             R.string.notif_change_cancelled_text,
             change.subject,
-            date(change.entry),
+            date(context, change.entry),
             time(change.entry),
         )
 
@@ -145,7 +154,7 @@ object Notifications {
             R.string.notif_change_room_text,
             change.subject,
             fromTo(context, change),
-            date(change.entry),
+            date(context, change.entry),
             time(change.entry),
         )
 
@@ -153,7 +162,7 @@ object Notifications {
             R.string.notif_change_teacher_text,
             change.subject,
             fromTo(context, change),
-            date(change.entry),
+            date(context, change.entry),
             time(change.entry),
         )
     }
@@ -168,9 +177,9 @@ object Notifications {
             change.newValue?.takeIf { it.isNotBlank() } ?: "?",
         )
 
-    private fun date(entry: TimetableEntry): String =
+    private fun date(context: Context, entry: TimetableEntry): String =
         runCatching {
-            DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.getDefault())
+            DateTimeFormatter.ofPattern("EEE, d. MMM", context.appLocale())
                 .format(entry.date.toUntisLocalDate())
         }.getOrDefault("")
 

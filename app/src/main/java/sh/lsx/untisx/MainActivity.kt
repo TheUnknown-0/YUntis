@@ -312,6 +312,10 @@ private fun MainApp(
     )
     val updateVm: UpdateViewModel = viewModel()
 
+    DisposableEffect(timetableVm) {
+        onDispose { timetableVm.cancelBackgroundWork() }
+    }
+
     var currentScreen by remember { mutableStateOf(Screen.TIMETABLE) }
     var selectedLesson by remember { mutableStateOf<TimetableEntry?>(null) }
     var settingsCategory by remember { mutableStateOf<SettingsCategory?>(null) }

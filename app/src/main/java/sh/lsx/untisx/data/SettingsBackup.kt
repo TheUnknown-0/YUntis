@@ -190,11 +190,25 @@ object SettingsBackupManager {
         }
 
         backup.timetable?.let { timetable ->
-            timetable.subjectColors?.forEach { (name, hex) ->
-                hexToColor(hex)?.let { SubjectColorsPrefs.setColor(context, name, it) }
-            }
+            timetable.subjectColors
+                ?.entries
+                ?.take(MAX_SUBJECT_ENTRIES)
+                ?.forEach { (name, hex) ->
+                    val subject = name.trim().takeIf { it.isNotBlank() && it.length <= MAX_SUBJECT_NAME_LENGTH }
 
-            timetable.knownSubjects?.let { SubjectColorsPrefs.setKnown(context, it) }
+                    if (subject != null) hexToColor(hex)?.let { SubjectColorsPrefs.setColor(context, subject, it) }
+                }
+
+            timetable.knownSubjects
+                ?.asSequence()
+                ?.map { it.trim() }
+                ?.filter { it.isNotBlank() && it.length <= MAX_SUBJECT_NAME_LENGTH }
+                ?.distinct()
+                ?.sorted()
+                ?.take(MAX_SUBJECT_ENTRIES)
+                ?.toList()
+                ?.let { SubjectColorsPrefs.setKnown(context, it) }
+
             timetable.defaultSubjectColor
                 ?.let(::hexToColor)
                 ?.let { SubjectColorsPrefs.setDefaultColor(context, it) }
@@ -204,6 +218,9 @@ object SettingsBackupManager {
             timetable.cancelledStrike?.let { SubjectColorsPrefs.setCancelledStrike(context, it) }
         }
     }
+
+    private const val MAX_SUBJECT_ENTRIES = 500
+    private const val MAX_SUBJECT_NAME_LENGTH = 64
 
     private fun appVersion(context: Context): String = runCatching {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName
@@ -223,9 +240,11 @@ internal fun colorToHex(argb: Int): String {
 internal fun hexToColor(hex: String): Int? {
     val clean = hex.trim().removePrefix("#")
 
-    return when (clean.length) {
+    val color = when (clean.length) {
         6 -> clean.toLongOrNull(16)?.toInt()?.or(0xFF000000.toInt())
         8 -> clean.toLongOrNull(16)?.toInt()
         else -> null
-    }
+    } ?: return null
+
+    return if (color ushr 24 == 0) color or 0xFF000000.toInt() else color
 }

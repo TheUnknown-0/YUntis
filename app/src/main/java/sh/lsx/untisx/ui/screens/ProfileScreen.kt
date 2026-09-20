@@ -70,6 +70,7 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
             val id = AccountPrefs.accountId(account)
 
             UntisClient.logout(account)
+            UntisClient.clearSessionCache(id)
             TimetableCache.clear(context, id)
             AccountPrefs.removeAccount(context, id)
             AuthPrefs.clear(context)

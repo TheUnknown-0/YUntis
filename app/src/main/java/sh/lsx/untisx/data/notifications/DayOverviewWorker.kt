@@ -6,6 +6,8 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import sh.lsx.untisx.R
 import sh.lsx.untisx.data.TimetableCache
+import kotlinx.coroutines.CancellationException
+import sh.lsx.untisx.data.appLocale
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
@@ -15,7 +17,6 @@ import sh.lsx.untisx.data.model.toUntisWeekStart
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 class DayOverviewWorker(
     appContext: Context,
@@ -45,8 +46,10 @@ class DayOverviewWorker(
 
         val entries = try {
             TimetableSource.fetchRange(context, auth, target, target).entries
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            Log.d(TAG, "overview fetch failed, using cache: ${e.message}")
+            Log.d(TAG, "overview fetch failed, using cache: ${e.javaClass.simpleName}")
             cachedEntries(context, accountId, target)
         }
 
@@ -63,7 +66,7 @@ class DayOverviewWorker(
 
         Notifications.notifyOverview(
             context = context,
-            title = formatDate(target),
+            title = formatDate(context, target),
             content = content,
             silent = NotificationPrefs.overviewSilent(context) || NotificationRules.isDuringLessons(context),
             focusDate = target.toUntisDate(),
@@ -150,8 +153,8 @@ class DayOverviewWorker(
         }
         .joinToString(", ")
 
-    private fun formatDate(date: LocalDate): String =
-        DateTimeFormatter.ofPattern("EEEE, d. MMMM", Locale.getDefault()).format(date)
+    private fun formatDate(context: Context, date: LocalDate): String =
+        DateTimeFormatter.ofPattern("EEEE, d. MMMM", context.appLocale()).format(date)
 
     companion object {
         private const val TAG = "DayOverviewWorker"

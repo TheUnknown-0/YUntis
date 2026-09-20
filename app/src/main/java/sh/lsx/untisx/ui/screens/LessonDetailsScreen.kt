@@ -36,15 +36,12 @@ import sh.lsx.untisx.R
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
-import sh.lsx.untisx.data.model.toUntisLocalDate
+import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.ui.timetable.TIME_FORMAT
+import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
-private val DAY_NAME_FORMAT = DateTimeFormatter.ofPattern("EEEE, d. MMMM yyyy", Locale.getDefault())
 
 @Composable
 fun LessonDetailsScreen(
@@ -62,7 +59,7 @@ fun LessonDetailsScreen(
         ?.let { subjectsById[it.id]?.name?.takeIf { name -> name.isNotBlank() } ?: it.name }
         .orEmpty()
 
-    val date = remember(entry.date) { entry.date.toUntisLocalDate() }
+    val date = remember(entry.date) { entry.date.toUntisLocalDateOrNull() }
 
     Column(
         modifier = modifier
@@ -95,11 +92,13 @@ fun LessonDetailsScreen(
                         )
                     }
 
-                Text(
-                    text = formatLessonDate(date, entry),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = textColor.copy(alpha = 0.8f),
-                )
+                date?.let {
+                    Text(
+                        text = formatLessonDate(it, entry),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = textColor.copy(alpha = 0.8f),
+                    )
+                }
             }
         }
 
@@ -250,7 +249,7 @@ private fun strikethroughChange(orig: String, current: String): AnnotatedString 
 
 @Composable
 private fun formatLessonDate(date: LocalDate, entry: TimetableEntry): String {
-    val dayName = DAY_NAME_FORMAT.format(date)
+    val dayName = rememberDateFormat("EEEE, d. MMMM yyyy").format(date)
 
     return if (date == LocalDate.now()) {
         stringResource(R.string.lesson_date_today, dayName)

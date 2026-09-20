@@ -96,7 +96,15 @@ fun LocalDate.toUntisDate(): Int = year * 10000 + monthValue * 100 + dayOfMonth
 fun Int.toUntisLocalDate(): LocalDate =
     LocalDate.of(this / 10000, (this / 100) % 100, this % 100)
 
-fun Int.toUntisLocalTime(): LocalTime = LocalTime.of(this / 100, this % 100)
+fun Int.toUntisLocalDateOrNull(): LocalDate? =
+    runCatching { toUntisLocalDate() }.getOrNull()
+
+fun Int.toUntisLocalTime(): LocalTime {
+    val hour = (this / 100).coerceIn(0, 23)
+    val minute = (this % 100).coerceIn(0, 59)
+
+    return LocalTime.of(hour, minute)
+}
 
 fun LocalDate.toUntisWeekStart(): LocalDate = with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 

@@ -148,7 +148,7 @@ object StatsStore {
         val updated = data.copy(years = data.years + (key to updatedYear))
         save(context, accountId, updated)
 
-        Log.d(TAG, "stats $key -> ${days.size} days recorded")
+        Log.d(TAG, "stats -> ${days.size} days recorded")
 
         updated
     }

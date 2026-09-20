@@ -118,6 +118,9 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
                 error = UiText.Res(R.string.error_network)
                 suggestionsExpanded = false
             }
+        } catch (e: Exception) {
+            suggestions = emptyList()
+            suggestionsExpanded = false
         } finally {
             searching = false
         }

@@ -13,6 +13,9 @@ object NotificationPrefs {
     const val DEFAULT_SYNC_INTERVAL_MINUTES = 120
     const val DEFAULT_OVERVIEW_MINUTE = 7 * 60 + 15
 
+    const val MIN_OVERVIEW_MINUTE = 0
+    const val MAX_OVERVIEW_MINUTE = 23 * 60 + 59
+
     private const val KEY_ENABLED = "notif_enabled"
     private const val KEY_CHANGES_ENABLED = "notif_changes_enabled"
     private const val KEY_CHANGE_CANCELLED = "notif_change_cancelled"
@@ -92,9 +95,12 @@ object NotificationPrefs {
 
     fun overviewMinute(context: Context): Int =
         prefs(context).getInt(KEY_OVERVIEW_MINUTE, DEFAULT_OVERVIEW_MINUTE)
+            .coerceIn(MIN_OVERVIEW_MINUTE, MAX_OVERVIEW_MINUTE)
 
     fun setOverviewMinute(context: Context, minute: Int) =
-        prefs(context).edit { putInt(KEY_OVERVIEW_MINUTE, minute) }
+        prefs(context).edit {
+            putInt(KEY_OVERVIEW_MINUTE, minute.coerceIn(MIN_OVERVIEW_MINUTE, MAX_OVERVIEW_MINUTE))
+        }
 
     fun overviewShowChanges(context: Context): Boolean =
         prefs(context).getBoolean(KEY_OVERVIEW_SHOW_CHANGES, true)

@@ -45,12 +45,11 @@ import sh.lsx.untisx.data.SchoolYearStats
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.SchoolYear
 import sh.lsx.untisx.data.model.toUntisLocalDate
+import sh.lsx.untisx.ui.util.rememberDateFormat
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-
-private val STATS_DATE_FORMAT = DateTimeFormatter.ofPattern("d. MMM yyyy", Locale.getDefault())
 
 private data class EntryCount(val label: String, val count: Int)
 
@@ -314,8 +313,10 @@ private fun HeaderCard(
             )
 
             if (start != null && end != null) {
+                val dateFormat = rememberDateFormat("d. MMM yyyy")
+
                 Text(
-                    text = "${STATS_DATE_FORMAT.format(start)} – ${STATS_DATE_FORMAT.format(end)}",
+                    text = "${dateFormat.format(start)} – ${dateFormat.format(end)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
