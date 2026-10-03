@@ -33,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import sh.lsx.untisx.R
+import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
@@ -53,6 +54,7 @@ fun LessonDetailsScreen(
     textColor: Color,
     modifier: Modifier = Modifier,
     notes: TimetableViewModel.NotesState? = null,
+    exam: ExamInfo? = null,
 ) {
     val subjectEl = entry.subject.firstOrNull()
     val subjectName = subjectEl
@@ -60,6 +62,11 @@ fun LessonDetailsScreen(
         .orEmpty()
 
     val date = remember(entry.date) { entry.date.toUntisLocalDateOrNull() }
+
+    val examType = exam?.examType?.takeIf { it.isNotBlank() } ?: entry.exam?.examtype
+    val examName = exam?.name?.takeIf { it.isNotBlank() } ?: entry.exam?.name
+    val examText = exam?.text?.takeIf { it.isNotBlank() } ?: entry.exam?.text
+    val hasExam = examType != null || examName != null || examText != null
 
     Column(
         modifier = modifier
@@ -105,6 +112,68 @@ fun LessonDetailsScreen(
         when {
             entry.cancelled -> Badge(stringResource(R.string.lesson_cancelled), MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
             entry.irregular -> Badge(stringResource(R.string.lesson_changed), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
+        }
+
+        if (hasExam) {
+            DetailCard {
+                Text(
+                    text = stringResource(R.string.lesson_exam),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                examType?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+
+                examName?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+
+                exam?.let { examInfo ->
+                    if (examInfo.startTime != 0) {
+                        DetailRow(
+                            stringResource(R.string.lesson_time),
+                            AnnotatedString(
+                                "${examInfo.startTime.toUntisLocalTime().format(TIME_FORMAT)} - " +
+                                    examInfo.endTime.toUntisLocalTime().format(TIME_FORMAT),
+                            ),
+                        )
+                    }
+
+                    val roomNames = examInfo.roomIds
+                        .mapNotNull { id -> roomsById[id]?.name?.takeIf { name -> name.isNotBlank() } }
+                        .distinct()
+
+                    if (roomNames.isNotEmpty()) {
+                        DetailRow(stringResource(R.string.lesson_room), AnnotatedString(roomNames.joinToString(", ")))
+                    }
+
+                    val teacherNames = examInfo.teacherIds
+                        .mapNotNull { id -> teachersById[id]?.name?.takeIf { name -> name.isNotBlank() } }
+                        .distinct()
+
+                    if (teacherNames.isNotEmpty()) {
+                        DetailRow(stringResource(R.string.lesson_teacher), AnnotatedString(teacherNames.joinToString(", ")))
+                    }
+                }
+
+                examText?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
         }
 
         DetailCard {

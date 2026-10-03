@@ -49,6 +49,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
+import sh.lsx.untisx.data.ExamsMatcher
+import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
@@ -195,6 +197,7 @@ fun TimetableScreen(
                         cancelledStrike = cancelledStrike,
                         onLessonClick = onLessonClick,
                         onEventClick = onEventClick,
+                        exams = vm.exams,
                     )
                 }
             }
@@ -220,6 +223,7 @@ private fun WeekPage(
     cancelledStrike: Boolean,
     onLessonClick: (TimetableEntry) -> Unit,
     onEventClick: (TimetableEntry) -> Unit,
+    exams: List<ExamInfo>,
 ) {
     when {
         loading && entries == null -> Box(
@@ -232,7 +236,7 @@ private fun WeekPage(
         else -> {
             val safeEntries = entries.orEmpty()
 
-            val displays = remember(safeEntries, subjectsById, teachersById, roomsById) {
+            val displays = remember(safeEntries, subjectsById, teachersById, roomsById, exams) {
                 safeEntries.map { entry ->
                     LessonDisplay(
                         entry = entry,
@@ -241,6 +245,18 @@ private fun WeekPage(
                         teachers = resolveNames(entry.teacher, teachersById),
                         origRooms = resolveOriginals(entry.room, roomsById),
                         origTeachers = resolveOriginals(entry.teacher, teachersById),
+                        exam = ExamsMatcher.best(entry, exams) ?: entry.exam?.let { periodExam ->
+                            ExamInfo(
+                                id = periodExam.id,
+                                examType = periodExam.examtype.orEmpty(),
+                                name = periodExam.name.orEmpty(),
+                                text = periodExam.text.orEmpty(),
+                                date = entry.date,
+                                startTime = entry.startTime,
+                                endTime = entry.endTime,
+                                subjectId = entry.subject.firstOrNull()?.id ?: 0,
+                            )
+                        },
                     )
                 }
             }

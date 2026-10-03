@@ -33,6 +33,7 @@ data class TimetableEntry(
     val substText: String? = null,
     val lessonText: String? = null,
     val activityType: String? = null,
+    val exam: PeriodExam? = null,
 ) {
     val cancelled: Boolean get() = code == "cancelled"
     val irregular: Boolean get() = code == "irregular"
@@ -43,6 +44,29 @@ data class TimetableEntry(
         get() = listOfNotNull(lstext, lessonText, info, substText)
             .firstOrNull { it.isNotBlank() }
 }
+
+@Serializable
+data class PeriodExam(
+    val id: Int = 0,
+    val examtype: String? = null,
+    val name: String? = null,
+    val text: String? = null,
+)
+
+@Serializable
+data class ExamInfo(
+    val id: Int = 0,
+    val examType: String = "",
+    val name: String = "",
+    val text: String = "",
+    val date: Int = 0,
+    val startTime: Int = 0,
+    val endTime: Int = 0,
+    val subjectId: Int = 0,
+    val roomIds: List<Int> = emptyList(),
+    val teacherIds: List<Int> = emptyList(),
+    val klasseIds: List<Int> = emptyList(),
+)
 
 @Serializable
 data class TimegridUnit(

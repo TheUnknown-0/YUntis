@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import sh.lsx.untisx.R
 import sh.lsx.untisx.data.model.DayMessage
+import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
@@ -61,11 +62,20 @@ fun EventsScreen(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     onEventClick: (TimetableEntry) -> Unit = {},
+    exams: List<ExamInfo> = emptyList(),
+    subjectsById: Map<Int, MasterDataItem> = emptyMap(),
+    teachersById: Map<Int, MasterDataItem> = emptyMap(),
 ) {
     val today = rememberToday()
 
     val upcomingEvents = remember(events, today) {
         events
+            .filter { (it.date.tryLocalDate() ?: return@filter false) >= today }
+            .sortedWith(compareBy({ it.date }, { it.startTime }))
+    }
+
+    val upcomingExams = remember(exams, today) {
+        exams
             .filter { (it.date.tryLocalDate() ?: return@filter false) >= today }
             .sortedWith(compareBy({ it.date }, { it.startTime }))
     }
@@ -82,7 +92,8 @@ fun EventsScreen(
         onRefresh = onRefresh,
         modifier = modifier.fillMaxSize(),
     ) {
-        val isEmpty = upcomingEvents.isEmpty() && upcomingHolidays.isEmpty() && messages.isEmpty()
+        val isEmpty = upcomingEvents.isEmpty() && upcomingHolidays.isEmpty() && messages.isEmpty() &&
+            upcomingExams.isEmpty()
 
         when {
             isEmpty && loading -> {
@@ -132,6 +143,34 @@ fun EventsScreen(
                                     event = event,
                                     rooms = resolveNames(event.room, roomsById),
                                     onClick = { onEventClick(event) },
+                                )
+                            }
+                        }
+                    }
+
+                    if (upcomingExams.isNotEmpty()) {
+                        item {
+                            SectionHeader(
+                                text = stringResource(R.string.exams_title),
+                                modifier = Modifier.padding(
+                                    top = if (upcomingEvents.isNotEmpty() || messages.isNotEmpty()) 16.dp else 0.dp,
+                                ),
+                            )
+                        }
+
+                        val examsByDate = upcomingExams.groupBy { it.date }
+
+                        examsByDate.forEach { (date, dayExams) ->
+                            item {
+                                DayLabel(date.tryLocalDate(), today)
+                            }
+
+                            items(dayExams, key = { "exam-${it.id}-${it.date}-${it.startTime}" }) { exam ->
+                                ExamCard(
+                                    exam = exam,
+                                    subjectsById = subjectsById,
+                                    teachersById = teachersById,
+                                    roomsById = roomsById,
                                 )
                             }
                         }
@@ -296,6 +335,88 @@ private fun EventCard(
                 color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.End,
             )
+        }
+    }
+}
+
+@Composable
+private fun ExamCard(
+    exam: ExamInfo,
+    subjectsById: Map<Int, MasterDataItem>,
+    teachersById: Map<Int, MasterDataItem>,
+    roomsById: Map<Int, MasterDataItem>,
+) {
+    val type = exam.examType.takeIf { it.isNotBlank() } ?: stringResource(R.string.lesson_exam)
+    val subject = subjectsById[exam.subjectId]?.name?.takeIf { it.isNotBlank() }
+    val rooms = exam.roomIds.mapNotNull { roomsById[it]?.name?.takeIf { name -> name.isNotBlank() } }.distinct()
+    val teachers = exam.teacherIds.mapNotNull { teachersById[it]?.name?.takeIf { name -> name.isNotBlank() } }.distinct()
+    val timed = exam.startTime != 0 || exam.endTime != 0
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = listOfNotNull(type, subject).joinToString(" · "),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+
+                if (exam.name.isNotBlank()) {
+                    Text(
+                        text = exam.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+
+                if (exam.text.isNotBlank()) {
+                    Text(
+                        text = exam.text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                if (teachers.isNotEmpty()) {
+                    Text(
+                        text = teachers.joinToString(", "),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                if (rooms.isNotEmpty()) {
+                    Text(
+                        text = rooms.joinToString(", "),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (timed) {
+                Text(
+                    text = "${exam.startTime.toUntisLocalTime().format(TIME_FORMAT)} – " +
+                        exam.endTime.toUntisLocalTime().format(TIME_FORMAT),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.End,
+                )
+            }
         }
     }
 }

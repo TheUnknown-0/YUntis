@@ -26,6 +26,8 @@ import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.appLocale
+import sh.lsx.untisx.data.ExamsMatcher
+import sh.lsx.untisx.data.ExamsStore
 import sh.lsx.untisx.data.StatsData
 import sh.lsx.untisx.data.StatsStore
 import sh.lsx.untisx.data.SchoolYearStats
@@ -34,6 +36,7 @@ import sh.lsx.untisx.data.api.SessionManager
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.DayMessage
+import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.SchoolYear
@@ -87,6 +90,9 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         private const val SCAN_FROM_MONTHS = 1L
         private const val SCAN_TO_MONTHS = 11L
         private const val EVENTS_AHEAD_MONTHS = 6L
+        private const val EXAMS_BACK_MONTHS = 2L
+        private const val EXAMS_AHEAD_MONTHS = 6L
+        private const val EXAMS_TTL_MS = 12 * 60 * 60 * 1000L
     }
 
     var weeks by mutableStateOf<Map<Int, List<TimetableEntry>>>(emptyMap())
@@ -139,8 +145,11 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var statsUpToDate by mutableStateOf(false)
         private set
+    var exams by mutableStateOf<List<ExamInfo>>(emptyList())
+        private set
 
     private var statsYear: SchoolYear? = null
+    private var examsFetchedAt = 0L
 
     private var auth: AuthData? = null
     private var staticDataLoaded = false
@@ -171,12 +180,22 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { StatsStore.load(getApplication(), AccountPrefs.accountId(it)) }
             }
 
+            val cachedExams = account?.let {
+                withContext(Dispatchers.IO) { ExamsStore.load(getApplication(), AccountPrefs.accountId(it)) }
+            }
+
+            if (cachedExams != null) {
+                exams = cachedExams.exams
+                examsFetchedAt = cachedExams.fetchedAt
+            }
+
             if (cached != null) {
                 Log.d(TAG, "cache loaded: ${cached.weeks.size} weeks")
                 applyCached(cached)
             }
 
             refreshCurrentWeek()
+            refreshExams(force = false)
         }
     }
 
@@ -189,6 +208,8 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshVisibleWeek(offset: Int) {
         refreshing = true
+
+        backgroundScope.launch { refreshExams(force = true) }
 
         ensureWeekOffset(offset, force = true) {
             refreshing = false
@@ -329,6 +350,42 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         currentYearStats()?.days?.values?.sumOf { it.lessons } ?: 0
 
     fun statsSchoolYear(): SchoolYear? = statsYear
+
+    fun examFor(entry: TimetableEntry): ExamInfo? = ExamsMatcher.best(entry, exams)
+
+    private suspend fun refreshExams(force: Boolean) {
+        val currentAuth = auth ?: return
+        val now = System.currentTimeMillis()
+
+        if (!force && examsFetchedAt > 0L && now - examsFetchedAt < EXAMS_TTL_MS) return
+
+        try {
+            val today = LocalDate.now()
+            val fetched = UntisClient.fetchExams(
+                currentAuth,
+                withPassword(),
+                today.minusMonths(EXAMS_BACK_MONTHS),
+                today.plusMonths(EXAMS_AHEAD_MONTHS),
+            )
+
+            exams = fetched
+            examsFetchedAt = System.currentTimeMillis()
+
+            withContext(Dispatchers.IO) {
+                ExamsStore.save(
+                    getApplication(),
+                    AccountPrefs.accountId(currentAuth),
+                    ExamsStore.Data(exams = fetched, fetchedAt = examsFetchedAt),
+                )
+            }
+
+            Log.d(TAG, "exams -> ${fetched.size}")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.d(TAG, "exams fetch failed: ${e.javaClass.simpleName}")
+        }
+    }
 
     fun loadHistoricalStats() {
         if (statsLoading) return
@@ -620,6 +677,8 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                     staticDataLoaded = true
                     loadStaticData()
                 }
+
+                backgroundScope.launch { refreshExams(force = false) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

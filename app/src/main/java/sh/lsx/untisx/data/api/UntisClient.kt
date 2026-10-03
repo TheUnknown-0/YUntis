@@ -29,9 +29,11 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import sh.lsx.untisx.data.model.AuthResult
 import sh.lsx.untisx.data.model.DayMessage
 import sh.lsx.untisx.data.model.DirectMessage
+import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.model.JsonRpcRequest
 import sh.lsx.untisx.data.model.JsonRpcResponse
 import sh.lsx.untisx.data.model.MessagesData
+import sh.lsx.untisx.data.model.PeriodExam
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.model.Holiday
@@ -435,13 +437,7 @@ object UntisClient {
         from: LocalDate,
         to: LocalDate,
     ): List<TimetableEntry> = withContext(Dispatchers.IO) {
-        val session = auth.session
-
-        val (elementId, elementType) = when {
-            session.personType == 5 && session.personId != 0 -> session.personId to "STUDENT"
-            session.klasseId != 0 -> session.klasseId to "CLASS"
-            else -> session.personId to "STUDENT"
-        }
+        val (elementId, elementType) = internalElement(auth.session)
 
         val result = internalRpc(auth, password, "getTimetable2017") { credentials ->
             buildJsonArray {
@@ -460,6 +456,71 @@ object UntisClient {
 
         parseInternTimetable(result).also { log("getTimetable2017 -> ${it.size} periods") }
     }
+
+    private fun internalElement(session: AuthResult): Pair<Int, String> = when {
+        session.personType == 5 && session.personId != 0 -> session.personId to "STUDENT"
+        session.klasseId != 0 -> session.klasseId to "CLASS"
+        else -> session.personId to "STUDENT"
+    }
+
+    suspend fun fetchExams(
+        auth: AuthData,
+        password: String,
+        from: LocalDate,
+        to: LocalDate,
+    ): List<ExamInfo> = withContext(Dispatchers.IO) {
+        val (elementId, elementType) = internalElement(auth.session)
+
+        val result = internalRpc(auth, password, "getExams2017") { credentials ->
+            buildJsonArray {
+                add(buildJsonObject {
+                    put("id", elementId)
+                    put("type", elementType)
+                    put("startDate", from.format(DateTimeFormatter.ISO_LOCAL_DATE))
+                    put("endDate", to.format(DateTimeFormatter.ISO_LOCAL_DATE))
+                    put("auth", credentials)
+                })
+            }
+        }
+
+        parseExams(result).also { log("getExams2017 -> ${it.size} exams") }
+    }
+
+    private fun parseExams(result: JsonElement): List<ExamInfo> {
+        val exams = runCatching {
+            when (result) {
+                is JsonArray -> result
+                else -> result.jsonObject["exams"]?.jsonArray.orEmpty()
+            }
+        }.getOrNull() ?: return emptyList()
+
+        return exams.mapNotNull { element ->
+            val obj = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
+
+            val start = obj["startDateTime"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            val end = obj["endDateTime"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            val date = parseIsoDate(start)
+
+            if (date == 0) return@mapNotNull null
+
+            ExamInfo(
+                id = obj["id"]?.jsonPrimitive?.intOrNull ?: 0,
+                examType = obj["examType"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty(),
+                name = obj["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                text = obj["text"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                date = date,
+                startTime = parseIsoTime(start),
+                endTime = parseIsoTime(end),
+                subjectId = obj["subjectId"]?.jsonPrimitive?.intOrNull ?: 0,
+                roomIds = intList(obj["roomIds"]),
+                teacherIds = intList(obj["teacherIds"]),
+                klasseIds = intList(obj["klasseIds"]),
+            )
+        }
+    }
+
+    private fun intList(element: JsonElement?): List<Int> =
+        (element as? JsonArray)?.mapNotNull { it.jsonPrimitive.intOrNull } ?: emptyList()
 
     data class PeriodNotes(
         val topic: String?,
@@ -807,6 +868,15 @@ object UntisClient {
         val info = text?.get("info")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
         val lessonText = text?.get("lesson")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
 
+        val exam = runCatching { period["exam"]?.jsonObject }.getOrNull()?.let { obj ->
+            PeriodExam(
+                id = obj["id"]?.jsonPrimitive?.intOrNull ?: 0,
+                examtype = obj["examtype"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank),
+                name = obj["name"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank),
+                text = obj["text"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank),
+            )
+        }
+
         return TimetableEntry(
             id = period["id"]?.jsonPrimitive?.intOrNull ?: 0,
             date = parseIsoDate(start),
@@ -825,6 +895,7 @@ object UntisClient {
             info = info,
             substText = substitution,
             lessonText = lessonText,
+            exam = exam,
         )
     }
 

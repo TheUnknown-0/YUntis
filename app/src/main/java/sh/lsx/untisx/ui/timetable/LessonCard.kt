@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,9 +29,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -45,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.atan2
 import kotlin.math.sqrt
+import sh.lsx.untisx.R
 
 private val StrikeColor = Color(0xFFE53935)
 private val RibbonWidth = 6.dp
@@ -84,6 +88,7 @@ internal fun LessonCard(
 
     val titleColor = if (cancelled) textColor.copy(alpha = 0.7f) else textColor
     val bodyColor = if (cancelled) textColor.copy(alpha = 0.55f) else textColor.copy(alpha = 0.8f)
+    val examColor = MaterialTheme.colorScheme.error
 
     var cell by remember { mutableStateOf(IntSize.Zero) }
     val density = LocalDensity.current
@@ -102,6 +107,14 @@ internal fun LessonCard(
                         color = container,
                         cornerRadius = CornerRadius(6.dp.toPx()),
                     )
+
+                    if (lesson.exam != null) {
+                        drawRoundRect(
+                            color = examColor,
+                            cornerRadius = CornerRadius(6.dp.toPx()),
+                            style = Stroke(width = 2.dp.toPx()),
+                        )
+                    }
 
                     if (cancelled && strike && measured) {
                         val radius = 6.dp.toPx()
@@ -161,6 +174,36 @@ internal fun LessonCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        lesson.exam?.let { exam ->
+            val label = exam.examType.takeIf { it.isNotBlank() }
+                ?: stringResource(R.string.lesson_exam)
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 1.dp, end = 1.dp)
+                    .background(
+                        examColor,
+                        RoundedCornerShape(
+                            topStart = 0.dp,
+                            topEnd = 4.dp,
+                            bottomEnd = 0.dp,
+                            bottomStart = 4.dp,
+                        ),
+                    )
+                    .padding(horizontal = 4.dp),
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 8.sp,
+                    lineHeight = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onError,
+                    maxLines = 1,
                 )
             }
         }

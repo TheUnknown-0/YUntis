@@ -123,6 +123,7 @@
     <!-- Lesson details -->
     <string name="lesson_cancelled">Cancelled</string>
     <string name="lesson_changed">Changed</string>
+    <string name="lesson_exam">Exam</string>
     <string name="lesson_time">Time</string>
     <string name="lesson_teacher">Teacher</string>
     <string name="lesson_room">Room</string>
@@ -149,6 +150,7 @@
     <string name="events_holiday_running">Runs until %1$s</string>
     <string name="events_empty">No upcoming events.</string>
     <string name="events_empty_hint">Events published by your school will show up here.</string>
+    <string name="exams_title">Exams</string>
     <plurals name="events_holiday_days">
         <item quantity="one">Starts in %1$d day</item>
         <item quantity="other">Starts in %1$d days</item>

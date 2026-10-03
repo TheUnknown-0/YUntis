@@ -640,6 +640,9 @@ private fun MainApp(
                         loading = timetableVm.eventsLoading,
                         onRefresh = timetableVm::refreshEvents,
                         onEventClick = { openEvent(it, Screen.EVENTS) },
+                        exams = timetableVm.exams,
+                        subjectsById = timetableVm.subjectsById,
+                        teachersById = timetableVm.teachersById,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(padding),
@@ -726,6 +729,7 @@ private fun MainApp(
                             ]?.let { Color(it) } ?: Color(defaultSubjectColor),
                             textColor = Color(lessonTextColor),
                             notes = timetableVm.lessonNotes,
+                            exam = timetableVm.examFor(lesson),
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(padding),

@@ -2,6 +2,7 @@ package sh.lsx.untisx.ui.timetable
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
@@ -24,6 +25,7 @@ internal data class LessonDisplay(
     val teachers: String,
     val origRooms: String? = null,
     val origTeachers: String? = null,
+    val exam: ExamInfo? = null,
 )
 
 internal data class HourMarker(
