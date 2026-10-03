@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Notifications
@@ -118,7 +119,7 @@ fun EventsScreen(
                             SectionHeader(stringResource(R.string.events_messages))
                         }
 
-                        items(messages, key = { "message-${it.id}" }) { message ->
+                        itemsIndexed(messages, key = { index, message -> "message-${message.id}:$index" }) { _, message ->
                             MessageCard(message = message)
                         }
                     }
@@ -165,7 +166,10 @@ fun EventsScreen(
                                 DayLabel(date.tryLocalDate(), today)
                             }
 
-                            items(dayExams, key = { "exam-${it.id}-${it.date}-${it.startTime}" }) { exam ->
+                            itemsIndexed(
+                                dayExams,
+                                key = { index, exam -> "exam-${exam.id}-${exam.date}-${exam.startTime}:$index" },
+                            ) { _, exam ->
                                 ExamCard(
                                     exam = exam,
                                     subjectsById = subjectsById,

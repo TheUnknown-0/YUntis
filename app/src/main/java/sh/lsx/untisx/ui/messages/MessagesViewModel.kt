@@ -35,6 +35,8 @@ class MessagesViewModel(app: Application) : AndroidViewModel(app) {
     var detailLoading by mutableStateOf(false)
         private set
 
+    private var detailRequestId = 0
+
     val messageCount: Int
         get() = incoming.size + readConfirmations.size
 
@@ -99,10 +101,12 @@ class MessagesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun open(message: DirectMessage) {
+        val requestId = ++detailRequestId
+
         detail = message
         detailLoading = message.id > 0
 
-        if (!detailLoading) return
+        if (message.id <= 0) return
 
         viewModelScope.launch {
             try {
@@ -114,6 +118,8 @@ class MessagesViewModel(app: Application) : AndroidViewModel(app) {
 
                 val full = UntisClient.fetchMessage(account, password, message.id)
 
+                if (requestId != detailRequestId) return@launch
+
                 if (full != null) {
                     detail = full
                     incoming = incoming.map { if (it.id == full.id) full else it }
@@ -124,7 +130,9 @@ class MessagesViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 Log.d(TAG, "message detail failed: ${e.javaClass.simpleName}")
             } finally {
-                detailLoading = false
+                if (requestId == detailRequestId) {
+                    detailLoading = false
+                }
             }
         }
     }

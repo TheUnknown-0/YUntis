@@ -1236,30 +1236,43 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun persistCache() {
         val currentAuth = auth ?: return
 
+        val weeksSnapshot = weekCache.toMap()
+        val subjectsSnapshot = subjectsById.values.toList()
+        val teachersSnapshot = teachersById.values.toList()
+        val roomsSnapshot = roomsById.values.toList()
+        val holidaysSnapshot = holidays
+        val timegridSnapshot = timegrid
+        val restrictedSnapshot = restrictedDays
+        val eventsSnapshot = events
+        val eventsFetchedSnapshot = eventsFetchedAt
+        val messagesSnapshot = dayMessages
+        val messagesFetchedSnapshot = messagesFetchedAt
+        val lastFetchSnapshot = lastFetch
+
         val data = withContext(Dispatchers.IO) {
             val accountId = AccountPrefs.accountId(currentAuth)
             val previous = TimetableCache.load(getApplication(), accountId)
 
             TimetableCache.Data(
-                weeks = weekCache.mapKeys { (offset, _) ->
+                weeks = weeksSnapshot.mapKeys { (offset, _) ->
                     LocalDate.now().toVisibleWeekStart()
                         .plusUntisWeeks(offset.toLong())
                         .toUntisWeekStart()
                         .toUntisDate()
                         .toString()
                 },
-                subjects = subjectsById.values.toList().ifEmpty { previous?.subjects.orEmpty() },
-                teachers = teachersById.values.toList().ifEmpty { previous?.teachers.orEmpty() },
-                rooms = roomsById.values.toList().ifEmpty { previous?.rooms.orEmpty() },
-                holidays = holidays.ifEmpty { previous?.holidays.orEmpty() },
-                timegrid = timegrid.ifEmpty { previous?.timegrid.orEmpty() },
-                restrictedDays = restrictedDays,
-                events = if (eventsFetchedAt > 0L) events else previous?.events.orEmpty(),
-                eventsFetchedAt = if (eventsFetchedAt > 0L) eventsFetchedAt else previous?.eventsFetchedAt ?: 0L,
-                messages = if (messagesFetchedAt > 0L) dayMessages else previous?.messages.orEmpty(),
-                messagesFetchedAt = if (messagesFetchedAt > 0L) messagesFetchedAt else previous?.messagesFetchedAt ?: 0L,
+                subjects = subjectsSnapshot.ifEmpty { previous?.subjects.orEmpty() },
+                teachers = teachersSnapshot.ifEmpty { previous?.teachers.orEmpty() },
+                rooms = roomsSnapshot.ifEmpty { previous?.rooms.orEmpty() },
+                holidays = holidaysSnapshot.ifEmpty { previous?.holidays.orEmpty() },
+                timegrid = timegridSnapshot.ifEmpty { previous?.timegrid.orEmpty() },
+                restrictedDays = restrictedSnapshot,
+                events = if (eventsFetchedSnapshot > 0L) eventsSnapshot else previous?.events.orEmpty(),
+                eventsFetchedAt = if (eventsFetchedSnapshot > 0L) eventsFetchedSnapshot else previous?.eventsFetchedAt ?: 0L,
+                messages = if (messagesFetchedSnapshot > 0L) messagesSnapshot else previous?.messages.orEmpty(),
+                messagesFetchedAt = if (messagesFetchedSnapshot > 0L) messagesFetchedSnapshot else previous?.messagesFetchedAt ?: 0L,
                 lastFetch = when {
-                    lastFetch > 0L -> lastFetch
+                    lastFetchSnapshot > 0L -> lastFetchSnapshot
                     previous != null -> previous.lastFetch
                     else -> System.currentTimeMillis()
                 },

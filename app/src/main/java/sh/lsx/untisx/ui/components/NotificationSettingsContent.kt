@@ -1,6 +1,7 @@
 package sh.lsx.untisx.ui.components
 
 import android.Manifest
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -100,7 +101,11 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
 
                 TextButton(
                     onClick = Haptics.haptic {
-                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            NotificationScheduler.openNotificationSettings(context)
+                        }
                     },
                 ) {
                     Text(stringResource(R.string.settings_notifications_grant))

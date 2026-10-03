@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -83,7 +83,7 @@ fun MessagesScreen(
                         SectionHeader(stringResource(R.string.messages_inbox))
                     }
 
-                    items(messages, key = { "in-${it.id}" }) { message ->
+                    itemsIndexed(messages, key = { index, message -> "in-${message.id}:$index" }) { _, message ->
                         MessageCard(message = message, onClick = {
                             vm.open(message)
                             onMessageClick()
@@ -99,7 +99,7 @@ fun MessagesScreen(
                         )
                     }
 
-                    items(confirmations, key = { "rc-${it.id}" }) { message ->
+                    itemsIndexed(confirmations, key = { index, message -> "rc-${message.id}:$index" }) { _, message ->
                         MessageCard(message = message, onClick = {
                             vm.open(message)
                             onMessageClick()

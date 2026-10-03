@@ -53,7 +53,7 @@
     <string name="login_sign_in">Anmelden</string>
     <string name="login_signing_in">Angemeldung läuft…</string>
     <string name="login_signed_in">Angemeldet.</string>
-    <string name="login_error_untis">Untis-Fehler %1$d: %2$s</string>
+    <string name="login_error_untis">Untis-Fehler %1$s: %2$s</string>
     <string name="login_error_unexpected">Unerwarteter Fehler: %1$s</string>
 
     <!-- Profile -->
@@ -203,7 +203,7 @@
     <string name="error_bad_credentials">Benutzername oder Passwort ist falsch.</string>
     <string name="error_too_many_results">Deine Suche passt zu zu vielen Schulen.</string>
     <string name="error_session_expired">Deine Sitzung ist abgelaufen.</string>
-    <string name="error_untis_generic">Untis-Fehler %1$d: %2$s</string>
+    <string name="error_untis_generic">Untis-Fehler %1$s: %2$s</string>
     <string name="error_unexpected">Unerwarteter Fehler: %1$s</string>
     <string name="error_refresh_cached">Aktualisieren fehlgeschlagen - gespeicherter Plan wird angezeigt. %1$s</string>
     <string name="error_refresh_cached_at">Aktualisieren fehlgeschlagen - gespeicherter Plan vom %1$s wird angezeigt. %2$s</string>

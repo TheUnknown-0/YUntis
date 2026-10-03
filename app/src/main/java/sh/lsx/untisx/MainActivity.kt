@@ -55,6 +55,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +70,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import sh.lsx.untisx.data.AppTheme
 import sh.lsx.untisx.data.LanguagePrefs
 import sh.lsx.untisx.data.model.TimetableEntry
@@ -152,6 +155,20 @@ private fun readOnboardingDone(context: Context): Boolean =
 
 private fun prefsEdit(context: Context) =
     context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE).edit()
+
+private val entryJson = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+}
+
+private val timetableEntrySaver: Saver<TimetableEntry?, String> = Saver(
+    save = { entry ->
+        entry?.let { runCatching { entryJson.encodeToString(TimetableEntry.serializer(), it) }.getOrNull() }
+    },
+    restore = { text ->
+        runCatching { entryJson.decodeFromString(TimetableEntry.serializer(), text) }.getOrNull()
+    },
+)
 
 @Composable
 private fun AppRoot(
@@ -327,11 +344,15 @@ private fun MainApp(
         onDispose { timetableVm.cancelBackgroundWork() }
     }
 
-    var currentScreen by remember { mutableStateOf(Screen.TIMETABLE) }
-    var selectedLesson by remember { mutableStateOf<TimetableEntry?>(null) }
-    var selectedEvent by remember { mutableStateOf<TimetableEntry?>(null) }
-    var previousScreen by remember { mutableStateOf(Screen.TIMETABLE) }
-    var settingsCategory by remember { mutableStateOf<SettingsCategory?>(null) }
+    var currentScreen by rememberSaveable { mutableStateOf(Screen.TIMETABLE) }
+    var selectedLesson by rememberSaveable(stateSaver = timetableEntrySaver) {
+        mutableStateOf<TimetableEntry?>(null)
+    }
+    var selectedEvent by rememberSaveable(stateSaver = timetableEntrySaver) {
+        mutableStateOf<TimetableEntry?>(null)
+    }
+    var previousScreen by rememberSaveable { mutableStateOf(Screen.TIMETABLE) }
+    var settingsCategory by rememberSaveable { mutableStateOf<SettingsCategory?>(null) }
 
     fun openEvent(entry: TimetableEntry, from: Screen) {
         selectedEvent = entry

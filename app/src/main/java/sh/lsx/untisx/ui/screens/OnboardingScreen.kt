@@ -144,7 +144,6 @@ fun OnboardingScreen(
                 }
 
                 val stepComplete = when (pagerState.currentPage) {
-                    1 -> notifGranted
                     2 -> loggedIn
                     else -> true
                 }

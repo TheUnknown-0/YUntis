@@ -128,6 +128,14 @@ object NotificationScheduler {
         runCatching { context.startActivity(intent) }
     }
 
+    fun openNotificationSettings(context: Context) {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+        runCatching { context.startActivity(intent) }
+    }
+
     private fun nextTrigger(context: Context): Long? {
         val now = ZonedDateTime.now()
         val minute = NotificationPrefs.overviewMinute(context)
