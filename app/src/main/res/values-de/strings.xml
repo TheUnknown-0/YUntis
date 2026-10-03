@@ -135,6 +135,9 @@
 
     <!-- Events -->
     <string name="events">Termine</string>
+    <string name="event">Termin</string>
+    <string name="event_description">Beschreibung</string>
+    <string name="event_no_details">Keine weiteren Details verfügbar.</string>
     <string name="events_messages">Mitteilungen</string>
     <string name="events_upcoming">Kommende Termine</string>
     <string name="events_holidays">Ferien</string>

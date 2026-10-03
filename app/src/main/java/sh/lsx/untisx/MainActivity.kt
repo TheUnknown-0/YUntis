@@ -79,6 +79,7 @@ import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.data.notifications.Notifications
 import sh.lsx.untisx.ui.components.UpdateDialog
 import sh.lsx.untisx.ui.screens.AboutScreen
+import sh.lsx.untisx.ui.screens.EventDetailsScreen
 import sh.lsx.untisx.ui.screens.EventsScreen
 import sh.lsx.untisx.ui.screens.LessonDetailsScreen
 import sh.lsx.untisx.ui.screens.ProfileScreen
@@ -276,6 +277,7 @@ private enum class Screen {
     TIMETABLE,
     PROFILE,
     LESSON_DETAILS,
+    EVENT_DETAILS,
     EVENTS,
     TEACHERS,
     ROOMS,
@@ -318,12 +320,22 @@ private fun MainApp(
 
     var currentScreen by remember { mutableStateOf(Screen.TIMETABLE) }
     var selectedLesson by remember { mutableStateOf<TimetableEntry?>(null) }
+    var selectedEvent by remember { mutableStateOf<TimetableEntry?>(null) }
+    var previousScreen by remember { mutableStateOf(Screen.TIMETABLE) }
     var settingsCategory by remember { mutableStateOf<SettingsCategory?>(null) }
+
+    fun openEvent(entry: TimetableEntry, from: Screen) {
+        selectedEvent = entry
+        timetableVm.loadLessonNotes(entry)
+        previousScreen = from
+        currentScreen = Screen.EVENT_DETAILS
+    }
 
     fun goBack() {
         when {
             drawerState.isOpen -> scope.launch { drawerState.close() }
             currentScreen == Screen.SETTINGS && settingsCategory != null -> settingsCategory = null
+            currentScreen == Screen.EVENT_DETAILS -> currentScreen = previousScreen
             else -> currentScreen = Screen.TIMETABLE
         }
     }
@@ -464,6 +476,7 @@ private fun MainApp(
         val title = when (currentScreen) {
             Screen.PROFILE -> stringResource(R.string.profile)
             Screen.LESSON_DETAILS -> stringResource(R.string.lesson)
+            Screen.EVENT_DETAILS -> stringResource(R.string.event)
             Screen.EVENTS -> stringResource(R.string.events)
             Screen.TEACHERS -> stringResource(R.string.teachers)
             Screen.ROOMS -> stringResource(R.string.rooms)
@@ -603,6 +616,37 @@ private fun MainApp(
                         roomsById = timetableVm.roomsById,
                         loading = timetableVm.eventsLoading,
                         onRefresh = timetableVm::refreshEvents,
+                        onEventClick = { openEvent(it, Screen.EVENTS) },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                    )
+
+                    Screen.EVENT_DETAILS -> selectedEvent?.let { event ->
+                        EventDetailsScreen(
+                            entry = event,
+                            teachersById = timetableVm.teachersById,
+                            roomsById = timetableVm.roomsById,
+                            notes = timetableVm.lessonNotes,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding),
+                        )
+                    } ?: TimetableScreen(
+                        vm = timetableVm,
+                        subjectColors = subjectColors.mapValues { Color(it.value) },
+                        defaultColor = Color(defaultSubjectColor),
+                        textColor = Color(lessonTextColor),
+                        cancelledStrike = cancelledStrike,
+                        focusDate = focusDate,
+                        focusNonce = focusNonce,
+                        onFocusConsumed = onFocusConsumed,
+                        onLessonClick = { entry ->
+                            selectedLesson = entry
+                            timetableVm.loadLessonNotes(entry)
+                            currentScreen = Screen.LESSON_DETAILS
+                        },
+                        onEventClick = { openEvent(it, Screen.TIMETABLE) },
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(padding),
@@ -662,6 +706,7 @@ private fun MainApp(
                             timetableVm.loadLessonNotes(entry)
                             currentScreen = Screen.LESSON_DETAILS
                         },
+                        onEventClick = { openEvent(it, Screen.TIMETABLE) },
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(padding),
@@ -681,6 +726,7 @@ private fun MainApp(
                             timetableVm.loadLessonNotes(entry)
                             currentScreen = Screen.LESSON_DETAILS
                         },
+                        onEventClick = { openEvent(it, Screen.TIMETABLE) },
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(padding),

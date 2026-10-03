@@ -129,24 +129,33 @@ internal fun defaultHourMarkers(): List<HourMarker> = DEFAULT_PERIODS
             HourMarker(start = start, end = end, label = (index + 1).toString())
         }
 
-internal fun mergeEventSpans(entries: List<TimetableEntry>): List<Pair<Int, Int>> {
+internal data class EventSpan(
+    val start: Int,
+    val end: Int,
+    val title: String?,
+    val entry: TimetableEntry,
+) {
+    val allDay: Boolean get() = start == 0 && end == 0
+}
+
+internal fun mergeEventSpans(entries: List<TimetableEntry>): List<EventSpan> {
     val sorted = entries.sortedWith(compareBy({ it.startTime }, { it.endTime }))
-    val spans = ArrayList<Triple<Int, Int, String?>>()
+    val spans = ArrayList<EventSpan>()
 
     for (entry in sorted) {
         val last = spans.lastOrNull()
-        val gap = last?.let { minutesOf(entry.startTime) - minutesOf(it.second) } ?: Int.MAX_VALUE
+        val gap = last?.let { minutesOf(entry.startTime) - minutesOf(it.end) } ?: Int.MAX_VALUE
         val sameEvent = last != null &&
             !entry.eventTitle.isNullOrBlank() &&
-            entry.eventTitle == last.third &&
+            entry.eventTitle == last.title &&
             gap <= 30
 
         if (sameEvent) {
-            spans[spans.size - 1] = last.copy(second = maxOf(last.second, entry.endTime))
+            spans[spans.size - 1] = last.copy(end = maxOf(last.end, entry.endTime))
         } else {
-            spans.add(Triple(entry.startTime, entry.endTime, entry.eventTitle))
+            spans.add(EventSpan(start = entry.startTime, end = entry.endTime, title = entry.eventTitle, entry = entry))
         }
     }
 
-    return spans.map { it.first to it.second }
+    return spans
 }

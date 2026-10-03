@@ -42,6 +42,7 @@ import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.ui.timetable.TIME_FORMAT
 import sh.lsx.untisx.ui.util.rememberDateFormat
+import sh.lsx.untisx.ui.util.tapHaptic
 import sh.lsx.untisx.ui.timetable.rememberToday
 import sh.lsx.untisx.ui.timetable.resolveNames
 import java.time.LocalDate
@@ -59,6 +60,7 @@ fun EventsScreen(
     loading: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    onEventClick: (TimetableEntry) -> Unit = {},
 ) {
     val today = rememberToday()
 
@@ -129,6 +131,7 @@ fun EventsScreen(
                                 EventCard(
                                     event = event,
                                     rooms = resolveNames(event.room, roomsById),
+                                    onClick = { onEventClick(event) },
                                 )
                             }
                         }
@@ -243,6 +246,7 @@ private fun DayLabel(
 private fun EventCard(
     event: TimetableEntry,
     rooms: String,
+    onClick: () -> Unit,
 ) {
     val timed = event.startTime != 0 && event.endTime != 0
 
@@ -253,7 +257,9 @@ private fun EventCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .tapHaptic(onClick),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {

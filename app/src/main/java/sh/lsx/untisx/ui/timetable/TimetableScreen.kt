@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -36,10 +37,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -97,6 +100,7 @@ fun TimetableScreen(
     textColor: Color = Color(0xFF212121),
     cancelledStrike: Boolean = true,
     onLessonClick: (TimetableEntry) -> Unit = {},
+    onEventClick: (TimetableEntry) -> Unit = {},
     focusDate: Int = 0,
     focusNonce: Int = 0,
     onFocusConsumed: () -> Unit = {},
@@ -190,6 +194,7 @@ fun TimetableScreen(
                         textColor = textColor,
                         cancelledStrike = cancelledStrike,
                         onLessonClick = onLessonClick,
+                        onEventClick = onEventClick,
                     )
                 }
             }
@@ -214,6 +219,7 @@ private fun WeekPage(
     textColor: Color,
     cancelledStrike: Boolean,
     onLessonClick: (TimetableEntry) -> Unit,
+    onEventClick: (TimetableEntry) -> Unit,
 ) {
     when {
         loading && entries == null -> Box(
@@ -248,8 +254,17 @@ private fun WeekPage(
             }
 
             Column(modifier = Modifier.fillMaxSize()) {
+                val allDayEvents = remember(displays) {
+                    displays
+                        .filter { it.entry.isEvent && it.entry.startTime == 0 && it.entry.endTime == 0 }
+                        .map { it.entry }
+                        .groupBy { it.date }
+                }
+
                 DayHeadersRow(
                     weekDays = weekDays,
+                    allDayEvents = allDayEvents,
+                    onEventClick = onEventClick,
                     modifier = Modifier.height(HEADER_HEIGHT),
                 )
 
@@ -265,6 +280,7 @@ private fun WeekPage(
                     textColor = textColor,
                     cancelledStrike = cancelledStrike,
                     onLessonClick = onLessonClick,
+                    onEventClick = onEventClick,
                 )
             }
         }
@@ -289,6 +305,8 @@ internal fun rememberToday(): LocalDate {
 @Composable
 private fun DayHeadersRow(
     weekDays: List<LocalDate>,
+    allDayEvents: Map<Int, List<TimetableEntry>>,
+    onEventClick: (TimetableEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val today = rememberToday()
@@ -302,6 +320,8 @@ private fun DayHeadersRow(
             DayHeader(
                 date = date,
                 isToday = date == today,
+                allDayEvents = allDayEvents[date.toUntisDate()].orEmpty(),
+                onEventClick = onEventClick,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
@@ -314,6 +334,8 @@ private fun DayHeadersRow(
 private fun DayHeader(
     date: LocalDate,
     isToday: Boolean,
+    allDayEvents: List<TimetableEntry>,
+    onEventClick: (TimetableEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dateFormat = rememberDateFormat("d. MMM")
@@ -339,6 +361,40 @@ private fun DayHeader(
             color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
         )
+
+        if (allDayEvents.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .padding(top = 1.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                    .tapHaptic { onEventClick(allDayEvents.first()) }
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.DateRange,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(9.dp),
+                )
+
+                Spacer(Modifier.width(2.dp))
+
+                Text(
+                    text = if (allDayEvents.size > 1) {
+                        allDayEvents.size.toString()
+                    } else {
+                        allDayEvents.first().eventTitle ?: stringResource(R.string.event)
+                    },
+                    fontSize = 8.sp,
+                    lineHeight = 9.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 
@@ -355,6 +411,7 @@ private fun WeekGrid(
     textColor: Color,
     cancelledStrike: Boolean,
     onLessonClick: (TimetableEntry) -> Unit,
+    onEventClick: (TimetableEntry) -> Unit,
 ) {
     val today = rememberToday()
     val byDate = remember(displays) { displays.groupBy { it.entry.date } }
@@ -387,6 +444,7 @@ private fun WeekGrid(
                 textColor = textColor,
                 cancelledStrike = cancelledStrike,
                 onLessonClick = onLessonClick,
+                onEventClick = onEventClick,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -461,6 +519,7 @@ private fun DayColumn(
     textColor: Color,
     cancelledStrike: Boolean,
     onLessonClick: (TimetableEntry) -> Unit,
+    onEventClick: (TimetableEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dayStartMinutes = minutesOf(dayStart)
@@ -488,9 +547,13 @@ private fun DayColumn(
                 .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
         )
 
-        mergeEventSpans(events.map { it.entry }).forEach { (start, end) ->
-            val startMin = (minutesOf(start) - dayStartMinutes).coerceAtLeast(0)
-            val endMin = (minutesOf(end) - dayStartMinutes).coerceAtMost(gridEndMinutes - dayStartMinutes)
+        val eventSpans = mergeEventSpans(events.map { it.entry })
+
+        eventSpans.forEach { span ->
+            if (span.allDay) return@forEach
+
+            val startMin = (minutesOf(span.start) - dayStartMinutes).coerceAtLeast(0)
+            val endMin = (minutesOf(span.end) - dayStartMinutes).coerceAtMost(gridEndMinutes - dayStartMinutes)
 
             val overlayHeight = MINUTE_HEIGHT * (endMin - startMin).coerceAtLeast(5)
 
@@ -502,9 +565,24 @@ private fun DayColumn(
                     .offset(y = MINUTE_HEIGHT * startMin)
                     .padding(horizontal = 1.dp)
                     .height(overlayHeight)
+                    .clip(RoundedCornerShape(6.dp))
                     .background(overlayColor.copy(alpha = 0.10f), RoundedCornerShape(6.dp))
-                    .border(1.dp, overlayColor.copy(alpha = 0.25f), RoundedCornerShape(6.dp)),
-            )
+                    .border(1.dp, overlayColor.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
+                    .tapHaptic { onEventClick(span.entry) },
+                contentAlignment = Alignment.TopStart,
+            ) {
+                if (overlayHeight >= 18.dp) {
+                    Text(
+                        text = span.title.orEmpty(),
+                        fontSize = 8.sp,
+                        lineHeight = 9.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
+                    )
+                }
+            }
         }
 
         placeholder?.let { type ->
