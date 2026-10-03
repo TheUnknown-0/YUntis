@@ -449,7 +449,7 @@ private fun HolidayCard(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text = holiday.name,
+                    text = holiday.longName.ifBlank { holiday.name },
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
