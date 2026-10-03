@@ -138,7 +138,7 @@
     <string name="event">Termin</string>
     <string name="event_description">Beschreibung</string>
     <string name="event_no_details">Keine weiteren Details verfügbar.</string>
-    <string name="events_messages">Mitteilungen</string>
+    <string name="events_messages">Nachrichten des Tages</string>
     <string name="events_upcoming">Kommende Termine</string>
     <string name="events_holidays">Ferien</string>
     <string name="events_all_day">Ganztägig</string>
@@ -153,6 +153,18 @@
         <item quantity="one">Noch %1$d Tag</item>
         <item quantity="other">Noch %1$d Tage</item>
     </plurals>
+
+    <!-- Messages -->
+    <string name="messages">Mitteilungen</string>
+    <string name="messages_inbox">Posteingang</string>
+    <string name="messages_read_confirmations">Lesebestätigungen</string>
+    <string name="messages_empty">Keine Mitteilungen.</string>
+    <string name="messages_empty_hint">Mitteilungen deiner Schule erscheinen hier.</string>
+    <string name="messages_no_subject">(Kein Betreff)</string>
+    <string name="messages_no_content">(Kein Inhalt)</string>
+    <string name="messages_attachments">Anhänge</string>
+    <string name="messages_confirmation">%1$d von %2$d bestätigt</string>
+    <string name="messages_replies">Antworten</string>
 
     <!-- Statistics -->
     <string name="stats">Statistiken</string>
@@ -196,6 +208,7 @@
     <string name="error_timegrid_missing">Deine Schule liefert kein Stundenraster. Die Stundenspalte bleibt daher ausgeblendet.</string>
     <string name="error_update_check_failed">Update-Suche fehlgeschlagen: %1$s</string>
     <string name="error_download_failed">Herunterladen fehlgeschlagen: %1$s</string>
+    <string name="error_messages_load">Mitteilungen konnten nicht geladen werden.</string>
 
     <!-- Update dialog / about updates -->
     <string name="update_available_title">Update verfügbar</string>

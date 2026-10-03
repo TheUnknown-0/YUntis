@@ -154,6 +154,18 @@
         <item quantity="other">Starts in %1$d days</item>
     </plurals>
 
+    <!-- Messages -->
+    <string name="messages">Messages</string>
+    <string name="messages_inbox">Inbox</string>
+    <string name="messages_read_confirmations">Read confirmations</string>
+    <string name="messages_empty">No messages.</string>
+    <string name="messages_empty_hint">Messages from your school will show up here.</string>
+    <string name="messages_no_subject">(No subject)</string>
+    <string name="messages_no_content">(No content)</string>
+    <string name="messages_attachments">Attachments</string>
+    <string name="messages_confirmation">%1$d of %2$d confirmed</string>
+    <string name="messages_replies">Replies</string>
+
     <!-- Statistics -->
     <string name="stats">Statistics</string>
     <string name="stats_days_collected">%1$d of %2$d school days collected</string>
@@ -196,6 +208,7 @@
     <string name="error_timegrid_missing">Your school doesn\'t provide an hourly grid. The hour column can\'t be shown.</string>
     <string name="error_update_check_failed">Update check failed: %1$s</string>
     <string name="error_download_failed">Download failed: %1$s</string>
+    <string name="error_messages_load">Couldn\'t load messages.</string>
 
     <!-- Update dialog / about updates -->
     <string name="update_available_title">Update available</string>

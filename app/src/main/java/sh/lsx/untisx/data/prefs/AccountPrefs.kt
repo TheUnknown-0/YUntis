@@ -3,6 +3,7 @@ package sh.lsx.untisx.data.prefs
 import android.content.Context
 import kotlinx.serialization.builtins.ListSerializer
 import sh.lsx.untisx.UntisXApp
+import sh.lsx.untisx.data.MessagesStore
 import sh.lsx.untisx.data.StatsStore
 import sh.lsx.untisx.data.TimetableCache
 import sh.lsx.untisx.data.security.Crypto
@@ -70,6 +71,7 @@ object AccountPrefs {
         PasswordVault.clear(context, id)
         TimetableCache.clear(context, id)
         StatsStore.clear(context, id)
+        MessagesStore.clear(context, id)
 
         if (getActiveId(context) == id) {
             val next = accounts.firstOrNull()?.let { accountId(it) }

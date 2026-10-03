@@ -3,6 +3,7 @@ package sh.lsx.untisx.data.api
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -27,8 +28,10 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import sh.lsx.untisx.data.model.AuthResult
 import sh.lsx.untisx.data.model.DayMessage
+import sh.lsx.untisx.data.model.DirectMessage
 import sh.lsx.untisx.data.model.JsonRpcRequest
 import sh.lsx.untisx.data.model.JsonRpcResponse
+import sh.lsx.untisx.data.model.MessagesData
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.model.Holiday
@@ -42,6 +45,7 @@ import sh.lsx.untisx.data.model.TimegridDay
 import sh.lsx.untisx.data.model.TimegridUnit
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.security.generateTotp
+import sh.lsx.untisx.data.stripHtml
 import java.io.IOException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -69,6 +73,7 @@ object UntisClient {
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
+        coerceInputValues = true
     }
 
     private val DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
@@ -469,32 +474,14 @@ object UntisClient {
     )
 
     suspend fun fetchCurrentSchoolYear(auth: AuthData, password: String): SchoolYear? = withContext(Dispatchers.IO) {
-        val jwt = mobileJwt(auth, password)
+        val body = authenticatedGet(auth, password, webuntisUrl(auth.server, "api/rest/view/v1/app/data"))
 
-        if (jwt != null) {
-            val host = auth.server.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
-            val url = "https://$host/WebUntis/api/rest/view/v1/app/data"
+        if (body != null) {
+            val parsed = runCatching { parseSchoolYear(body) }.getOrNull()
 
-            try {
-                http.newCall(
-                    Request.Builder().url(url)
-                        .header("Authorization", "Bearer $jwt")
-                        .header("Accept", "application/json")
-                        .get()
-                        .build(),
-                ).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val body = response.body?.string().orEmpty()
-                        val parsed = runCatching { parseSchoolYear(body) }.getOrNull()
-
-                        if (parsed != null) {
-                            log("school year -> id=${parsed.id}")
-                            return@withContext parsed
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                log("school year via app data failed: ${e.javaClass.simpleName}")
+            if (parsed != null) {
+                log("school year -> id=${parsed.id}")
+                return@withContext parsed
             }
         }
 
@@ -506,6 +493,85 @@ object UntisClient {
             log("school year via json-rpc failed: ${e.javaClass.simpleName}")
             null
         }
+    }
+
+    suspend fun fetchMessages(auth: AuthData, password: String): MessagesData? = withContext(Dispatchers.IO) {
+        val body = authenticatedGet(auth, password, webuntisUrl(auth.server, "api/rest/view/v1/messages"))
+            ?: return@withContext null
+
+        runCatching {
+            val response = json.decodeFromString<MessagesRestResponse>(body)
+
+            MessagesData(
+                incoming = response.incomingMessages.orEmpty(),
+                readConfirmations = response.readConfirmationMessages.orEmpty(),
+            )
+        }.onFailure {
+            Log.w(TAG, "messages returned an unparseable response")
+        }.getOrNull()
+    }
+
+    suspend fun fetchMessage(auth: AuthData, password: String, id: Long): DirectMessage? =
+        withContext(Dispatchers.IO) {
+            if (id <= 0) return@withContext null
+
+            val body = authenticatedGet(auth, password, webuntisUrl(auth.server, "api/rest/view/v1/messages/$id"))
+                ?: return@withContext null
+
+            runCatching {
+                json.decodeFromString<DirectMessage>(body)
+            }.onFailure {
+                Log.w(TAG, "message detail returned an unparseable response")
+            }.getOrNull()
+        }
+
+    @Serializable
+    private data class MessagesRestResponse(
+        val incomingMessages: List<DirectMessage>? = null,
+        val readConfirmationMessages: List<DirectMessage>? = null,
+    )
+
+    private fun authenticatedGet(auth: AuthData, password: String, url: String): String? {
+        repeat(2) { attempt ->
+            val jwt = mobileJwt(auth, password) ?: return null
+
+            val response = try {
+                http.newCall(
+                    Request.Builder().url(url)
+                        .header("Authorization", "Bearer $jwt")
+                        .header("Accept", "application/json")
+                        .get()
+                        .build(),
+                ).execute().use { result ->
+                    val body = if (result.isSuccessful) result.body?.string() else null
+
+                    body to result.code
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "bearer GET failed: ${e.javaClass.simpleName}")
+                return null
+            }
+
+            val (body, code) = response
+
+            if (body != null) return body
+
+            Log.w(TAG, "bearer GET $code")
+
+            if (code == 401 || code == 403) {
+                jwts.remove(AccountPrefs.accountId(auth))
+            }
+
+            if (attempt == 1 || (code != 401 && code != 403)) return null
+        }
+
+        return null
+    }
+
+    private fun webuntisUrl(server: String, path: String): String {
+        val host = server.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
+
+        return "https://$host/WebUntis/$path"
     }
 
     private fun parseSchoolYear(body: String): SchoolYear? {
@@ -545,7 +611,10 @@ object UntisClient {
                     .post(json.encodeToString(payload).toRequestBody("application/json".toMediaType()))
                     .build(),
             ).execute().use { response ->
-                if (!response.isSuccessful) return null
+                if (!response.isSuccessful) {
+                    Log.w(TAG, "mobile jwt http ${response.code}")
+                    return null
+                }
 
                 val jwt = runCatching {
                     json.parseToJsonElement(response.body?.string().orEmpty())
@@ -559,7 +628,7 @@ object UntisClient {
                 jwt
             }
         } catch (e: Exception) {
-            log("mobile jwt failed: ${e.javaClass.simpleName}")
+            Log.w(TAG, "mobile jwt failed: ${e.javaClass.simpleName}")
             null
         }
     }
@@ -580,8 +649,6 @@ object UntisClient {
         startTime: Int,
         endTime: Int,
     ): LessonDetail? = withContext(Dispatchers.IO) {
-        val jwt = mobileJwt(auth, password) ?: return@withContext fallbackLessonDetail(auth, password, entryId)
-
         val session = auth.session
 
         val (elementId, elementType) = when {
@@ -592,32 +659,16 @@ object UntisClient {
 
         val start = date.atTime(startTime.toUntisLocalTime()).format(DATE_TIME_FORMAT)
         val end = date.atTime(endTime.toUntisLocalTime()).format(DATE_TIME_FORMAT)
-        val host = auth.server.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
 
-        val url = "https://$host/WebUntis/api/rest/view/v2/calendar-entry/detail" +
-            "?elementId=$elementId&elementType=$elementType" +
-            "&startDateTime=$start&endDateTime=$end" +
-            "&initialSelectedPeriodId=$entryId&initialIsBlockSelected=false"
+        val url = webuntisUrl(
+            auth.server,
+            "api/rest/view/v2/calendar-entry/detail" +
+                "?elementId=$elementId&elementType=$elementType" +
+                "&startDateTime=$start&endDateTime=$end" +
+                "&initialSelectedPeriodId=$entryId&initialIsBlockSelected=false",
+        )
 
-        val body = try {
-            http.newCall(
-                Request.Builder().url(url)
-                    .header("Authorization", "Bearer $jwt")
-                    .header("Accept", "application/json")
-                    .get()
-                    .build(),
-            ).execute().use { response ->
-                if (!response.isSuccessful) {
-                    jwts.remove(AccountPrefs.accountId(auth))
-                    null
-                } else {
-                    response.body?.string()
-                }
-            }
-        } catch (e: Exception) {
-            log("lesson detail failed: ${e.javaClass.simpleName}")
-            null
-        }
+        val body = authenticatedGet(auth, password, url)
 
         val detail = body?.let { parseLessonDetail(it, entryId) }
 
@@ -684,14 +735,6 @@ object UntisClient {
                 )
             }
         }.getOrDefault(emptyList())
-
-    private fun stripHtml(text: String): String =
-        text
-            .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
-            .replace(Regex("<[^>]+>"), "")
-            .replace("&nbsp;", " ")
-            .replace("&amp;", "&")
-            .trim()
 
     suspend fun fetchPeriodNotes(
         auth: AuthData,

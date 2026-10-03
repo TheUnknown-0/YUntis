@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Person
@@ -78,6 +79,9 @@ import sh.lsx.untisx.data.ThemePrefs
 import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.data.notifications.Notifications
 import sh.lsx.untisx.ui.components.UpdateDialog
+import sh.lsx.untisx.ui.messages.MessageDetailsScreen
+import sh.lsx.untisx.ui.messages.MessagesScreen
+import sh.lsx.untisx.ui.messages.MessagesViewModel
 import sh.lsx.untisx.ui.screens.AboutScreen
 import sh.lsx.untisx.ui.screens.EventDetailsScreen
 import sh.lsx.untisx.ui.screens.EventsScreen
@@ -279,6 +283,8 @@ private enum class Screen {
     LESSON_DETAILS,
     EVENT_DETAILS,
     EVENTS,
+    MESSAGES,
+    MESSAGE_DETAILS,
     TEACHERS,
     ROOMS,
     STATS,
@@ -312,6 +318,9 @@ private fun MainApp(
     val timetableVm: TimetableViewModel = viewModel(
         key = "${auth.loginName}:${auth.session.personId}",
     )
+    val messagesVm: MessagesViewModel = viewModel(
+        key = "messages:${auth.loginName}:${auth.session.personId}",
+    )
     val updateVm: UpdateViewModel = viewModel()
 
     DisposableEffect(timetableVm) {
@@ -336,6 +345,7 @@ private fun MainApp(
             drawerState.isOpen -> scope.launch { drawerState.close() }
             currentScreen == Screen.SETTINGS && settingsCategory != null -> settingsCategory = null
             currentScreen == Screen.EVENT_DETAILS -> currentScreen = previousScreen
+            currentScreen == Screen.MESSAGE_DETAILS -> currentScreen = Screen.MESSAGES
             else -> currentScreen = Screen.TIMETABLE
         }
     }
@@ -403,6 +413,17 @@ private fun MainApp(
 
                 Spacer(Modifier.height(16.dp))
                 SidebarSection(stringResource(R.string.nav_information))
+
+                SidebarItem(
+                    icon = Icons.Outlined.Email,
+                    label = stringResource(R.string.messages),
+                    badge = messagesVm.messageCount.takeIf { it > 0 }?.toString(),
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        messagesVm.refresh()
+                        currentScreen = Screen.MESSAGES
+                    },
+                )
 
                 SidebarItem(
                     icon = Icons.Outlined.DateRange,
@@ -478,6 +499,8 @@ private fun MainApp(
             Screen.LESSON_DETAILS -> stringResource(R.string.lesson)
             Screen.EVENT_DETAILS -> stringResource(R.string.event)
             Screen.EVENTS -> stringResource(R.string.events)
+            Screen.MESSAGES -> stringResource(R.string.messages)
+            Screen.MESSAGE_DETAILS -> stringResource(R.string.messages)
             Screen.TEACHERS -> stringResource(R.string.teachers)
             Screen.ROOMS -> stringResource(R.string.rooms)
             Screen.STATS -> stringResource(R.string.stats)
@@ -647,6 +670,21 @@ private fun MainApp(
                             currentScreen = Screen.LESSON_DETAILS
                         },
                         onEventClick = { openEvent(it, Screen.TIMETABLE) },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                    )
+
+                    Screen.MESSAGES -> MessagesScreen(
+                        vm = messagesVm,
+                        onMessageClick = { currentScreen = Screen.MESSAGE_DETAILS },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                    )
+
+                    Screen.MESSAGE_DETAILS -> MessageDetailsScreen(
+                        vm = messagesVm,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(padding),
