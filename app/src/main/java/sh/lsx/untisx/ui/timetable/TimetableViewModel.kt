@@ -626,6 +626,13 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 val monday = LocalDate.now().toVisibleWeekStart().plusUntisWeeks(claimed.toLong())
                 val (entries, fresh, allRefused, refusedDays) = fetchWeekForOffset(claimed, monday)
 
+                Log.d(
+                    TAG,
+                    "week $claimed result: ${entries.size} entries " +
+                        entries.groupBy { it.date }.mapValues { it.value.size } +
+                        " refused=$refusedDays allRefused=$allRefused",
+                )
+
                 if (fresh != null) persistSession(fresh)
 
                 try {
@@ -719,27 +726,37 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun fetchWeekForOffset(claimed: Int, monday: LocalDate): WeekFetch {
         val currentAuth = requireAuth()
 
-        return if (claimed > 0) {
-            try {
-                WeekFetch(
-                    UntisClient.getTimetableIntern(
-                        currentAuth,
-                        withPassword(),
-                        monday,
-                        monday.plusDays(6),
-                    ),
-                    currentAuth,
-                    allRefused = false,
-                )
+        if (claimed >= 0) {
+            val rest = try {
+                UntisClient.fetchTimetableEntries(currentAuth, withPassword(), monday, monday.plusDays(6))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.d(TAG, "mobile API failed for week $claimed")
-                weekViaLegacy(currentAuth, monday)
+                Log.w(TAG, "REST week $claimed failed: ${e.javaClass.simpleName}")
+                null
             }
-        } else {
-            weekViaLegacy(currentAuth, monday)
+
+            if (rest != null) {
+                Log.d(TAG, "week $claimed via REST -> ${rest.size} entries")
+                return WeekFetch(resolveElementIds(rest), currentAuth, allRefused = false)
+            }
         }
+
+        val intern = try {
+            UntisClient.getTimetableIntern(currentAuth, withPassword(), monday, monday.plusDays(6))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "intern week $claimed failed: ${e.javaClass.simpleName}")
+            null
+        }
+
+        if (!intern.isNullOrEmpty()) {
+            Log.d(TAG, "week $claimed via intern -> ${intern.size} entries")
+            return WeekFetch(intern, currentAuth, allRefused = false)
+        }
+
+        return weekViaLegacy(currentAuth, monday)
     }
 
     private suspend fun weekViaLegacy(auth: AuthData, monday: LocalDate): WeekFetch {
@@ -751,6 +768,8 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                     endDate = monday.plusDays(6).toUntisDate(),
                 )
             }
+
+            Log.d(TAG, "week ${monday.toUntisDate()} via legacy -> ${entries.size} entries")
 
             WeekFetch(entries, fresh, allRefused = false)
         } catch (e: UntisException.Api) {
@@ -948,9 +967,18 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 loadStaticDataLegacy(currentAuth)
             }
 
+            weekCache.replaceAll { _, entries -> resolveElementIds(entries) }
+            publishWeeks()
+
             mergeTimetableElements()
             persistCache()
             scanSubjectsIfPossible()
+
+            weekCache[0]?.takeIf { it.isNotEmpty() }?.let { entries ->
+                runCatching {
+                    recordStatsWeek(LocalDate.now().toVisibleWeekStart(), entries, emptyList())
+                }
+            }
         }
     }
 
@@ -998,6 +1026,34 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         subjectsById = mergeMissing(subjectsById) { it.subject }
         teachersById = mergeMissing(teachersById) { it.teacher }
         roomsById = mergeMissing(roomsById) { it.room }
+    }
+
+    private fun resolveElementIds(entries: List<TimetableEntry>): List<TimetableEntry> {
+        if (subjectsById.isEmpty() && teachersById.isEmpty() && roomsById.isEmpty()) return entries
+
+        fun resolve(
+            elements: List<TimetableElement>,
+            data: Map<Int, MasterDataItem>,
+        ): List<TimetableElement> = elements.map { element ->
+            if (element.id > 0 || element.name.isBlank()) {
+                element
+            } else {
+                val match = data.values.firstOrNull { item ->
+                    item.name.equals(element.name, ignoreCase = true) ||
+                        (element.longName != null && item.longName.equals(element.longName, ignoreCase = true))
+                }
+
+                if (match != null) element.copy(id = match.id) else element
+            }
+        }
+
+        return entries.map { entry ->
+            entry.copy(
+                subject = resolve(entry.subject, subjectsById),
+                teacher = resolve(entry.teacher, teachersById),
+                room = resolve(entry.room, roomsById),
+            )
+        }
     }
 
     private fun mergeMissing(

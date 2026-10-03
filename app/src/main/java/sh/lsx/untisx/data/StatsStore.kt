@@ -204,7 +204,7 @@ object StatsStore {
     }
 
     private fun List<TimetableElement>.changed(): Boolean =
-        any { it.orgId != null && it.orgId > 0 && it.orgId != it.id }
+        any { (it.orgId != null && it.orgId > 0 && it.orgId != it.id) || !it.orgName.isNullOrBlank() }
 
     private fun save(context: Context, accountId: String, data: StatsData) {
         runCatching {

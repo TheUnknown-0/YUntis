@@ -9,8 +9,10 @@ An open-source timetable viewer for the Untis school system - built natively wit
 ## Features
 
 - **Timetable** - clear weekly view with all lessons, times, rooms and teachers
-- **School events** - displayed directly in the timetable
+- **School events** - displayed directly in the timetable and tappable for full details
 - **Events overview** - upcoming school events, announcements and holidays with countdown in one place
+- **Messages** - read messages sent by your school
+- **Exams** - exams and tests are marked on the timetable, with a list of upcoming ones
 - **Lesson details** - lesson information, substitutions, topic and class register notes
 - **Cancelled lessons** - showing up grayed out
 - **Subject colors** - every subject color can be customized

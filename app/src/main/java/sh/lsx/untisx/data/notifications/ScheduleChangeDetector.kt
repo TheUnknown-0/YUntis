@@ -55,7 +55,7 @@ object ScheduleChangeDetector {
             val oldRooms = names(old.room, rooms)
             val newRooms = names(entry.room, rooms)
 
-            if (filter.room && old.room.map { it.id } != entry.room.map { it.id }) {
+            if (filter.room && signatures(old.room) != signatures(entry.room)) {
                 changes += ScheduleChange(
                     type = ChangeType.ROOM,
                     entry = entry,
@@ -68,7 +68,7 @@ object ScheduleChangeDetector {
             val oldTeachers = names(old.teacher, teachers)
             val newTeachers = names(entry.teacher, teachers)
 
-            if (filter.teacher && old.teacher.map { it.id } != entry.teacher.map { it.id }) {
+            if (filter.teacher && signatures(old.teacher) != signatures(entry.teacher)) {
                 changes += ScheduleChange(
                     type = ChangeType.TEACHER,
                     entry = entry,
@@ -103,4 +103,7 @@ object ScheduleChangeDetector {
                 ?: element.longName?.takeIf { it.isNotBlank() }
         }
         .joinToString(", ")
+
+    private fun signatures(elements: List<TimetableElement>): List<String> =
+        elements.map { "${it.id}:${it.name}" }
 }

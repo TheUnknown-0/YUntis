@@ -93,6 +93,7 @@ internal fun LessonCard(
     var cell by remember { mutableStateOf(IntSize.Zero) }
     val density = LocalDensity.current
     val measured = cell.width > 0 && cell.height > 0
+    val compact = measured && with(density) { cell.width.toDp() } < 64.dp
     val angle = if (measured) {
         Math.toDegrees(atan2(cell.height.toFloat(), cell.width.toFloat()).toDouble()).toFloat()
     } else 0f
@@ -139,7 +140,7 @@ internal fun LessonCard(
                         }
                     }
                 }
-                .padding(horizontal = 4.dp, vertical = 2.dp),
+                .padding(horizontal = if (compact) 2.dp else 4.dp, vertical = 2.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             if (lesson.teachers.isNotBlank()) {
@@ -156,7 +157,7 @@ internal fun LessonCard(
 
             Text(
                 text = lesson.subject,
-                fontSize = 13.sp,
+                fontSize = if (compact) 9.sp else 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = titleColor,
                 maxLines = 1,
@@ -168,7 +169,7 @@ internal fun LessonCard(
             if (lesson.rooms.isNotBlank()) {
                 Text(
                     text = changedText(lesson.origRooms, lesson.rooms),
-                    fontSize = 9.sp,
+                    fontSize = if (compact) 8.sp else 9.sp,
                     lineHeight = 11.sp,
                     color = bodyColor,
                     maxLines = 1,
@@ -195,12 +196,12 @@ internal fun LessonCard(
                             bottomStart = 4.dp,
                         ),
                     )
-                    .padding(horizontal = 4.dp),
+                    .padding(horizontal = if (compact) 3.dp else 4.dp),
             ) {
                 Text(
                     text = label,
-                    fontSize = 8.sp,
-                    lineHeight = 10.sp,
+                    fontSize = if (compact) 7.sp else 8.sp,
+                    lineHeight = if (compact) 9.sp else 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onError,
                     maxLines = 1,

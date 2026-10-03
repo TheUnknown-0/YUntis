@@ -34,6 +34,8 @@ data class TimetableEntry(
     val lessonText: String? = null,
     val activityType: String? = null,
     val exam: PeriodExam? = null,
+    val layoutStartPosition: Int = 0,
+    val layoutWidth: Int = 1000,
 ) {
     val cancelled: Boolean get() = code == "cancelled"
     val irregular: Boolean get() = code == "irregular"

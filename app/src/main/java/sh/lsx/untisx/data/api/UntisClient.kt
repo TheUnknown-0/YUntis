@@ -463,6 +463,141 @@ object UntisClient {
         else -> session.personId to "STUDENT"
     }
 
+    suspend fun fetchTimetableEntries(
+        auth: AuthData,
+        password: String,
+        from: LocalDate,
+        to: LocalDate,
+    ): List<TimetableEntry>? = withContext(Dispatchers.IO) {
+        val (resourceType, resourceId) = restResource(auth.session)
+
+        val url = webuntisUrl(auth.server, "api/rest/view/v1/timetable/entries") +
+            "?start=${from.format(DateTimeFormatter.ISO_LOCAL_DATE)}" +
+            "&end=${to.format(DateTimeFormatter.ISO_LOCAL_DATE)}" +
+            "&resourceType=$resourceType&resources=$resourceId&timetableType=MY_TIMETABLE"
+
+        val body = authenticatedGet(auth, password, url) ?: return@withContext null
+
+        runCatching {
+            parseTimetableEntriesV1(json.parseToJsonElement(body))
+        }.onFailure {
+            Log.w(TAG, "timetable entries returned an unparseable response")
+        }.getOrNull()
+    }
+
+    private fun restResource(session: AuthResult): Pair<String, Int> = when {
+        session.personType == 5 && session.personId != 0 -> "STUDENT" to session.personId
+        session.personType == 2 && session.personId != 0 -> "TEACHER" to session.personId
+        session.klasseId != 0 -> "CLASS" to session.klasseId
+        else -> "STUDENT" to session.personId
+    }
+
+    private fun parseTimetableEntriesV1(result: JsonElement): List<TimetableEntry> {
+        val days = (result.jsonObject["days"] as? JsonArray).orEmpty()
+        val entries = ArrayList<TimetableEntry>()
+
+        for (day in days) {
+            val dayObj = runCatching { day.jsonObject }.getOrNull() ?: continue
+            val date = parseIsoDate(dayObj["date"]?.jsonPrimitive?.contentOrNull.orEmpty())
+
+            if (date == 0) continue
+
+            for (key in listOf("gridEntries", "dayEntries")) {
+                (dayObj[key] as? JsonArray).orEmpty().forEach { element ->
+                    runCatching { parseV1Entry(element.jsonObject, date) }
+                        .getOrNull()
+                        ?.let(entries::add)
+                }
+            }
+        }
+
+        return entries
+    }
+
+    private fun parseV1Entry(obj: JsonObject, date: Int): TimetableEntry {
+        val duration = runCatching { obj["duration"]?.jsonObject }.getOrNull()
+        val start = duration?.get("start")?.jsonPrimitive?.contentOrNull.orEmpty()
+        val end = duration?.get("end")?.jsonPrimitive?.contentOrNull.orEmpty()
+
+        val klasse = ArrayList<TimetableElement>()
+        val teacher = ArrayList<TimetableElement>()
+        val subject = ArrayList<TimetableElement>()
+        val room = ArrayList<TimetableElement>()
+
+        for (index in 1..7) {
+            (obj["position$index"] as? JsonArray).orEmpty().forEach { position ->
+                val pos = runCatching { position.jsonObject }.getOrNull() ?: return@forEach
+                val current = runCatching { pos["current"]?.jsonObject }.getOrNull() ?: return@forEach
+                val removed = runCatching { pos["removed"]?.jsonObject }.getOrNull()
+
+                val element = TimetableElement(
+                    id = current["id"]?.jsonPrimitive?.intOrNull ?: 0,
+                    name = current["shortName"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    longName = current["longName"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank),
+                    orgId = removed?.get("id")?.jsonPrimitive?.intOrNull,
+                    orgName = removed?.get("shortName")?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank),
+                )
+
+                when (current["type"]?.jsonPrimitive?.contentOrNull?.uppercase()) {
+                    "CLASS", "KLASSE" -> klasse += element
+                    "TEACHER" -> teacher += element
+                    "SUBJECT" -> subject += element
+                    "ROOM" -> room += element
+                }
+            }
+        }
+
+        val ids = (obj["ids"] as? JsonArray).orEmpty().mapNotNull { it.jsonPrimitive.intOrNull }
+        val type = obj["type"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val status = obj["status"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val statusDetail = obj["statusDetail"]?.jsonPrimitive?.contentOrNull.orEmpty()
+
+        val layoutStart = (obj["layoutStartPosition"]?.jsonPrimitive?.intOrNull ?: 0).coerceIn(0, 1000)
+        val layoutWidth = (obj["layoutWidth"]?.jsonPrimitive?.intOrNull ?: 1000).coerceIn(1, 1000)
+
+        val lessonInfo = obj["lessonInfo"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf(String::isNotBlank)
+        val lessonText = obj["lessonText"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf(String::isNotBlank)
+        val substitution = obj["substitutionText"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf(String::isNotBlank)
+        val name = obj["name"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf(String::isNotBlank)
+
+        val cancelled = listOf(type, status, statusDetail).any { it.contains("CANCEL", ignoreCase = true) }
+        val irregular = !cancelled && listOf(type, status, statusDetail).any { it.contains("IRREGULAR", ignoreCase = true) }
+
+        val exam = if (type.equals("EXAM", ignoreCase = true)) {
+            PeriodExam(
+                id = ids.firstOrNull() ?: 0,
+                examtype = null,
+                name = name ?: lessonInfo,
+                text = lessonInfo,
+            )
+        } else {
+            null
+        }
+
+        return TimetableEntry(
+            id = ids.firstOrNull() ?: 0,
+            date = date,
+            startTime = parseIsoTime(start),
+            endTime = parseIsoTime(end),
+            klasse = klasse,
+            teacher = teacher,
+            subject = subject,
+            room = room,
+            code = when {
+                cancelled -> "cancelled"
+                irregular -> "irregular"
+                else -> null
+            },
+            lstext = substitution ?: lessonInfo,
+            info = lessonInfo,
+            substText = substitution,
+            lessonText = lessonText,
+            exam = exam,
+            layoutStartPosition = layoutStart,
+            layoutWidth = layoutWidth,
+        )
+    }
+
     suspend fun fetchExams(
         auth: AuthData,
         password: String,

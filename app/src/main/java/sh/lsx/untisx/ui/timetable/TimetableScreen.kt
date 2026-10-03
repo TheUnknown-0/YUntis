@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -640,29 +641,36 @@ private fun DayColumn(
             }
         }
 
-        lessons.forEach { lesson ->
-            val entry = lesson.entry
-            val topMinutes = (minutesOf(entry.startTime) - dayStartMinutes)
-                .coerceIn(0, gridEndMinutes - dayStartMinutes)
-            val bottomMinutes = (minutesOf(entry.endTime) - dayStartMinutes)
-                .coerceIn(topMinutes, gridEndMinutes - dayStartMinutes)
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            lessons.forEach { lesson ->
+                val entry = lesson.entry
+                val topMinutes = (minutesOf(entry.startTime) - dayStartMinutes)
+                    .coerceIn(0, gridEndMinutes - dayStartMinutes)
+                val bottomMinutes = (minutesOf(entry.endTime) - dayStartMinutes)
+                    .coerceIn(topMinutes, gridEndMinutes - dayStartMinutes)
 
-            val top = MINUTE_HEIGHT * topMinutes
-            val lessonHeight = MINUTE_HEIGHT * (bottomMinutes - topMinutes) - 2.dp
+                val top = MINUTE_HEIGHT * topMinutes
+                val lessonHeight = MINUTE_HEIGHT * (bottomMinutes - topMinutes) - 2.dp
 
-            if (lessonHeight > 0.dp) {
-                LessonCard(
-                    lesson = lesson,
-                    color = colorFor(lesson.subject),
-                    textColor = textColor,
-                    strike = cancelledStrike,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .offset(y = top)
-                        .padding(horizontal = 1.dp)
-                        .height(lessonHeight)
-                        .tapHaptic { onLessonClick(entry) },
-                )
+                if (lessonHeight > 0.dp) {
+                    val startFraction = (entry.layoutStartPosition / 1000f).coerceIn(0f, 1f)
+                    val widthFraction = (entry.layoutWidth / 1000f).coerceIn(0.2f, 1f)
+                    val left = maxWidth * startFraction
+                    val cardWidth = (maxWidth * widthFraction).coerceAtMost(maxWidth - left)
+
+                    LessonCard(
+                        lesson = lesson,
+                        color = colorFor(lesson.subject),
+                        textColor = textColor,
+                        strike = cancelledStrike,
+                        modifier = Modifier
+                            .width(cardWidth)
+                            .offset(x = left, y = top)
+                            .padding(horizontal = 1.dp)
+                            .height(lessonHeight)
+                            .tapHaptic { onLessonClick(entry) },
+                    )
+                }
             }
         }
 

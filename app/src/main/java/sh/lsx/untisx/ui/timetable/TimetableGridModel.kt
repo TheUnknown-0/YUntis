@@ -66,8 +66,13 @@ internal fun resolveOriginals(
     data: Map<Int, MasterDataItem>,
 ): String? {
     val originals = elements.mapNotNull { el ->
-        el.orgId?.takeIf { it > 0 && it != el.id }?.let { orgId ->
-            data[orgId]?.name?.takeIf { it.isNotBlank() } ?: el.orgName?.takeIf { it.isNotBlank() } ?: "?"
+        val orgName = el.orgName?.takeIf { it.isNotBlank() }
+        val orgId = el.orgId?.takeIf { it > 0 && it != el.id }
+
+        when {
+            orgId != null -> data[orgId]?.name?.takeIf { it.isNotBlank() } ?: orgName ?: "?"
+            orgName != null -> orgName
+            else -> null
         }
     }
 

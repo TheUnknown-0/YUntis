@@ -281,8 +281,11 @@ private fun ElementRow(
             if (index > 0) append("  ")
 
             val current = data?.get(el.id)?.displayName() ?: el.name
-            val orig = el.orgId?.takeIf { it > 0 && it != el.id }
-                ?.let { data?.get(it)?.displayName() ?: el.orgName }
+            val orgId = el.orgId?.takeIf { it > 0 && it != el.id }
+            val orig = when {
+                orgId != null -> data?.get(orgId)?.displayName() ?: el.orgName
+                else -> el.orgName?.takeIf { it.isNotBlank() }
+            }
 
             if (orig.isNullOrBlank()) {
                 append(current)
