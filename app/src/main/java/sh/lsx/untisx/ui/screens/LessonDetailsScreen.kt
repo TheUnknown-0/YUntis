@@ -1,5 +1,9 @@
 package sh.lsx.untisx.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +46,9 @@ import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.ui.timetable.TIME_FORMAT
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
+import sh.lsx.untisx.ui.util.motionEffects
+import sh.lsx.untisx.ui.util.rememberDateFormat
+import sh.lsx.untisx.ui.util.sharedElementBounds
 import java.time.LocalDate
 
 @Composable
@@ -67,6 +74,7 @@ fun LessonDetailsScreen(
     val examName = exam?.name?.takeIf { it.isNotBlank() } ?: entry.exam?.name
     val examText = exam?.text?.takeIf { it.isNotBlank() } ?: entry.exam?.text
     val hasExam = examType != null || examName != null || examText != null
+    val notesFade = motionEffects<Float>()
 
     Column(
         modifier = modifier
@@ -77,6 +85,7 @@ fun LessonDetailsScreen(
     ) {
         Box(
             modifier = Modifier
+                .sharedElementBounds("lesson-${entry.id}-${entry.date}-${entry.startTime}")
                 .fillMaxWidth()
                 .background(color, RoundedCornerShape(16.dp))
                 .padding(horizontal = 16.dp, vertical = 20.dp),
@@ -216,54 +225,63 @@ fun LessonDetailsScreen(
             }
         }
 
-        when (notes) {
-            is TimetableViewModel.NotesState.Loading -> {
-                DetailCard {
-                    Text(
-                        text = stringResource(R.string.lesson_notes_loading),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            is TimetableViewModel.NotesState.Loaded -> {
-                notes.topic?.let { topic ->
+        AnimatedContent(
+            targetState = notes,
+            transitionSpec = {
+                fadeIn(animationSpec = notesFade) togetherWith
+                    fadeOut(animationSpec = notesFade)
+            },
+            label = "lessonNotes",
+        ) { state ->
+            when (state) {
+                is TimetableViewModel.NotesState.Loading -> {
                     DetailCard {
                         Text(
-                            text = stringResource(R.string.lesson_topic),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-
-                        Text(
-                            text = topic,
+                            text = stringResource(R.string.lesson_notes_loading),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
 
-                if (notes.notes.isNotEmpty()) {
-                    DetailCard {
-                        Text(
-                            text = stringResource(R.string.lesson_notes),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-
-                        notes.notes.forEach { note ->
+                is TimetableViewModel.NotesState.Loaded -> {
+                    state.topic?.let { topic ->
+                        DetailCard {
                             Text(
-                                text = note,
+                                text = stringResource(R.string.lesson_topic),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+
+                            Text(
+                                text = topic,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
                     }
-                }
-            }
 
-            else -> Unit
+                    if (state.notes.isNotEmpty()) {
+                        DetailCard {
+                            Text(
+                                text = stringResource(R.string.lesson_notes),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+
+                            state.notes.forEach { note ->
+                                Text(
+                                    text = note,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                else -> Unit
+            }
         }
     }
 }

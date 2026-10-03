@@ -13,12 +13,15 @@ import androidx.compose.ui.unit.dp
 import sh.lsx.untisx.R
 import sh.lsx.untisx.data.AppTheme
 import sh.lsx.untisx.ui.components.SettingsSectionCard
+import sh.lsx.untisx.ui.components.SettingsSwitchRow
 import sh.lsx.untisx.ui.components.ThemeSettingsContent
 
 @Composable
 fun AppearanceSettingsScreen(
     theme: AppTheme,
     onThemeChange: (AppTheme) -> Unit,
+    animationsEnabled: Boolean,
+    onAnimationsChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -30,6 +33,15 @@ fun AppearanceSettingsScreen(
     ) {
         SettingsSectionCard(title = stringResource(R.string.settings_appearance)) {
             ThemeSettingsContent(theme = theme, onChange = onThemeChange)
+        }
+
+        SettingsSectionCard {
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_animations),
+                description = stringResource(R.string.settings_animations_desc),
+                checked = animationsEnabled,
+                onCheckedChange = onAnimationsChange,
+            )
         }
     }
 }

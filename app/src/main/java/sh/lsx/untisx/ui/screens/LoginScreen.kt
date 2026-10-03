@@ -1,5 +1,17 @@
 package sh.lsx.untisx.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,13 +20,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -40,6 +55,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -49,9 +65,14 @@ import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.School
+import sh.lsx.untisx.ui.util.AppMotion
 import sh.lsx.untisx.ui.util.Haptics
+import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 import sh.lsx.untisx.ui.util.UiText
+import sh.lsx.untisx.ui.util.motionEffects
+import sh.lsx.untisx.ui.util.motionSpatial
 import sh.lsx.untisx.ui.util.uiTextString
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +93,21 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
     var signingIn by remember { mutableStateOf(false) }
     var signedIn by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<UiText?>(null) }
+
+    val errorShake = remember { Animatable(0f) }
+    val animations = LocalAnimationsEnabled.current
+    val effectsSpec = motionEffects<Float>()
+    val scaleSpec = motionSpatial<Float>()
+
+    LaunchedEffect(error, animations) {
+        if (animations && error != null) {
+            errorShake.snapTo(0f)
+
+            listOf(-14f, 11f, -7f, 4f, 0f).forEach { target ->
+                errorShake.animateTo(target, tween(durationMillis = 45, easing = LinearEasing))
+            }
+        }
+    }
 
     val searchCache = remember { mutableMapOf<String, List<School>>() }
 
@@ -331,32 +367,73 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
             modifier = Modifier.fillMaxWidth(),
         )
 
-        error?.let { message ->
-            Spacer(Modifier.height(8.dp))
+        var lastError by remember { mutableStateOf<String?>(null) }
+
+        error?.let { lastError = uiTextString(it) }
+
+        AnimatedVisibility(
+            visible = error != null,
+            enter = fadeIn(animationSpec = effectsSpec) +
+                expandVertically(animationSpec = if (animations) AppMotion.spatial() else snap()),
+            exit = fadeOut(animationSpec = effectsSpec) +
+                shrinkVertically(animationSpec = if (animations) AppMotion.spatial() else snap()),
+        ) {
             Text(
-                text = uiTextString(message),
+                text = lastError.orEmpty(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.offset { IntOffset(errorShake.value.roundToInt(), 0) },
             )
         }
 
         Spacer(Modifier.height(16.dp))
 
-        if (signedIn) {
-            Text(
-                text = stringResource(R.string.login_signed_in),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        } else {
-            Button(
-                onClick = Haptics.haptic(::signIn),
-                enabled = !signingIn && sel != null && user.isNotBlank() && password.isNotBlank(),
-            ) {
+        AnimatedContent(
+            targetState = signedIn,
+            transitionSpec = {
+                (fadeIn(animationSpec = effectsSpec) +
+                    scaleIn(initialScale = 0.92f, animationSpec = scaleSpec)) togetherWith
+                    fadeOut(animationSpec = effectsSpec)
+            },
+            label = "loginDone",
+        ) { done ->
+            if (done) {
                 Text(
-                    if (signingIn) stringResource(R.string.login_signing_in)
-                    else stringResource(R.string.login_sign_in),
+                    text = stringResource(R.string.login_signed_in),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
                 )
+            } else {
+                Button(
+                    onClick = Haptics.haptic(::signIn),
+                    enabled = !signingIn && sel != null && user.isNotBlank() && password.isNotBlank(),
+                ) {
+                    AnimatedContent(
+                        targetState = signingIn,
+                        transitionSpec = {
+                            fadeIn(animationSpec = effectsSpec) togetherWith
+                                fadeOut(animationSpec = effectsSpec)
+                        },
+                        label = "loginButton",
+                    ) { signing ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (signing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+
+                                Spacer(Modifier.width(8.dp))
+                            }
+
+                            Text(
+                                if (signing) stringResource(R.string.login_signing_in)
+                                else stringResource(R.string.login_sign_in),
+                            )
+                        }
+                    }
+                }
             }
         }
     }

@@ -1,5 +1,11 @@
 package sh.lsx.untisx.ui.timetable
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,6 +55,9 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.atan2
 import kotlin.math.sqrt
 import sh.lsx.untisx.R
+import sh.lsx.untisx.ui.util.AppMotion
+import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
+import sh.lsx.untisx.ui.util.sharedElementBounds
 
 private val StrikeColor = Color(0xFFE53935)
 private val RibbonWidth = 6.dp
@@ -84,10 +93,26 @@ internal fun LessonCard(
         return Color(gray, gray, gray, alpha)
     }
 
-    val container = if (cancelled) color.desaturated() else color
+    val animations = LocalAnimationsEnabled.current
 
-    val titleColor = if (cancelled) textColor.copy(alpha = 0.7f) else textColor
-    val bodyColor = if (cancelled) textColor.copy(alpha = 0.55f) else textColor.copy(alpha = 0.8f)
+    val container by animateColorAsState(
+        targetValue = if (cancelled) color.desaturated() else color,
+        animationSpec = if (animations) AppMotion.effects() else snap(),
+        label = "lessonContainer",
+    )
+
+    val titleColor by animateColorAsState(
+        targetValue = if (cancelled) textColor.copy(alpha = 0.7f) else textColor,
+        animationSpec = if (animations) AppMotion.effects() else snap(),
+        label = "lessonTitleColor",
+    )
+
+    val bodyColor by animateColorAsState(
+        targetValue = if (cancelled) textColor.copy(alpha = 0.55f) else textColor.copy(alpha = 0.8f),
+        animationSpec = if (animations) AppMotion.effects() else snap(),
+        label = "lessonBodyColor",
+    )
+
     val examColor = MaterialTheme.colorScheme.error
 
     var cell by remember { mutableStateOf(IntSize.Zero) }
@@ -98,7 +123,11 @@ internal fun LessonCard(
         Math.toDegrees(atan2(cell.height.toFloat(), cell.width.toFloat()).toDouble()).toFloat()
     } else 0f
 
-    Box(modifier = modifier.onSizeChanged { cell = it }) {
+    Box(
+        modifier = modifier
+            .sharedElementBounds("lesson-${entry.id}-${entry.date}-${entry.startTime}")
+            .onSizeChanged { cell = it },
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -209,14 +238,23 @@ internal fun LessonCard(
             }
         }
 
-        if (cancelled && strike && measured) {
+        AnimatedVisibility(
+            visible = cancelled && strike && measured,
+            enter = fadeIn(animationSpec = if (animations) AppMotion.effects() else snap()) +
+                scaleIn(
+                    initialScale = 0.6f,
+                    animationSpec = if (animations) AppMotion.spatial() else snap(),
+                ),
+            exit = fadeOut(animationSpec = if (animations) AppMotion.effects() else snap()),
+            modifier = Modifier.matchParentSize(),
+        ) {
             val overhangPx = with(density) { 1.dp.toPx() }
-            val diagonal = sqrt(cell.width.toFloat() * cell.width + cell.height.toFloat() * cell.height,)
+            val diagonal = sqrt(cell.width.toFloat() * cell.width + cell.height.toFloat() * cell.height)
 
             StrikeRibbon(
                 angle = angle,
                 length = with(density) { (diagonal + overhangPx * 2).toDp() },
-                modifier = Modifier.matchParentSize(),
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }

@@ -30,6 +30,7 @@ import sh.lsx.untisx.data.model.MessageAttachment
 import sh.lsx.untisx.data.model.parseMessageDateTime
 import sh.lsx.untisx.data.stripHtml
 import sh.lsx.untisx.ui.util.rememberDateFormat
+import sh.lsx.untisx.ui.util.sharedElementBounds
 import sh.lsx.untisx.ui.util.tapHaptic
 
 @Composable
@@ -101,6 +102,7 @@ private fun MessageHeader(message: DirectMessage) {
 
     Box(
         modifier = Modifier
+            .sharedElementBounds("message-${message.id}")
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(16.dp))
             .padding(horizontal = 16.dp, vertical = 20.dp),

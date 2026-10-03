@@ -1,6 +1,7 @@
 package sh.lsx.untisx.ui.theme
 
 import android.os.Build
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
@@ -14,6 +15,8 @@ import androidx.compose.ui.platform.LocalContext
 import com.google.android.material.color.utilities.Scheme
 import sh.lsx.untisx.data.ThemeMode
 import sh.lsx.untisx.data.ThemePreset
+import sh.lsx.untisx.ui.util.AppMotion
+import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 
 @Suppress("RestrictedApi") // material-color-utilities scheme is used intentionally for seeded themes
 @Composable
@@ -37,8 +40,57 @@ fun UntisXTheme(
     }
 
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = if (LocalAnimationsEnabled.current) colorScheme.animated() else colorScheme,
         content = content,
+    )
+}
+
+@Composable
+private fun ColorScheme.animated(): ColorScheme {
+    @Composable
+    fun animate(color: Color): Color =
+        animateColorAsState(
+            targetValue = color,
+            animationSpec = AppMotion.effects(),
+            label = "themeColor",
+        ).value
+
+    return copy(
+        primary = animate(primary),
+        onPrimary = animate(onPrimary),
+        primaryContainer = animate(primaryContainer),
+        onPrimaryContainer = animate(onPrimaryContainer),
+        secondary = animate(secondary),
+        onSecondary = animate(onSecondary),
+        secondaryContainer = animate(secondaryContainer),
+        onSecondaryContainer = animate(onSecondaryContainer),
+        tertiary = animate(tertiary),
+        onTertiary = animate(onTertiary),
+        tertiaryContainer = animate(tertiaryContainer),
+        onTertiaryContainer = animate(onTertiaryContainer),
+        error = animate(error),
+        onError = animate(onError),
+        errorContainer = animate(errorContainer),
+        onErrorContainer = animate(onErrorContainer),
+        background = animate(background),
+        onBackground = animate(onBackground),
+        surface = animate(surface),
+        onSurface = animate(onSurface),
+        surfaceVariant = animate(surfaceVariant),
+        onSurfaceVariant = animate(onSurfaceVariant),
+        outline = animate(outline),
+        outlineVariant = animate(outlineVariant),
+        scrim = animate(scrim),
+        inverseSurface = animate(inverseSurface),
+        inverseOnSurface = animate(inverseOnSurface),
+        inversePrimary = animate(inversePrimary),
+        surfaceBright = animate(surfaceBright),
+        surfaceDim = animate(surfaceDim),
+        surfaceContainer = animate(surfaceContainer),
+        surfaceContainerHigh = animate(surfaceContainerHigh),
+        surfaceContainerHighest = animate(surfaceContainerHighest),
+        surfaceContainerLow = animate(surfaceContainerLow),
+        surfaceContainerLowest = animate(surfaceContainerLowest),
     )
 }
 

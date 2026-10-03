@@ -5,9 +5,23 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,8 +39,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.List
-import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Email
@@ -62,12 +76,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -76,6 +94,7 @@ import sh.lsx.untisx.data.LanguagePrefs
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.prefs.AccountPrefs
+import sh.lsx.untisx.data.prefs.AnimationPrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.ThemePrefs
@@ -106,7 +125,13 @@ import sh.lsx.untisx.ui.timetable.InfoBanner
 import sh.lsx.untisx.ui.timetable.TimetableScreen
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.theme.UntisXTheme
+import sh.lsx.untisx.ui.util.AppMotion
+import sh.lsx.untisx.ui.util.LocalAnimatedContentScope
+import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 import sh.lsx.untisx.ui.util.LocalHapticsEnabled
+import sh.lsx.untisx.ui.util.LocalSharedTransitionScope
+import sh.lsx.untisx.ui.util.motionEffects
+import sh.lsx.untisx.ui.util.motionSpatial
 import sh.lsx.untisx.ui.util.tapHaptic
 import sh.lsx.untisx.ui.util.uiTextString
 import sh.lsx.untisx.update.UpdateViewModel
@@ -117,6 +142,8 @@ class MainActivity : AppCompatActivity() {
     private var focusNonce by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
@@ -181,6 +208,7 @@ private fun AppRoot(
     var onboardingDone by remember { mutableStateOf(readOnboardingDone(context)) }
     var auth by remember { mutableStateOf(AccountPrefs.getActive(context)) }
     var hapticsEnabled by remember { mutableStateOf(HapticsPrefs.isEnabled(context)) }
+    var animationsEnabled by remember { mutableStateOf(AnimationPrefs.isEnabled(context)) }
     var subjectColors by remember { mutableStateOf(SubjectColorsPrefs.getColors(context)) }
     var knownSubjects by remember { mutableStateOf(SubjectColorsPrefs.getKnown(context)) }
     var defaultSubjectColor by remember { mutableStateOf(SubjectColorsPrefs.getDefaultColor(context)) }
@@ -206,6 +234,10 @@ private fun AppRoot(
                 hapticsEnabled = HapticsPrefs.isEnabled(context)
             }
 
+            if (key == AnimationPrefs.KEY) {
+                animationsEnabled = AnimationPrefs.isEnabled(context)
+            }
+
             if (key in SubjectColorsPrefs.KEYS) {
                 subjectColors = SubjectColorsPrefs.getColors(context)
                 knownSubjects = SubjectColorsPrefs.getKnown(context)
@@ -221,7 +253,10 @@ private fun AppRoot(
 
     fun saveTheme(newTheme: AppTheme) = ThemePrefs.save(context, newTheme)
 
-    CompositionLocalProvider(LocalHapticsEnabled provides hapticsEnabled) {
+    CompositionLocalProvider(
+        LocalHapticsEnabled provides hapticsEnabled,
+        LocalAnimationsEnabled provides animationsEnabled,
+    ) {
         UntisXTheme(mode = theme.mode, preset = theme.preset) {
             val currentAuth = auth
 
@@ -268,6 +303,8 @@ private fun AppRoot(
                         onThemeChange = ::saveTheme,
                         hapticsEnabled = hapticsEnabled,
                         onHapticsChange = { HapticsPrefs.setEnabled(context, it) },
+                        animationsEnabled = animationsEnabled,
+                        onAnimationsChange = { AnimationPrefs.setEnabled(context, it) },
                         subjectColors = subjectColors,
                         knownSubjects = knownSubjects,
                         onSubjectColor = { name, argb -> SubjectColorsPrefs.setColor(context, name, argb) },
@@ -309,6 +346,68 @@ private enum class Screen {
     ABOUT,
 }
 
+private fun Screen.depth(): Int = when (this) {
+    Screen.TIMETABLE -> 0
+
+    Screen.PROFILE,
+    Screen.EVENTS,
+    Screen.MESSAGES,
+    Screen.TEACHERS,
+    Screen.ROOMS,
+    Screen.STATS,
+    Screen.SETTINGS,
+    Screen.ABOUT,
+    -> 1
+
+    Screen.LESSON_DETAILS,
+    Screen.EVENT_DETAILS,
+    Screen.MESSAGE_DETAILS,
+    -> 2
+}
+
+@Composable
+private fun AnimatedScreenHost(
+    screen: Screen,
+    content: @Composable (Screen) -> Unit,
+) {
+    val spatial = motionSpatial<IntOffset>()
+    val effects = motionEffects<Float>()
+
+    SharedTransitionLayout {
+        AnimatedContent(
+            targetState = screen,
+            transitionSpec = { screenTransition(initialState, targetState, spatial, effects) },
+            label = "screen",
+        ) { target ->
+            CompositionLocalProvider(
+                LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                LocalAnimatedContentScope provides this@AnimatedContent,
+            ) {
+                content(target)
+            }
+        }
+    }
+}
+
+private fun screenTransition(
+    initial: Screen,
+    target: Screen,
+    spatial: FiniteAnimationSpec<IntOffset>,
+    effects: FiniteAnimationSpec<Float>,
+): ContentTransform {
+    val forward = target.depth() >= initial.depth()
+
+    val enter = slideInHorizontally(animationSpec = spatial) { width ->
+        if (forward) width / 5 else -width / 8
+    } + fadeIn(animationSpec = effects)
+
+    val exit = slideOutHorizontally(animationSpec = spatial) { width ->
+        if (forward) -width / 8 else width / 5
+    } + fadeOut(animationSpec = effects)
+
+    return enter togetherWith exit
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainApp(
@@ -317,6 +416,8 @@ private fun MainApp(
     onThemeChange: (AppTheme) -> Unit,
     hapticsEnabled: Boolean,
     onHapticsChange: (Boolean) -> Unit,
+    animationsEnabled: Boolean,
+    onAnimationsChange: (Boolean) -> Unit,
     subjectColors: Map<String, Int>,
     knownSubjects: List<String>,
     onSubjectColor: (String, Int?) -> Unit,
@@ -331,6 +432,9 @@ private fun MainApp(
     onFocusConsumed: () -> Unit,
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerOpen = drawerState.targetValue == DrawerValue.Open
+    val effectsSpec = motionEffects<Float>()
+    val spatialSpec = motionSpatial<IntOffset>()
     val scope = rememberCoroutineScope()
     val timetableVm: TimetableViewModel = viewModel(
         key = "${auth.loginName}:${auth.session.personId}",
@@ -371,8 +475,24 @@ private fun MainApp(
         }
     }
 
-    BackHandler(enabled = drawerState.isOpen || currentScreen != Screen.TIMETABLE) {
+    val backProgress = remember { Animatable(0f) }
+
+    BackHandler(
+        enabled = drawerState.isOpen || (currentScreen != Screen.TIMETABLE && !animationsEnabled),
+    ) {
         goBack()
+    }
+
+    PredictiveBackHandler(
+        enabled = currentScreen != Screen.TIMETABLE && !drawerState.isOpen && animationsEnabled,
+    ) { progress ->
+        try {
+            progress.collect { event -> backProgress.snapTo(event.progress) }
+            goBack()
+            backProgress.snapTo(0f)
+        } catch (e: CancellationException) {
+            scope.launch { backProgress.animateTo(0f, AppMotion.spatial<Float>()) }
+        }
     }
 
     val allTeachers = remember {
@@ -439,6 +559,8 @@ private fun MainApp(
                     icon = Icons.Outlined.Email,
                     label = stringResource(R.string.messages),
                     badge = messagesVm.messageCount.takeIf { it > 0 }?.toString(),
+                    visible = drawerOpen,
+                    index = 0,
                     onClick = {
                         scope.launch { drawerState.close() }
                         messagesVm.refresh()
@@ -450,6 +572,8 @@ private fun MainApp(
                     icon = Icons.Outlined.DateRange,
                     label = stringResource(R.string.events),
                     badge = timetableVm.dayMessages.size.takeIf { it > 0 }?.toString(),
+                    visible = drawerOpen,
+                    index = 1,
                     onClick = {
                         scope.launch { drawerState.close() }
                         timetableVm.ensureEvents()
@@ -461,6 +585,8 @@ private fun MainApp(
                     icon = Icons.Outlined.Person,
                     label = stringResource(R.string.teachers),
                     badge = allTeachers.size.toString(),
+                    visible = drawerOpen,
+                    index = 2,
                     onClick = {
                         scope.launch { drawerState.close() }
                         currentScreen = Screen.TEACHERS
@@ -471,6 +597,8 @@ private fun MainApp(
                     icon = Icons.Outlined.Place,
                     label = stringResource(R.string.rooms),
                     badge = "...",
+                    visible = drawerOpen,
+                    index = 3,
                     onClick = {
                         scope.launch { drawerState.close() }
                         currentScreen = Screen.ROOMS
@@ -481,6 +609,8 @@ private fun MainApp(
                     icon = Icons.AutoMirrored.Outlined.List,
                     label = stringResource(R.string.stats),
                     badge = timetableVm.currentYearLessonCount().takeIf { it > 0 }?.toString(),
+                    visible = drawerOpen,
+                    index = 4,
                     onClick = {
                         scope.launch { drawerState.close() }
                         currentScreen = Screen.STATS
@@ -493,6 +623,8 @@ private fun MainApp(
                 SidebarItem(
                     icon = Icons.Outlined.Settings,
                     label = stringResource(R.string.settings),
+                    visible = drawerOpen,
+                    index = 5,
                     onClick = {
                         scope.launch { drawerState.close() }
                         settingsCategory = null
@@ -503,6 +635,8 @@ private fun MainApp(
                 SidebarItem(
                     icon = Icons.Outlined.Info,
                     label = stringResource(R.string.about),
+                    visible = drawerOpen,
+                    index = 6,
                     onClick = {
                         scope.launch { drawerState.close() }
                         currentScreen = Screen.ABOUT
@@ -532,6 +666,17 @@ private fun MainApp(
 
         Box(modifier = Modifier.fillMaxSize()) {
             Scaffold(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val progress = backProgress.value
+
+                        if (progress > 0f) {
+                            translationX = size.width * 0.12f * progress
+                            scaleX = 1f - 0.04f * progress
+                            scaleY = 1f - 0.04f * progress
+                        }
+                    },
                 topBar = {
                     Row(
                         modifier = Modifier
@@ -541,261 +686,317 @@ private fun MainApp(
                             .padding(horizontal = 6.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (isTimetable) {
-                            Icon(
-                                imageVector = Icons.Outlined.Menu,
-                                contentDescription = stringResource(R.string.menu),
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .tapHaptic {
-                                        scope.launch {
-                                            if (drawerState.isClosed) drawerState.open()
-                                            else drawerState.close()
+                        AnimatedContent(
+                            targetState = isTimetable,
+                            transitionSpec = {
+                                fadeIn(animationSpec = effectsSpec) togetherWith
+                                    fadeOut(animationSpec = effectsSpec)
+                            },
+                            label = "topBarLeading",
+                        ) { timetable ->
+                            if (timetable) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Menu,
+                                    contentDescription = stringResource(R.string.menu),
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .tapHaptic {
+                                            scope.launch {
+                                                if (drawerState.isClosed) drawerState.open()
+                                                else drawerState.close()
+                                            }
                                         }
-                                    }
-                                    .padding(8.dp),
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Outlined.ArrowBack,
-                                contentDescription = stringResource(R.string.back),
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .tapHaptic { goBack() }
-                                    .padding(8.dp),
+                                        .padding(8.dp),
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                    contentDescription = stringResource(R.string.back),
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .tapHaptic { goBack() }
+                                        .padding(8.dp),
+                                )
+                            }
+                        }
+
+                        AnimatedContent(
+                            targetState = title,
+                            modifier = Modifier.weight(1f),
+                            transitionSpec = {
+                                fadeIn(animationSpec = effectsSpec) togetherWith
+                                    fadeOut(animationSpec = effectsSpec)
+                            },
+                            label = "topBarTitle",
+                        ) { text ->
+                            Text(
+                                text = text,
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
                             )
                         }
 
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.Center,
-                        )
-
-                        if (isTimetable) {
-                            Icon(
-                                imageVector = Icons.Outlined.Person,
-                                contentDescription = stringResource(R.string.profile),
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .tapHaptic { currentScreen = Screen.PROFILE }
-                                    .padding(8.dp),
-                            )
-                        } else {
-                            Spacer(Modifier.size(40.dp))
+                        AnimatedContent(
+                            targetState = isTimetable,
+                            transitionSpec = {
+                                fadeIn(animationSpec = effectsSpec) togetherWith
+                                    fadeOut(animationSpec = effectsSpec)
+                            },
+                            label = "topBarTrailing",
+                        ) { timetable ->
+                            if (timetable) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Person,
+                                    contentDescription = stringResource(R.string.profile),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .tapHaptic { currentScreen = Screen.PROFILE }
+                                        .padding(8.dp),
+                                )
+                            } else {
+                                Spacer(Modifier.size(40.dp))
+                            }
                         }
                     }
                 },
             ) { padding ->
-                when (currentScreen) {
-                    Screen.PROFILE -> ProfileScreen(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                    )
+                AnimatedScreenHost(
+                    screen = currentScreen,
+                ) { screen ->
+                    when (screen) {
+                        Screen.PROFILE -> ProfileScreen(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding),
+                        )
 
-                    Screen.SETTINGS -> {
-                        val settingsModifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding)
+                        Screen.SETTINGS -> {
+                            val settingsModifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding)
 
-                        val category = settingsCategory
+                            AnimatedContent(
+                                targetState = settingsCategory,
+                                transitionSpec = {
+                                    val forward = targetState != null
 
-                        if (category == null) {
-                            SettingsOverviewScreen(
-                                onOpenCategory = { settingsCategory = it },
-                                modifier = settingsModifier,
-                            )
-                        } else {
-                            when (category) {
-                                SettingsCategory.GENERAL -> GeneralSettingsScreen(
-                                    hapticsEnabled = hapticsEnabled,
-                                    onHapticsChange = onHapticsChange,
-                                    modifier = settingsModifier,
-                                )
+                                    val enter = slideInHorizontally(animationSpec = spatialSpec) { width ->
+                                        if (forward) width / 4 else -width / 8
+                                    } + fadeIn(animationSpec = effectsSpec)
+                                    val exit = slideOutHorizontally(animationSpec = spatialSpec) { width ->
+                                        if (forward) -width / 8 else width / 4
+                                    } + fadeOut(animationSpec = effectsSpec)
 
-                                SettingsCategory.APPEARANCE -> AppearanceSettingsScreen(
-                                    theme = theme,
-                                    onThemeChange = onThemeChange,
-                                    modifier = settingsModifier,
-                                )
+                                    enter togetherWith exit
+                                },
+                                label = "settingsCategory",
+                            ) { category ->
+                                if (category == null) {
+                                    SettingsOverviewScreen(
+                                        onOpenCategory = { settingsCategory = it },
+                                        modifier = settingsModifier,
+                                    )
+                                } else {
+                                    when (category) {
+                                        SettingsCategory.GENERAL -> GeneralSettingsScreen(
+                                            hapticsEnabled = hapticsEnabled,
+                                            onHapticsChange = onHapticsChange,
+                                            modifier = settingsModifier,
+                                        )
 
-                                SettingsCategory.NOTIFICATIONS -> NotificationSettingsScreen(
-                                    modifier = settingsModifier,
-                                )
+                                        SettingsCategory.APPEARANCE -> AppearanceSettingsScreen(
+                                            theme = theme,
+                                            onThemeChange = onThemeChange,
+                                            animationsEnabled = animationsEnabled,
+                                            onAnimationsChange = onAnimationsChange,
+                                            modifier = settingsModifier,
+                                        )
 
-                                SettingsCategory.TIMETABLE -> TimetableSettingsScreen(
-                                    vm = timetableVm,
-                                    knownSubjects = knownSubjects,
-                                    subjectColors = subjectColors,
-                                    onSubjectColor = onSubjectColor,
-                                    defaultSubjectColor = defaultSubjectColor,
-                                    onDefaultSubjectColor = onDefaultSubjectColor,
-                                    lessonTextColor = lessonTextColor,
-                                    onLessonTextColor = onLessonTextColor,
-                                    cancelledStrike = cancelledStrike,
-                                    onCancelledStrike = onCancelledStrike,
-                                    modifier = settingsModifier,
-                                )
+                                        SettingsCategory.NOTIFICATIONS -> NotificationSettingsScreen(
+                                            modifier = settingsModifier,
+                                        )
+
+                                        SettingsCategory.TIMETABLE -> TimetableSettingsScreen(
+                                            vm = timetableVm,
+                                            knownSubjects = knownSubjects,
+                                            subjectColors = subjectColors,
+                                            onSubjectColor = onSubjectColor,
+                                            defaultSubjectColor = defaultSubjectColor,
+                                            onDefaultSubjectColor = onDefaultSubjectColor,
+                                            lessonTextColor = lessonTextColor,
+                                            onLessonTextColor = onLessonTextColor,
+                                            cancelledStrike = cancelledStrike,
+                                            onCancelledStrike = onCancelledStrike,
+                                            modifier = settingsModifier,
+                                        )
+                                    }
+                                }
                             }
                         }
-                    }
 
-                    Screen.TEACHERS -> TeachersListScreen(
-                        teachers = allTeachers,
-                        modifier = Modifier.padding(padding),
-                    )
-
-                    Screen.EVENTS -> EventsScreen(
-                        events = timetableVm.events,
-                        holidays = timetableVm.holidays,
-                        messages = timetableVm.dayMessages,
-                        roomsById = timetableVm.roomsById,
-                        loading = timetableVm.eventsLoading,
-                        onRefresh = timetableVm::refreshEvents,
-                        onEventClick = { openEvent(it, Screen.EVENTS) },
-                        exams = timetableVm.exams,
-                        subjectsById = timetableVm.subjectsById,
-                        teachersById = timetableVm.teachersById,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                    )
-
-                    Screen.EVENT_DETAILS -> selectedEvent?.let { event ->
-                        EventDetailsScreen(
-                            entry = event,
-                            teachersById = timetableVm.teachersById,
-                            roomsById = timetableVm.roomsById,
-                            notes = timetableVm.lessonNotes,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(padding),
+                        Screen.TEACHERS -> TeachersListScreen(
+                            teachers = allTeachers,
+                            modifier = Modifier.padding(padding),
                         )
-                    } ?: TimetableScreen(
-                        vm = timetableVm,
-                        subjectColors = subjectColors.mapValues { Color(it.value) },
-                        defaultColor = Color(defaultSubjectColor),
-                        textColor = Color(lessonTextColor),
-                        cancelledStrike = cancelledStrike,
-                        focusDate = focusDate,
-                        focusNonce = focusNonce,
-                        onFocusConsumed = onFocusConsumed,
-                        onLessonClick = { entry ->
-                            selectedLesson = entry
-                            timetableVm.loadLessonNotes(entry)
-                            currentScreen = Screen.LESSON_DETAILS
-                        },
-                        onEventClick = { openEvent(it, Screen.TIMETABLE) },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                    )
 
-                    Screen.MESSAGES -> MessagesScreen(
-                        vm = messagesVm,
-                        onMessageClick = { currentScreen = Screen.MESSAGE_DETAILS },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                    )
-
-                    Screen.MESSAGE_DETAILS -> MessageDetailsScreen(
-                        vm = messagesVm,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                    )
-
-                    Screen.ROOMS -> RoomsListScreen(
-                        modifier = Modifier.padding(padding),
-                    )
-
-                    Screen.STATS -> StatsScreen(
-                        yearStats = timetableVm.currentYearStats(),
-                        schoolYear = timetableVm.statsSchoolYear(),
-                        subjectsById = timetableVm.subjectsById,
-                        loading = timetableVm.statsLoading,
-                        progress = timetableVm.statsProgress,
-                        upToDate = timetableVm.statsUpToDate,
-                        onLoadHistory = timetableVm::loadHistoricalStats,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                    )
-
-                    Screen.ABOUT -> AboutScreen(
-                        auth = auth,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                    )
-
-                    Screen.LESSON_DETAILS -> selectedLesson?.let { lesson ->
-                        LessonDetailsScreen(
-                            entry = lesson,
+                        Screen.EVENTS -> EventsScreen(
+                            events = timetableVm.events,
+                            holidays = timetableVm.holidays,
+                            messages = timetableVm.dayMessages,
+                            roomsById = timetableVm.roomsById,
+                            loading = timetableVm.eventsLoading,
+                            onRefresh = timetableVm::refreshEvents,
+                            onEventClick = { openEvent(it, Screen.EVENTS) },
+                            exams = timetableVm.exams,
                             subjectsById = timetableVm.subjectsById,
                             teachersById = timetableVm.teachersById,
-                            roomsById = timetableVm.roomsById,
-                            color = subjectColors[
-                                lesson.subject.firstOrNull()
-                                    ?.let { timetableVm.subjectsById[it.id]?.name?.takeIf { name -> name.isNotBlank() } ?: it.name }
-                            ]?.let { Color(it) } ?: Color(defaultSubjectColor),
-                            textColor = Color(lessonTextColor),
-                            notes = timetableVm.lessonNotes,
-                            exam = timetableVm.examFor(lesson),
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(padding),
                         )
-                    } ?: TimetableScreen(
-                        vm = timetableVm,
-                        subjectColors = subjectColors.mapValues { Color(it.value) },
-                        defaultColor = Color(defaultSubjectColor),
-                        textColor = Color(lessonTextColor),
-                        cancelledStrike = cancelledStrike,
-                        focusDate = focusDate,
-                        focusNonce = focusNonce,
-                        onFocusConsumed = onFocusConsumed,
-                        onLessonClick = { entry ->
-                            selectedLesson = entry
-                            timetableVm.loadLessonNotes(entry)
-                            currentScreen = Screen.LESSON_DETAILS
-                        },
-                        onEventClick = { openEvent(it, Screen.TIMETABLE) },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                    )
 
-                    else -> TimetableScreen(
-                        vm = timetableVm,
-                        subjectColors = subjectColors.mapValues { Color(it.value) },
-                        defaultColor = Color(defaultSubjectColor),
-                        textColor = Color(lessonTextColor),
-                        cancelledStrike = cancelledStrike,
-                        focusDate = focusDate,
-                        focusNonce = focusNonce,
-                        onFocusConsumed = onFocusConsumed,
-                        onLessonClick = { entry ->
-                            selectedLesson = entry
-                            timetableVm.loadLessonNotes(entry)
-                            currentScreen = Screen.LESSON_DETAILS
-                        },
-                        onEventClick = { openEvent(it, Screen.TIMETABLE) },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                    )
+                        Screen.EVENT_DETAILS -> selectedEvent?.let { event ->
+                            EventDetailsScreen(
+                                entry = event,
+                                teachersById = timetableVm.teachersById,
+                                roomsById = timetableVm.roomsById,
+                                notes = timetableVm.lessonNotes,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(padding),
+                            )
+                        } ?: TimetableScreen(
+                            vm = timetableVm,
+                            subjectColors = subjectColors.mapValues { Color(it.value) },
+                            defaultColor = Color(defaultSubjectColor),
+                            textColor = Color(lessonTextColor),
+                            cancelledStrike = cancelledStrike,
+                            focusDate = focusDate,
+                            focusNonce = focusNonce,
+                            onFocusConsumed = onFocusConsumed,
+                            onLessonClick = { entry ->
+                                selectedLesson = entry
+                                timetableVm.loadLessonNotes(entry)
+                                currentScreen = Screen.LESSON_DETAILS
+                            },
+                            onEventClick = { openEvent(it, Screen.TIMETABLE) },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding),
+                        )
+
+                        Screen.MESSAGES -> MessagesScreen(
+                            vm = messagesVm,
+                            onMessageClick = { currentScreen = Screen.MESSAGE_DETAILS },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding),
+                        )
+
+                        Screen.MESSAGE_DETAILS -> MessageDetailsScreen(
+                            vm = messagesVm,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding),
+                        )
+
+                        Screen.ROOMS -> RoomsListScreen(
+                            modifier = Modifier.padding(padding),
+                        )
+
+                        Screen.STATS -> StatsScreen(
+                            yearStats = timetableVm.currentYearStats(),
+                            schoolYear = timetableVm.statsSchoolYear(),
+                            subjectsById = timetableVm.subjectsById,
+                            loading = timetableVm.statsLoading,
+                            progress = timetableVm.statsProgress,
+                            upToDate = timetableVm.statsUpToDate,
+                            onLoadHistory = timetableVm::loadHistoricalStats,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding),
+                        )
+
+                        Screen.ABOUT -> AboutScreen(
+                            auth = auth,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding),
+                        )
+
+                        Screen.LESSON_DETAILS -> selectedLesson?.let { lesson ->
+                            LessonDetailsScreen(
+                                entry = lesson,
+                                subjectsById = timetableVm.subjectsById,
+                                teachersById = timetableVm.teachersById,
+                                roomsById = timetableVm.roomsById,
+                                color = subjectColors[
+                                    lesson.subject.firstOrNull()
+                                        ?.let { timetableVm.subjectsById[it.id]?.name?.takeIf { name -> name.isNotBlank() } ?: it.name }
+                                ]?.let { Color(it) } ?: Color(defaultSubjectColor),
+                                textColor = Color(lessonTextColor),
+                                notes = timetableVm.lessonNotes,
+                                exam = timetableVm.examFor(lesson),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(padding),
+                            )
+                        } ?: TimetableScreen(
+                            vm = timetableVm,
+                            subjectColors = subjectColors.mapValues { Color(it.value) },
+                            defaultColor = Color(defaultSubjectColor),
+                            textColor = Color(lessonTextColor),
+                            cancelledStrike = cancelledStrike,
+                            focusDate = focusDate,
+                            focusNonce = focusNonce,
+                            onFocusConsumed = onFocusConsumed,
+                            onLessonClick = { entry ->
+                                selectedLesson = entry
+                                timetableVm.loadLessonNotes(entry)
+                                currentScreen = Screen.LESSON_DETAILS
+                            },
+                            onEventClick = { openEvent(it, Screen.TIMETABLE) },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding),
+                        )
+
+                        else -> TimetableScreen(
+                            vm = timetableVm,
+                            subjectColors = subjectColors.mapValues { Color(it.value) },
+                            defaultColor = Color(defaultSubjectColor),
+                            textColor = Color(lessonTextColor),
+                            cancelledStrike = cancelledStrike,
+                            focusDate = focusDate,
+                            focusNonce = focusNonce,
+                            onFocusConsumed = onFocusConsumed,
+                            onLessonClick = { entry ->
+                                selectedLesson = entry
+                                timetableVm.loadLessonNotes(entry)
+                                currentScreen = Screen.LESSON_DETAILS
+                            },
+                            onEventClick = { openEvent(it, Screen.TIMETABLE) },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding),
+                        )
+                    }
                 }
             }
+
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer { alpha = 0.22f * backProgress.value }
+                    .background(Color.Black),
+            )
 
             Column(
                 modifier = Modifier
@@ -806,34 +1007,40 @@ private fun MainApp(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                updateVm.transientError?.let { message ->
-                    ErrorBanner(text = uiTextString(message), onRetry = updateVm::check)
-                }
+                ErrorBanner(
+                    text = updateVm.transientError?.let { uiTextString(it) },
+                    onRetry = updateVm::check,
+                )
 
                 if (isTimetable) {
-                    timetableVm.error?.let { loadError ->
-                        ErrorBanner(text = uiTextString(loadError.text), onRetry = timetableVm::retry)
-                    }
+                    ErrorBanner(
+                        text = timetableVm.error?.let { uiTextString(it.text) },
+                        onRetry = timetableVm::retry,
+                    )
 
-                    timetableVm.info?.let { message ->
-                        InfoBanner(text = uiTextString(message), onRetry = timetableVm::retry)
-                    }
+                    InfoBanner(
+                        text = timetableVm.info?.let { uiTextString(it) },
+                        onRetry = timetableVm::retry,
+                    )
 
-                    timetableVm.timegridError?.let { message ->
-                        InfoBanner(text = uiTextString(message), onRetry = timetableVm::retryTimegrid)
-                    }
+                    InfoBanner(
+                        text = timetableVm.timegridError?.let { uiTextString(it) },
+                        onRetry = timetableVm::retryTimegrid,
+                    )
                 }
 
                 if (currentScreen == Screen.EVENTS) {
-                    timetableVm.eventsError?.let { message ->
-                        ErrorBanner(text = uiTextString(message), onRetry = timetableVm::refreshEvents)
-                    }
+                    ErrorBanner(
+                        text = timetableVm.eventsError?.let { uiTextString(it) },
+                        onRetry = timetableVm::refreshEvents,
+                    )
                 }
 
                 if (currentScreen == Screen.STATS) {
-                    timetableVm.statsError?.let { message ->
-                        ErrorBanner(text = uiTextString(message), onRetry = timetableVm::loadHistoricalStats)
-                    }
+                    ErrorBanner(
+                        text = timetableVm.statsError?.let { uiTextString(it) },
+                        onRetry = timetableVm::loadHistoricalStats,
+                    )
                 }
             }
         }
@@ -855,39 +1062,63 @@ private fun SidebarItem(
     icon: ImageVector,
     label: String,
     badge: String? = null,
+    visible: Boolean = true,
+    index: Int = 0,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .padding(horizontal = 12.dp, vertical = 2.dp)
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(32.dp))
-            .tapHaptic(onClick)
-            .padding(horizontal = 18.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val animations = LocalAnimationsEnabled.current
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(
+            animationSpec = if (animations) {
+                tween(durationMillis = 180, delayMillis = index * 35)
+            } else {
+                snap()
+            },
+        ) + slideInHorizontally(
+            animationSpec = if (animations) {
+                tween(durationMillis = 220, delayMillis = index * 35)
+            } else {
+                snap()
+            },
+        ) { width -> -width / 4 },
+        exit = fadeOut(
+            animationSpec = if (animations) tween(durationMillis = 90) else snap(),
+        ),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(24.dp),
-        )
-
-        Spacer(Modifier.width(20.dp))
-
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-
-        if (badge != null) {
-            Text(
-                text = badge,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 2.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(32.dp))
+                .tapHaptic(onClick)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp),
             )
+
+            Spacer(Modifier.width(20.dp))
+
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+
+            if (badge != null) {
+                Text(
+                    text = badge,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

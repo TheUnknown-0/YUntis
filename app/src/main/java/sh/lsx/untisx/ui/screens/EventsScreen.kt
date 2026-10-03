@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,7 +25,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -43,7 +46,10 @@ import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.ui.timetable.TIME_FORMAT
+import sh.lsx.untisx.ui.util.animatedItem
+import sh.lsx.untisx.ui.util.entranceEffect
 import sh.lsx.untisx.ui.util.rememberDateFormat
+import sh.lsx.untisx.ui.util.sharedElementBounds
 import sh.lsx.untisx.ui.util.tapHaptic
 import sh.lsx.untisx.ui.timetable.rememberToday
 import sh.lsx.untisx.ui.timetable.resolveNames
@@ -68,6 +74,11 @@ fun EventsScreen(
     teachersById: Map<Int, MasterDataItem> = emptyMap(),
 ) {
     val today = rememberToday()
+    var appeared by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        appeared = true
+    }
 
     val upcomingEvents = remember(events, today) {
         events
@@ -119,8 +130,11 @@ fun EventsScreen(
                             SectionHeader(stringResource(R.string.events_messages))
                         }
 
-                        itemsIndexed(messages, key = { index, message -> "message-${message.id}:$index" }) { _, message ->
-                            MessageCard(message = message)
+                        itemsIndexed(messages, key = { index, message -> "message-${message.id}:$index" }) { index, message ->
+                            MessageCard(
+                                message = message,
+                                modifier = animatedItem().entranceEffect(appeared, index),
+                            )
                         }
                     }
 
@@ -139,10 +153,15 @@ fun EventsScreen(
                                 DayLabel(date.tryLocalDate(), today)
                             }
 
-                            items(dayEvents) { event ->
+                            itemsIndexed(
+                                dayEvents,
+                                key = { index, event -> "event-${event.id}-${event.date}-${event.startTime}:$index" },
+                            ) { index, event ->
                                 EventCard(
                                     event = event,
                                     rooms = resolveNames(event.room, roomsById),
+                                    modifier = animatedItem()
+                                        .entranceEffect(appeared, messages.size + index),
                                     onClick = { onEventClick(event) },
                                 )
                             }
@@ -169,12 +188,14 @@ fun EventsScreen(
                             itemsIndexed(
                                 dayExams,
                                 key = { index, exam -> "exam-${exam.id}-${exam.date}-${exam.startTime}:$index" },
-                            ) { _, exam ->
+                            ) { index, exam ->
                                 ExamCard(
                                     exam = exam,
                                     subjectsById = subjectsById,
                                     teachersById = teachersById,
                                     roomsById = roomsById,
+                                    modifier = animatedItem()
+                                        .entranceEffect(appeared, messages.size + upcomingEvents.size + index),
                                 )
                             }
                         }
@@ -188,8 +209,16 @@ fun EventsScreen(
                             )
                         }
 
-                        items(upcomingHolidays) { holiday ->
-                            HolidayCard(holiday = holiday, today = today)
+                        itemsIndexed(
+                            upcomingHolidays,
+                            key = { index, holiday -> "holiday-${holiday.startDate}-${holiday.endDate}:$index" },
+                        ) { index, holiday ->
+                            HolidayCard(
+                                holiday = holiday,
+                                today = today,
+                                modifier = animatedItem()
+                                    .entranceEffect(appeared, messages.size + upcomingEvents.size + upcomingExams.size + index),
+                            )
                         }
                     }
                 }
@@ -290,6 +319,7 @@ private fun EventCard(
     event: TimetableEntry,
     rooms: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val timed = event.startTime != 0 && event.endTime != 0
 
@@ -300,7 +330,8 @@ private fun EventCard(
     }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
+            .sharedElementBounds("event-${event.id}-${event.date}-${event.startTime}")
             .fillMaxWidth()
             .tapHaptic(onClick),
         shape = RoundedCornerShape(14.dp),
@@ -349,6 +380,7 @@ private fun ExamCard(
     subjectsById: Map<Int, MasterDataItem>,
     teachersById: Map<Int, MasterDataItem>,
     roomsById: Map<Int, MasterDataItem>,
+    modifier: Modifier = Modifier,
 ) {
     val type = exam.examType.takeIf { it.isNotBlank() } ?: stringResource(R.string.lesson_exam)
     val subject = subjectsById[exam.subjectId]?.name?.takeIf { it.isNotBlank() }
@@ -357,7 +389,7 @@ private fun ExamCard(
     val timed = exam.startTime != 0 || exam.endTime != 0
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
@@ -429,12 +461,13 @@ private fun ExamCard(
 private fun HolidayCard(
     holiday: Holiday,
     today: LocalDate,
+    modifier: Modifier = Modifier,
 ) {
     val start = holiday.startDate.tryLocalDate()
     val end = holiday.endDate.tryLocalDate()
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {

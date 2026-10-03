@@ -24,7 +24,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -36,7 +40,10 @@ import sh.lsx.untisx.R
 import sh.lsx.untisx.data.model.DirectMessage
 import sh.lsx.untisx.data.model.parseMessageDateTime
 import sh.lsx.untisx.data.stripHtml
+import sh.lsx.untisx.ui.util.animatedItem
+import sh.lsx.untisx.ui.util.entranceEffect
 import sh.lsx.untisx.ui.util.rememberDateFormat
+import sh.lsx.untisx.ui.util.sharedElementBounds
 import sh.lsx.untisx.ui.util.tapHaptic
 import sh.lsx.untisx.ui.util.uiTextString
 
@@ -49,6 +56,12 @@ fun MessagesScreen(
 ) {
     val messages = vm.incoming
     val confirmations = vm.readConfirmations
+
+    var appeared by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        appeared = true
+    }
 
     PullToRefreshBox(
         isRefreshing = vm.loading && (messages.isNotEmpty() || confirmations.isNotEmpty()),
@@ -83,11 +96,15 @@ fun MessagesScreen(
                         SectionHeader(stringResource(R.string.messages_inbox))
                     }
 
-                    itemsIndexed(messages, key = { index, message -> "in-${message.id}:$index" }) { _, message ->
-                        MessageCard(message = message, onClick = {
-                            vm.open(message)
-                            onMessageClick()
-                        })
+                    itemsIndexed(messages, key = { index, message -> "in-${message.id}:$index" }) { index, message ->
+                        MessageCard(
+                            message = message,
+                            modifier = animatedItem().entranceEffect(appeared, index),
+                            onClick = {
+                                vm.open(message)
+                                onMessageClick()
+                            },
+                        )
                     }
                 }
 
@@ -99,11 +116,16 @@ fun MessagesScreen(
                         )
                     }
 
-                    itemsIndexed(confirmations, key = { index, message -> "rc-${message.id}:$index" }) { _, message ->
-                        MessageCard(message = message, onClick = {
-                            vm.open(message)
-                            onMessageClick()
-                        })
+                    itemsIndexed(confirmations, key = { index, message -> "rc-${message.id}:$index" }) { index, message ->
+                        MessageCard(
+                            message = message,
+                            modifier = animatedItem()
+                                .entranceEffect(appeared, messages.size + index),
+                            onClick = {
+                                vm.open(message)
+                                onMessageClick()
+                            },
+                        )
                     }
                 }
             }
@@ -128,13 +150,15 @@ private fun SectionHeader(
 private fun MessageCard(
     message: DirectMessage,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val dateFormat = rememberDateFormat("d. MMM, HH:mm")
     val time = remember(message.sentDateTime) { parseMessageDateTime(message.sentDateTime) }
     val preview = remember(message.preview) { stripHtml(message.preview) }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
+            .sharedElementBounds("message-${message.id}")
             .fillMaxWidth()
             .tapHaptic(onClick),
         shape = RoundedCornerShape(14.dp),

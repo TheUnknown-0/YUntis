@@ -30,6 +30,7 @@ import sh.lsx.untisx.ui.timetable.TIME_FORMAT
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.timetable.resolveNames
 import sh.lsx.untisx.ui.util.rememberDateFormat
+import sh.lsx.untisx.ui.util.sharedElementBounds
 
 @Composable
 fun EventDetailsScreen(
@@ -69,6 +70,7 @@ fun EventDetailsScreen(
     ) {
         Box(
             modifier = Modifier
+                .sharedElementBounds("event-${entry.id}-${entry.date}-${entry.startTime}")
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(16.dp))
                 .padding(horizontal = 16.dp, vertical = 20.dp),

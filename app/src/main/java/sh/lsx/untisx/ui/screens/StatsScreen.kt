@@ -1,5 +1,8 @@
 package sh.lsx.untisx.ui.screens
 
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +29,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,11 +49,13 @@ import sh.lsx.untisx.data.SchoolYearStats
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.SchoolYear
 import sh.lsx.untisx.data.model.toUntisLocalDate
+import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.roundToInt
 
 private data class EntryCount(val label: String, val count: Int)
 
@@ -131,10 +137,6 @@ fun StatsScreen(
     }
 
     val locale = LocalConfiguration.current.locales[0]
-    val cancelRate = remember(lessons, cancelled, locale) { formatPercent(lessons, cancelled, locale) }
-    val cancelChangeRate = remember(lessons, cancelled, changes, locale) {
-        formatPercent(lessons, cancelled + changes, locale)
-    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -223,13 +225,13 @@ fun StatsScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     StatTile(
                         label = stringResource(R.string.stats_total),
-                        value = lessons.toString(),
+                        target = lessons.toFloat(),
                         modifier = Modifier.weight(1f),
                     )
 
                     StatTile(
                         label = stringResource(R.string.stats_taught),
-                        value = taught.toString(),
+                        target = taught.toFloat(),
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -239,14 +241,14 @@ fun StatsScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     StatTile(
                         label = stringResource(R.string.stats_cancelled),
-                        value = cancelled.toString(),
+                        target = cancelled.toFloat(),
                         accent = MaterialTheme.colorScheme.error,
                         modifier = Modifier.weight(1f),
                     )
 
                     StatTile(
                         label = stringResource(R.string.stats_changes),
-                        value = changes.toString(),
+                        target = changes.toFloat(),
                         accent = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.weight(1f),
                     )
@@ -257,15 +259,17 @@ fun StatsScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     StatTile(
                         label = stringResource(R.string.stats_cancel_rate),
-                        value = cancelRate,
+                        target = percentValue(lessons, cancelled),
                         accent = MaterialTheme.colorScheme.error,
+                        valueFormat = { formatPercentValue(it, locale) },
                         modifier = Modifier.weight(1f),
                     )
 
                     StatTile(
                         label = stringResource(R.string.stats_cancel_change_rate),
-                        value = cancelChangeRate,
+                        target = percentValue(lessons, cancelled + changes),
                         accent = MaterialTheme.colorScheme.tertiary,
+                        valueFormat = { formatPercentValue(it, locale) },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -403,10 +407,24 @@ private fun LoadCard(
 @Composable
 private fun StatTile(
     label: String,
-    value: String,
+    target: Float,
     modifier: Modifier = Modifier,
     accent: Color = MaterialTheme.colorScheme.primary,
+    valueFormat: (Float) -> String = { it.roundToInt().toString() },
 ) {
+    var started by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        started = true
+    }
+
+    val animations = LocalAnimationsEnabled.current
+    val animated by animateFloatAsState(
+        targetValue = if (started) target else 0f,
+        animationSpec = tween(durationMillis = 550, easing = LinearOutSlowInEasing),
+        label = "statValue",
+    )
+
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
@@ -419,7 +437,7 @@ private fun StatTile(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = value,
+                text = valueFormat(if (animations) animated else target),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = accent,
@@ -460,12 +478,13 @@ private fun BreakdownCard(
                 modifier = Modifier.padding(bottom = 6.dp),
             )
 
-            entries.forEach { entry ->
+            entries.forEachIndexed { index, entry ->
                 CountRow(
                     label = entry.label,
                     count = entry.count,
                     total = total,
                     locale = locale,
+                    index = index,
                 )
             }
         }
@@ -478,7 +497,26 @@ private fun CountRow(
     count: Int,
     total: Int,
     locale: Locale,
+    index: Int = 0,
 ) {
+    var started by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        started = true
+    }
+
+    val animations = LocalAnimationsEnabled.current
+    val fraction = if (total > 0) (count.toFloat() / total).coerceIn(0f, 1f) else 0f
+    val animatedFraction by animateFloatAsState(
+        targetValue = if (started) fraction else 0f,
+        animationSpec = tween(
+            durationMillis = 500,
+            delayMillis = index.coerceAtMost(10) * 40,
+            easing = LinearOutSlowInEasing,
+        ),
+        label = "statBar",
+    )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -509,11 +547,9 @@ private fun CountRow(
                 .height(6.dp)
                 .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(3.dp)),
         ) {
-            val fraction = if (total > 0) (count.toFloat() / total).coerceIn(0f, 1f) else 0f
-
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(fraction)
+                    .fillMaxWidth(if (animations) animatedFraction else fraction)
                     .fillMaxHeight()
                     .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(3.dp)),
             )
@@ -553,6 +589,12 @@ private fun formatPercent(lessons: Int, part: Int, locale: Locale): String {
 
     return String.format(locale, "%.1f%%", value)
 }
+
+private fun percentValue(lessons: Int, part: Int): Float =
+    if (lessons > 0) part * 100f / lessons else 0f
+
+private fun formatPercentValue(value: Float, locale: Locale): String =
+    String.format(locale, "%.1f%%", value)
 
 private fun monthLabel(month: YearMonth, locale: Locale): String =
     month.format(DateTimeFormatter.ofPattern("MMM yyyy", locale))

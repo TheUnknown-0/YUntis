@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import sh.lsx.untisx.data.notifications.NotificationPrefs
 import sh.lsx.untisx.data.notifications.NotificationScheduler
+import sh.lsx.untisx.data.prefs.AnimationPrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
 import java.util.Locale
 
@@ -18,6 +19,7 @@ data class GeneralSettingsBackup(
 data class AppearanceSettingsBackup(
     val themeMode: String? = null,
     val themePreset: String? = null,
+    val animations: Boolean? = null,
 )
 
 @Serializable
@@ -124,6 +126,7 @@ object SettingsBackupManager {
             appearance = AppearanceSettingsBackup(
                 themeMode = theme.mode.name,
                 themePreset = theme.preset.name,
+                animations = AnimationPrefs.isEnabled(context),
             ),
             notifications = NotificationSettingsBackup(
                 enabled = NotificationPrefs.isEnabled(context),
@@ -169,6 +172,8 @@ object SettingsBackupManager {
                 ?: current.preset
 
             ThemePrefs.save(context, AppTheme(mode = mode, preset = preset))
+
+            appearance.animations?.let { AnimationPrefs.setEnabled(context, it) }
         }
 
         backup.notifications?.let { notifications ->

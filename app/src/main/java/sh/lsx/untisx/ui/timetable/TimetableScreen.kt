@@ -1,5 +1,14 @@
 package sh.lsx.untisx.ui.timetable
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -40,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,6 +74,9 @@ import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.model.toUntisWeekStart
 import sh.lsx.untisx.data.model.toVisibleWeekStart
 import sh.lsx.untisx.R
+import sh.lsx.untisx.ui.util.AppMotion
+import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
+import sh.lsx.untisx.ui.util.motionEffects
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.util.tapHaptic
 import java.time.Duration
@@ -71,6 +85,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 internal enum class DayPlaceholder {
@@ -113,6 +128,7 @@ fun TimetableScreen(
     val error = vm.error
     val info = vm.info
     val refreshing = vm.refreshing
+    val animations = LocalAnimationsEnabled.current
 
     val colorFor = remember(subjectColors, defaultColor) {
         { name: String -> subjectColors[name] ?: defaultColor }
@@ -125,7 +141,14 @@ fun TimetableScreen(
 
     LaunchedEffect(focusNonce) {
         if (focusDate > 0) {
-            pagerState.scrollToPage(focusPageFor(focusDate))
+            val target = focusPageFor(focusDate)
+
+            if (animations && abs(target - pagerState.currentPage) <= 2) {
+                pagerState.animateScrollToPage(target)
+            } else {
+                pagerState.scrollToPage(target)
+            }
+
             onFocusConsumed()
         }
     }
@@ -227,15 +250,19 @@ private fun WeekPage(
     onEventClick: (TimetableEntry) -> Unit,
     exams: List<ExamInfo>,
 ) {
-    when {
-        loading && entries == null -> Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            CircularProgressIndicator()
-        }
-
-        else -> {
+    Crossfade(
+        targetState = loading && entries == null,
+        animationSpec = motionEffects(),
+        label = "weekLoading",
+    ) { showSpinner ->
+        if (showSpinner) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
             val safeEntries = entries.orEmpty()
 
             val displays = remember(safeEntries, subjectsById, teachersById, roomsById, exams) {
@@ -542,6 +569,7 @@ private fun DayColumn(
 ) {
     val dayStartMinutes = minutesOf(dayStart)
     val gridEndMinutes = minutesOf(dayEnd)
+    val animations = LocalAnimationsEnabled.current
 
     var nowMinutes by remember { mutableStateOf(LocalTime.now().let { it.hour * 60 + it.minute }) }
 
@@ -553,6 +581,26 @@ private fun DayColumn(
             }
         }
     }
+
+    val pulse = if (isToday && animations) rememberInfiniteTransition(label = "nowPulse") else null
+    val pulseScale = pulse?.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "pulseScale",
+    )
+    val pulseAlpha = pulse?.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.45f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "pulseAlpha",
+    )
 
     Box(
         modifier = modifier
@@ -680,7 +728,11 @@ private fun DayColumn(
                 else -> minOf(nowMinutes, gridEndMinutes)
             }
 
-            val overlayHeight = MINUTE_HEIGHT * (dimEnd - dayStartMinutes)
+            val overlayHeight by animateDpAsState(
+                targetValue = (MINUTE_HEIGHT * (dimEnd - dayStartMinutes)).coerceAtLeast(0.dp),
+                animationSpec = if (animations) AppMotion.spatial() else snap(),
+                label = "dimOverlay",
+            )
 
             if (overlayHeight > 0.dp) {
                 Box(
@@ -694,13 +746,36 @@ private fun DayColumn(
             val showLine = isToday && nowMinutes >= dayStartMinutes && nowMinutes < gridEndMinutes
 
             if (showLine) {
-                Box(
+                val lineOffset by animateDpAsState(
+                    targetValue = MINUTE_HEIGHT * (dimEnd - dayStartMinutes),
+                    animationSpec = if (animations) AppMotion.spatial() else snap(),
+                    label = "nowLine",
+                )
+
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset(y = MINUTE_HEIGHT * (dimEnd - dayStartMinutes))
-                        .height(2.dp)
-                        .background(MaterialTheme.colorScheme.primary),
-                )
+                        .offset(y = lineOffset),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(2.dp)
+                            .background(MaterialTheme.colorScheme.primary),
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .graphicsLayer {
+                                scaleX = pulseScale?.value ?: 1f
+                                scaleY = pulseScale?.value ?: 1f
+                                alpha = pulseAlpha?.value ?: 1f
+                            }
+                            .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    )
+                }
             }
         }
     }

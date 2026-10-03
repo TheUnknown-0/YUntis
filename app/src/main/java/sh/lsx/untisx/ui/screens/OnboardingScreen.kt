@@ -5,6 +5,17 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +42,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,10 +51,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -55,7 +69,12 @@ import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.ui.components.LanguageSettingsContent
 import sh.lsx.untisx.ui.components.ThemeAccentSettingsContent
 import sh.lsx.untisx.ui.components.ThemeModeSettingsContent
+import sh.lsx.untisx.ui.util.AppMotion
 import sh.lsx.untisx.ui.util.Haptics
+import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
+import sh.lsx.untisx.ui.util.motionEffects
+import sh.lsx.untisx.ui.util.motionSpatial
+import kotlin.math.abs
 
 private const val PAGE_COUNT = 4
 
@@ -73,6 +92,14 @@ fun OnboardingScreen(
 
     var notifGranted by remember { mutableStateOf(isNotifGranted(context)) }
     var language by remember { mutableStateOf(LanguagePrefs.get(context)) }
+    var introVisible by remember { mutableStateOf(false) }
+    val animations = LocalAnimationsEnabled.current
+    val ctaEffects = motionEffects<Float>()
+    val ctaSpatial = motionSpatial<IntOffset>()
+
+    LaunchedEffect(Unit) {
+        introVisible = true
+    }
 
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -95,28 +122,40 @@ fun OnboardingScreen(
                 state = pagerState,
                 modifier = Modifier.weight(1f),
             ) { page ->
-                when (page) {
-                    0 -> WelcomePage(
-                        language = language,
-                        onLanguageChange = { newLanguage ->
-                            language = newLanguage
-                            LanguagePrefs.save(context, newLanguage)
+                val pageOffset = pagerState.getOffsetDistanceInPages(page)
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            translationX = pageOffset * 48.dp.toPx()
+                            alpha = (1f - abs(pageOffset) * 0.4f).coerceIn(0f, 1f)
                         },
-                    )
+                ) {
+                    when (page) {
+                        0 -> WelcomePage(
+                            language = language,
+                            animateIn = introVisible,
+                            onLanguageChange = { newLanguage ->
+                                language = newLanguage
+                                LanguagePrefs.save(context, newLanguage)
+                            },
+                        )
 
-                    1 -> PermissionsPage(
-                        notifGranted = notifGranted,
-                        onRequestNotifications = {
-                            notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        },
-                    )
+                        1 -> PermissionsPage(
+                            notifGranted = notifGranted,
+                            onRequestNotifications = {
+                                notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            },
+                        )
 
-                    2 -> LoginScreen()
+                        2 -> LoginScreen()
 
-                    3 -> ThemePage(
-                        theme = theme,
-                        onChange = onThemeChange,
-                    )
+                        3 -> ThemePage(
+                            theme = theme,
+                            onChange = onThemeChange,
+                        )
+                    }
                 }
             }
 
@@ -135,7 +174,13 @@ fun OnboardingScreen(
             ) {
                 if (pagerState.currentPage > 0) {
                     TextButton(onClick = Haptics.haptic {
-                        scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+                        scope.launch {
+                            if (animations) {
+                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                            } else {
+                                pagerState.scrollToPage(pagerState.currentPage - 1)
+                            }
+                        }
                     }) {
                         Text(stringResource(R.string.back))
                     }
@@ -148,18 +193,38 @@ fun OnboardingScreen(
                     else -> true
                 }
 
-                if (pagerState.currentPage < PAGE_COUNT - 1) {
-                    Button(
-                        onClick = Haptics.haptic {
-                            scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                val lastPage = pagerState.currentPage == PAGE_COUNT - 1
+
+                Button(
+                    onClick = Haptics.haptic {
+                        if (lastPage) {
+                            onFinish()
+                        } else {
+                            scope.launch {
+                                if (animations) {
+                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                } else {
+                                    pagerState.scrollToPage(pagerState.currentPage + 1)
+                                }
+                            }
+                        }
+                    },
+                    enabled = stepComplete,
+                ) {
+                    AnimatedContent(
+                        targetState = lastPage,
+                        transitionSpec = {
+                            (fadeIn(animationSpec = ctaEffects) +
+                                slideInVertically(animationSpec = ctaSpatial) { height -> height / 2 }) togetherWith
+                                (fadeOut(animationSpec = ctaEffects) +
+                                    slideOutVertically(animationSpec = ctaSpatial) { height -> -height / 2 })
                         },
-                        enabled = stepComplete,
-                    ) {
-                        Text(stringResource(R.string.next))
-                    }
-                } else {
-                    Button(onClick = Haptics.haptic(onFinish), enabled = stepComplete) {
-                        Text(stringResource(R.string.onboarding_get_started))
+                        label = "onboardingCta",
+                    ) { last ->
+                        Text(
+                            if (last) stringResource(R.string.onboarding_get_started)
+                            else stringResource(R.string.next),
+                        )
                     }
                 }
             }
@@ -180,14 +245,31 @@ private fun PageIndicator(pageCount: Int, currentPage: Int, modifier: Modifier =
     ) {
         repeat(pageCount) { index ->
             val active = index == currentPage
+            val animations = LocalAnimationsEnabled.current
+            val targetWidth = if (active) 24.dp else 8.dp
+            val targetColor = if (active) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.outlineVariant
+            }
+
+            val width by animateDpAsState(
+                targetValue = targetWidth,
+                animationSpec = if (animations) AppMotion.spatial() else snap(),
+                label = "indicatorWidth",
+            )
+
+            val color by animateColorAsState(
+                targetValue = targetColor,
+                animationSpec = if (animations) AppMotion.effects() else snap(),
+                label = "indicatorColor",
+            )
+
             Box(
                 modifier = Modifier
-                    .size(width = if (active) 24.dp else 8.dp, height = 8.dp)
+                    .size(width = if (animations) width else targetWidth, height = 8.dp)
                     .clip(CircleShape)
-                    .background(
-                        if (active) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outlineVariant,
-                    ),
+                    .background(if (animations) color else targetColor),
             )
         }
     }
@@ -196,8 +278,17 @@ private fun PageIndicator(pageCount: Int, currentPage: Int, modifier: Modifier =
 @Composable
 private fun WelcomePage(
     language: AppLanguage,
+    animateIn: Boolean,
     onLanguageChange: (AppLanguage) -> Unit,
 ) {
+    val logoProgress by animateFloatAsState(
+        targetValue = if (animateIn) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 200f),
+        label = "logoIntro",
+    )
+    val animations = LocalAnimationsEnabled.current
+    val progress = if (animations) logoProgress else 1f
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -209,7 +300,13 @@ private fun WelcomePage(
         Image(
             painter = painterResource(R.drawable.app_logo),
             contentDescription = stringResource(R.string.untisx_logo),
-            modifier = Modifier.size(196.dp),
+            modifier = Modifier
+                .size(196.dp)
+                .graphicsLayer {
+                    scaleX = 0.85f + 0.15f * progress
+                    scaleY = 0.85f + 0.15f * progress
+                    alpha = progress
+                },
         )
 
         Spacer(Modifier.height(24.dp))
