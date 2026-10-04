@@ -41,6 +41,10 @@ object NotificationPrefs {
     private const val KEY_EXAM_REMINDER_MINUTE = "notif_exam_reminder_minute"
     private const val KEY_EXAM_REMINDER_SENT = "notif_exam_reminder_sent"
 
+    private const val KEY_NEWS_MESSAGES = "notif_news_messages"
+    private const val KEY_NEWS_EVENTS = "notif_news_events"
+    private const val KEY_NEWS_ANNOUNCEMENTS = "notif_news_announcements"
+
     private const val KEY_LAST_SYNC = "notif_last_sync"
 
     private fun prefs(context: Context) =
@@ -167,6 +171,27 @@ object NotificationPrefs {
 
         setExamReminderSentKeys(context, remaining)
     }
+
+    fun notifyNewMessages(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_NEWS_MESSAGES, true)
+
+    fun setNotifyNewMessages(context: Context, value: Boolean) =
+        prefs(context).edit { putBoolean(KEY_NEWS_MESSAGES, value) }
+
+    fun notifyNewEvents(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_NEWS_EVENTS, true)
+
+    fun setNotifyNewEvents(context: Context, value: Boolean) =
+        prefs(context).edit { putBoolean(KEY_NEWS_EVENTS, value) }
+
+    fun notifyNewAnnouncements(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_NEWS_ANNOUNCEMENTS, true)
+
+    fun setNotifyNewAnnouncements(context: Context, value: Boolean) =
+        prefs(context).edit { putBoolean(KEY_NEWS_ANNOUNCEMENTS, value) }
+
+    fun areAnyNewsEnabled(context: Context): Boolean =
+        notifyNewMessages(context) || notifyNewEvents(context) || notifyNewAnnouncements(context)
 
     fun lastSyncAt(context: Context): Long =
         prefs(context).getLong(KEY_LAST_SYNC, 0L)

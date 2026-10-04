@@ -32,6 +32,7 @@ object NotificationScheduler {
 
     fun onAccountRemoved(context: Context, accountId: String) {
         ChangeBaseline.clear(context, accountId)
+        NewsBaseline.clear(context, accountId)
         NotificationPrefs.clearExamReminderSentKeys(context, accountId)
 
         if (AccountPrefs.getActive(context) == null) {
@@ -52,7 +53,7 @@ object NotificationScheduler {
         val workManager = WorkManager.getInstance(context)
 
         val enabled = NotificationPrefs.isEnabled(context) &&
-            NotificationPrefs.areChangesEnabled(context) &&
+            (NotificationPrefs.areChangesEnabled(context) || NotificationPrefs.areAnyNewsEnabled(context)) &&
             Notifications.canPost(context)
 
         if (!enabled) {

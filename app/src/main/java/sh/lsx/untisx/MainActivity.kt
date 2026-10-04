@@ -139,6 +139,7 @@ import sh.lsx.untisx.update.UpdateViewModel
 class MainActivity : AppCompatActivity() {
 
     private var focusDate by mutableIntStateOf(0)
+    private var focusScreen by mutableStateOf<String?>(null)
     private var focusNonce by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -151,7 +152,12 @@ class MainActivity : AppCompatActivity() {
         handleIntent(intent)
 
         setContent {
-            AppRoot(focusDate = focusDate, focusNonce = focusNonce, onFocusConsumed = ::consumeFocus)
+            AppRoot(
+                focusDate = focusDate,
+                focusScreen = focusScreen,
+                focusNonce = focusNonce,
+                onFocusConsumed = ::consumeFocus,
+            )
         }
     }
 
@@ -164,15 +170,22 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleIntent(intent: Intent?) {
         val date = intent?.getIntExtra(Notifications.EXTRA_FOCUS_DATE, 0) ?: 0
+        val screen = intent?.getStringExtra(Notifications.EXTRA_FOCUS_SCREEN)
 
         if (date > 0) {
             focusDate = date
+            focusNonce++
+        }
+
+        if (!screen.isNullOrBlank()) {
+            focusScreen = screen
             focusNonce++
         }
     }
 
     private fun consumeFocus() {
         focusDate = 0
+        focusScreen = null
     }
 }
 
@@ -200,6 +213,7 @@ private val timetableEntrySaver: Saver<TimetableEntry?, String> = Saver(
 @Composable
 private fun AppRoot(
     focusDate: Int,
+    focusScreen: String?,
     focusNonce: Int,
     onFocusConsumed: () -> Unit,
 ) {
@@ -315,6 +329,7 @@ private fun AppRoot(
                         cancelledStrike = cancelledStrike,
                         onCancelledStrike = { SubjectColorsPrefs.setCancelledStrike(context, it) },
                         focusDate = focusDate,
+                        focusScreen = focusScreen,
                         focusNonce = focusNonce,
                         onFocusConsumed = onFocusConsumed,
                     )
@@ -428,6 +443,7 @@ private fun MainApp(
     cancelledStrike: Boolean,
     onCancelledStrike: (Boolean) -> Unit,
     focusDate: Int,
+    focusScreen: String?,
     focusNonce: Int,
     onFocusConsumed: () -> Unit,
 ) {
@@ -457,6 +473,22 @@ private fun MainApp(
     }
     var previousScreen by rememberSaveable { mutableStateOf(Screen.TIMETABLE) }
     var settingsCategory by rememberSaveable { mutableStateOf<SettingsCategory?>(null) }
+
+    LaunchedEffect(focusNonce) {
+        when (focusScreen) {
+            Notifications.FOCUS_MESSAGES -> {
+                messagesVm.refresh()
+                currentScreen = Screen.MESSAGES
+                onFocusConsumed()
+            }
+
+            Notifications.FOCUS_EVENTS -> {
+                timetableVm.ensureEvents()
+                currentScreen = Screen.EVENTS
+                onFocusConsumed()
+            }
+        }
+    }
 
     fun openEvent(entry: TimetableEntry, from: Screen) {
         selectedEvent = entry

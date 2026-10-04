@@ -59,6 +59,10 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
     var examDaysBefore by remember { mutableIntStateOf(NotificationPrefs.examReminderDaysBefore(context)) }
     var examMinute by remember { mutableIntStateOf(NotificationPrefs.examReminderMinute(context)) }
 
+    var newsMessages by remember { mutableStateOf(NotificationPrefs.notifyNewMessages(context)) }
+    var newsEvents by remember { mutableStateOf(NotificationPrefs.notifyNewEvents(context)) }
+    var newsAnnouncements by remember { mutableStateOf(NotificationPrefs.notifyNewAnnouncements(context)) }
+
     var notificationsAllowed by remember { mutableStateOf(Notifications.canPost(context)) }
     var exactAlarmsAllowed by remember {
         mutableStateOf(NotificationScheduler.canScheduleExactAlarms(context))
@@ -302,6 +306,43 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
                 onPick = {
                     examMinute = it
                     NotificationPrefs.setExamReminderMinute(context, it)
+                    reschedule()
+                },
+            )
+        }
+
+        SettingsSectionCard(
+            title = stringResource(R.string.settings_notifications_news),
+        ) {
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_notifications_news_messages),
+                description = stringResource(R.string.settings_notifications_news_messages_desc),
+                checked = newsMessages,
+                onCheckedChange = {
+                    newsMessages = it
+                    NotificationPrefs.setNotifyNewMessages(context, it)
+                    reschedule()
+                },
+            )
+
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_notifications_news_events),
+                description = stringResource(R.string.settings_notifications_news_events_desc),
+                checked = newsEvents,
+                onCheckedChange = {
+                    newsEvents = it
+                    NotificationPrefs.setNotifyNewEvents(context, it)
+                    reschedule()
+                },
+            )
+
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_notifications_news_announcements),
+                description = stringResource(R.string.settings_notifications_news_announcements_desc),
+                checked = newsAnnouncements,
+                onCheckedChange = {
+                    newsAnnouncements = it
+                    NotificationPrefs.setNotifyNewAnnouncements(context, it)
                     reschedule()
                 },
             )

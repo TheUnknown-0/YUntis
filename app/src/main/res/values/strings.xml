@@ -278,6 +278,18 @@
     <string name="notif_channel_exams_desc">Reminds you of upcoming exams.</string>
     <string name="notif_channel_exams_silent">Exam reminders (silent)</string>
     <string name="notif_channel_exams_silent_desc">Same as exam reminders, but without sound.</string>
+    <string name="notif_channel_new_messages">New messages</string>
+    <string name="notif_channel_new_messages_desc">Notifies you about new inbox messages.</string>
+    <string name="notif_channel_new_messages_silent">New messages (silent)</string>
+    <string name="notif_channel_new_messages_silent_desc">Same as new messages, but without sound.</string>
+    <string name="notif_channel_new_events">New events</string>
+    <string name="notif_channel_new_events_desc">Notifies you about new events.</string>
+    <string name="notif_channel_new_events_silent">New events (silent)</string>
+    <string name="notif_channel_new_events_silent_desc">Same as new events, but without sound.</string>
+    <string name="notif_channel_new_announcements">New announcements</string>
+    <string name="notif_channel_new_announcements_desc">Notifies you about new daily announcements.</string>
+    <string name="notif_channel_new_announcements_silent">New announcements (silent)</string>
+    <string name="notif_channel_new_announcements_silent_desc">Same as new announcements, but without sound.</string>
     <string name="notif_change_cancelled_title">Lesson cancelled</string>
     <string name="notif_change_room_title">Room change</string>
     <string name="notif_change_teacher_title">Teacher change</string>
@@ -326,4 +338,11 @@
         <item quantity="other">%1$d days before</item>
     </plurals>
     <string name="settings_notifications_exams_time">Time</string>
+    <string name="settings_notifications_news">News</string>
+    <string name="settings_notifications_news_messages">New messages</string>
+    <string name="settings_notifications_news_messages_desc">Notifies you about new inbox messages.</string>
+    <string name="settings_notifications_news_events">New events</string>
+    <string name="settings_notifications_news_events_desc">Notifies you about new events.</string>
+    <string name="settings_notifications_news_announcements">New announcements</string>
+    <string name="settings_notifications_news_announcements_desc">Notifies you about new daily announcements.</string>
 </resources>

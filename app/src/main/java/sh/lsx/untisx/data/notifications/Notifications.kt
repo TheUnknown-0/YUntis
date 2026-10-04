@@ -10,6 +10,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import sh.lsx.untisx.MainActivity
 import sh.lsx.untisx.R
+import sh.lsx.untisx.data.model.DayMessage
+import sh.lsx.untisx.data.model.DirectMessage
 import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDate
@@ -24,9 +26,18 @@ data class ExamReminder(
     val teachers: String,
 )
 
+data class NewsEvent(
+    val event: TimetableEntry,
+    val room: String,
+)
+
 object Notifications {
 
     const val EXTRA_FOCUS_DATE = "sh.lsx.untisx.extra.FOCUS_DATE"
+    const val EXTRA_FOCUS_SCREEN = "sh.lsx.untisx.extra.FOCUS_SCREEN"
+
+    const val FOCUS_MESSAGES = "messages"
+    const val FOCUS_EVENTS = "events"
 
     private const val CHANNEL_CHANGES = "schedule_changes"
     private const val CHANNEL_CHANGES_SILENT = "schedule_changes_silent"
@@ -34,12 +45,25 @@ object Notifications {
     private const val CHANNEL_OVERVIEW_SILENT = "timetable_overview_silent"
     private const val CHANNEL_EXAMS = "exam_reminders"
     private const val CHANNEL_EXAMS_SILENT = "exam_reminders_silent"
+    private const val CHANNEL_NEWS_MESSAGES = "new_messages"
+    private const val CHANNEL_NEWS_MESSAGES_SILENT = "new_messages_silent"
+    private const val CHANNEL_NEWS_EVENTS = "new_events"
+    private const val CHANNEL_NEWS_EVENTS_SILENT = "new_events_silent"
+    private const val CHANNEL_NEWS_ANNOUNCEMENTS = "new_announcements"
+    private const val CHANNEL_NEWS_ANNOUNCEMENTS_SILENT = "new_announcements_silent"
 
     private const val OVERVIEW_ID = 2001
     private const val INDIVIDUAL_BASE = 10_000
     private const val CHANGE_ID_RANGE = 100_000
     private const val EXAM_BASE = 200_000
     private const val EXAM_ID_RANGE = 10_000
+    private const val NEWS_MESSAGES_BASE = 300_000
+    private const val NEWS_EVENTS_BASE = 310_000
+    private const val NEWS_ANNOUNCEMENTS_BASE = 320_000
+    private const val NEWS_ID_RANGE = 10_000
+
+    private const val REQUEST_MESSAGES = 4301
+    private const val REQUEST_EVENTS = 4302
 
     private val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
 
@@ -92,6 +116,54 @@ object Notifications {
                 context.getString(R.string.notif_channel_exams_silent),
                 NotificationManager.IMPORTANCE_LOW,
             ).apply { description = context.getString(R.string.notif_channel_exams_silent_desc) },
+        )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_NEWS_MESSAGES,
+                context.getString(R.string.notif_channel_new_messages),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply { description = context.getString(R.string.notif_channel_new_messages_desc) },
+        )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_NEWS_MESSAGES_SILENT,
+                context.getString(R.string.notif_channel_new_messages_silent),
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply { description = context.getString(R.string.notif_channel_new_messages_silent_desc) },
+        )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_NEWS_EVENTS,
+                context.getString(R.string.notif_channel_new_events),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply { description = context.getString(R.string.notif_channel_new_events_desc) },
+        )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_NEWS_EVENTS_SILENT,
+                context.getString(R.string.notif_channel_new_events_silent),
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply { description = context.getString(R.string.notif_channel_new_events_silent_desc) },
+        )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_NEWS_ANNOUNCEMENTS,
+                context.getString(R.string.notif_channel_new_announcements),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply { description = context.getString(R.string.notif_channel_new_announcements_desc) },
+        )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_NEWS_ANNOUNCEMENTS_SILENT,
+                context.getString(R.string.notif_channel_new_announcements_silent),
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply { description = context.getString(R.string.notif_channel_new_announcements_silent_desc) },
         )
     }
 
@@ -220,6 +292,122 @@ object Notifications {
         return EXAM_BASE + (hash and 0x7FFFFFFF) % EXAM_ID_RANGE
     }
 
+    @SuppressLint("MissingPermission")
+    fun notifyNewMessages(
+        context: Context,
+        messages: List<DirectMessage>,
+        silent: Boolean,
+    ) {
+        if (messages.isEmpty() || !canPost(context)) return
+
+        val channel = channel(CHANNEL_NEWS_MESSAGES, CHANNEL_NEWS_MESSAGES_SILENT, silent)
+        val manager = NotificationManagerCompat.from(context)
+
+        messages.forEach { message ->
+            val key = NewsSignatures.message(message)
+            val sender = message.sender?.displayName.orEmpty().trim()
+
+            val builder = NotificationCompat.Builder(context, channel)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(
+                    message.subject.takeIf { it.isNotBlank() }
+                        ?: context.getString(R.string.messages),
+                )
+                .setContentIntent(screenIntent(context, FOCUS_MESSAGES, REQUEST_MESSAGES))
+                .setAutoCancel(true)
+
+            if (sender.isNotBlank()) builder.setContentText(sender)
+
+            manager.notify(newsNotificationId(NEWS_MESSAGES_BASE, key), builder.build())
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun notifyNewEvents(
+        context: Context,
+        events: List<NewsEvent>,
+        silent: Boolean,
+    ) {
+        if (events.isEmpty() || !canPost(context)) return
+
+        val channel = channel(CHANNEL_NEWS_EVENTS, CHANNEL_NEWS_EVENTS_SILENT, silent)
+        val manager = NotificationManagerCompat.from(context)
+
+        events.forEach { newsEvent ->
+            val event = newsEvent.event
+            val key = NewsSignatures.event(event)
+
+            val date = runCatching {
+                DateTimeFormatter.ofPattern("EEE, d. MMM", context.appLocale())
+                    .format(event.date.toUntisLocalDate())
+            }.getOrDefault("")
+
+            val time = if (event.startTime != 0 || event.endTime != 0) {
+                "${event.startTime.toUntisLocalTime().format(timeFormat)}–${event.endTime.toUntisLocalTime().format(timeFormat)}"
+            } else {
+                null
+            }
+
+            val whenText = listOfNotNull(date.takeIf { it.isNotBlank() }, time).joinToString(", ")
+
+            val text = listOfNotNull(
+                whenText.takeIf { it.isNotBlank() },
+                newsEvent.room.takeIf { it.isNotBlank() },
+            ).joinToString(" · ")
+
+            val notification = NotificationCompat.Builder(context, channel)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(
+                    event.eventTitle?.takeIf { it.isNotBlank() }
+                        ?: context.getString(R.string.events),
+                )
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                .setContentIntent(screenIntent(context, FOCUS_EVENTS, REQUEST_EVENTS))
+                .setAutoCancel(true)
+                .build()
+
+            manager.notify(newsNotificationId(NEWS_EVENTS_BASE, key), notification)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun notifyNewAnnouncements(
+        context: Context,
+        announcements: List<DayMessage>,
+        silent: Boolean,
+    ) {
+        if (announcements.isEmpty() || !canPost(context)) return
+
+        val channel = channel(CHANNEL_NEWS_ANNOUNCEMENTS, CHANNEL_NEWS_ANNOUNCEMENTS_SILENT, silent)
+        val manager = NotificationManagerCompat.from(context)
+
+        announcements.forEach { announcement ->
+            val key = NewsSignatures.announcement(announcement)
+
+            val notification = NotificationCompat.Builder(context, channel)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(
+                    announcement.subject.takeIf { it.isNotBlank() }
+                        ?: context.getString(R.string.events_messages),
+                )
+                .setContentText(announcement.body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(announcement.body))
+                .setContentIntent(screenIntent(context, FOCUS_EVENTS, REQUEST_EVENTS))
+                .setAutoCancel(true)
+                .build()
+
+            manager.notify(newsNotificationId(NEWS_ANNOUNCEMENTS_BASE, key), notification)
+        }
+    }
+
+    private fun newsNotificationId(base: Int, key: String): Int {
+        var hash = 17
+        for (character in key) hash = hash * 31 + character.code
+
+        return base + (hash and 0x7FFFFFFF) % NEWS_ID_RANGE
+    }
+
     private fun changeNotificationId(change: ScheduleChange): Int {
         val key = "${change.entry.date}|${change.entry.startTime}|${change.type}"
 
@@ -300,6 +488,23 @@ object Notifications {
         return PendingIntent.getActivity(
             context,
             date ?: 0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun screenIntent(context: Context, screen: String, requestCode: Int): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+
+            putExtra(EXTRA_FOCUS_SCREEN, screen)
+        }
+
+        return PendingIntent.getActivity(
+            context,
+            requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

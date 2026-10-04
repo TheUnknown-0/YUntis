@@ -278,6 +278,18 @@
     <string name="notif_channel_exams_desc">Erinnert dich an anstehende Klausuren.</string>
     <string name="notif_channel_exams_silent">Klausur-Erinnerungen (lautlos)</string>
     <string name="notif_channel_exams_silent_desc">Wie Klausur-Erinnerungen, aber ohne Ton.</string>
+    <string name="notif_channel_new_messages">Neue Mitteilungen</string>
+    <string name="notif_channel_new_messages_desc">Benachrichtigt dich über neue Mitteilungen im Posteingang.</string>
+    <string name="notif_channel_new_messages_silent">Neue Mitteilungen (lautlos)</string>
+    <string name="notif_channel_new_messages_silent_desc">Wie neue Mitteilungen, aber ohne Ton.</string>
+    <string name="notif_channel_new_events">Neue Termine</string>
+    <string name="notif_channel_new_events_desc">Benachrichtigt dich über neue Termine.</string>
+    <string name="notif_channel_new_events_silent">Neue Termine (lautlos)</string>
+    <string name="notif_channel_new_events_silent_desc">Wie neue Termine, aber ohne Ton.</string>
+    <string name="notif_channel_new_announcements">Neue Nachrichten des Tages</string>
+    <string name="notif_channel_new_announcements_desc">Benachrichtigt dich über neue Nachrichten des Tages.</string>
+    <string name="notif_channel_new_announcements_silent">Neue Nachrichten des Tages (lautlos)</string>
+    <string name="notif_channel_new_announcements_silent_desc">Wie neue Nachrichten des Tages, aber ohne Ton.</string>
     <string name="notif_change_cancelled_title">Stunde entfällt</string>
     <string name="notif_change_room_title">Raumwechsel</string>
     <string name="notif_change_teacher_title">Lehrerwechsel</string>
@@ -326,4 +338,11 @@
         <item quantity="other">%1$d Tage vorher</item>
     </plurals>
     <string name="settings_notifications_exams_time">Uhrzeit</string>
+    <string name="settings_notifications_news">Neuigkeiten</string>
+    <string name="settings_notifications_news_messages">Neue Mitteilungen</string>
+    <string name="settings_notifications_news_messages_desc">Benachrichtigt dich über neue Mitteilungen im Posteingang.</string>
+    <string name="settings_notifications_news_events">Neue Termine</string>
+    <string name="settings_notifications_news_events_desc">Benachrichtigt dich über neue Termine.</string>
+    <string name="settings_notifications_news_announcements">Neue Nachrichten des Tages</string>
+    <string name="settings_notifications_news_announcements_desc">Benachrichtigt dich über neue Nachrichten des Tages.</string>
 </resources>
