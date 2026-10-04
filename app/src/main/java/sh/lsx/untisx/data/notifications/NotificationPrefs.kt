@@ -16,6 +16,11 @@ object NotificationPrefs {
     const val MIN_OVERVIEW_MINUTE = 0
     const val MAX_OVERVIEW_MINUTE = 23 * 60 + 59
 
+    const val MIN_EXAM_REMINDER_DAYS = 1
+    const val MAX_EXAM_REMINDER_DAYS = 7
+    const val DEFAULT_EXAM_REMINDER_DAYS = 2
+    const val DEFAULT_EXAM_REMINDER_MINUTE = 18 * 60
+
     private const val KEY_ENABLED = "notif_enabled"
     private const val KEY_CHANGES_ENABLED = "notif_changes_enabled"
     private const val KEY_CHANGE_CANCELLED = "notif_change_cancelled"
@@ -30,6 +35,11 @@ object NotificationPrefs {
     private const val KEY_OVERVIEW_SHOW_CHANGES = "notif_overview_show_changes"
     private const val KEY_OVERVIEW_DETAILED = "notif_overview_detailed"
     private const val KEY_OVERVIEW_SILENT = "notif_overview_silent"
+
+    private const val KEY_EXAM_REMINDERS = "notif_exam_reminders"
+    private const val KEY_EXAM_REMINDER_DAYS = "notif_exam_reminder_days"
+    private const val KEY_EXAM_REMINDER_MINUTE = "notif_exam_reminder_minute"
+    private const val KEY_EXAM_REMINDER_SENT = "notif_exam_reminder_sent"
 
     private const val KEY_LAST_SYNC = "notif_last_sync"
 
@@ -119,6 +129,44 @@ object NotificationPrefs {
 
     fun setOverviewSilent(context: Context, value: Boolean) =
         prefs(context).edit { putBoolean(KEY_OVERVIEW_SILENT, value) }
+
+    fun examRemindersEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_EXAM_REMINDERS, true)
+
+    fun setExamRemindersEnabled(context: Context, value: Boolean) =
+        prefs(context).edit { putBoolean(KEY_EXAM_REMINDERS, value) }
+
+    fun examReminderDaysBefore(context: Context): Int =
+        prefs(context).getInt(KEY_EXAM_REMINDER_DAYS, DEFAULT_EXAM_REMINDER_DAYS)
+            .coerceIn(MIN_EXAM_REMINDER_DAYS, MAX_EXAM_REMINDER_DAYS)
+
+    fun setExamReminderDaysBefore(context: Context, days: Int) =
+        prefs(context).edit {
+            putInt(KEY_EXAM_REMINDER_DAYS, days.coerceIn(MIN_EXAM_REMINDER_DAYS, MAX_EXAM_REMINDER_DAYS))
+        }
+
+    fun examReminderMinute(context: Context): Int =
+        prefs(context).getInt(KEY_EXAM_REMINDER_MINUTE, DEFAULT_EXAM_REMINDER_MINUTE)
+            .coerceIn(MIN_OVERVIEW_MINUTE, MAX_OVERVIEW_MINUTE)
+
+    fun setExamReminderMinute(context: Context, minute: Int) =
+        prefs(context).edit {
+            putInt(KEY_EXAM_REMINDER_MINUTE, minute.coerceIn(MIN_OVERVIEW_MINUTE, MAX_OVERVIEW_MINUTE))
+        }
+
+    fun examReminderSentKeys(context: Context): Set<String> =
+        prefs(context).getStringSet(KEY_EXAM_REMINDER_SENT, emptySet()).orEmpty()
+
+    fun setExamReminderSentKeys(context: Context, keys: Set<String>) =
+        prefs(context).edit { putStringSet(KEY_EXAM_REMINDER_SENT, keys) }
+
+    fun clearExamReminderSentKeys(context: Context, accountId: String) {
+        val remaining = examReminderSentKeys(context)
+            .filterNot { it.startsWith("$accountId|") }
+            .toSet()
+
+        setExamReminderSentKeys(context, remaining)
+    }
 
     fun lastSyncAt(context: Context): Long =
         prefs(context).getLong(KEY_LAST_SYNC, 0L)

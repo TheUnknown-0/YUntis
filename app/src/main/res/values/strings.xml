@@ -274,6 +274,10 @@
     <string name="notif_channel_overview_desc">Tells you about the upcoming school day.</string>
     <string name="notif_channel_overview_silent">Timetable overview (silent)</string>
     <string name="notif_channel_overview_silent_desc">Same as timetable overview, but without sound.</string>
+    <string name="notif_channel_exams">Exam reminders</string>
+    <string name="notif_channel_exams_desc">Reminds you of upcoming exams.</string>
+    <string name="notif_channel_exams_silent">Exam reminders (silent)</string>
+    <string name="notif_channel_exams_silent_desc">Same as exam reminders, but without sound.</string>
     <string name="notif_change_cancelled_title">Lesson cancelled</string>
     <string name="notif_change_room_title">Room change</string>
     <string name="notif_change_teacher_title">Teacher change</string>
@@ -295,7 +299,7 @@
     <string name="settings_notifications_master_desc">Allow UntisX to send notifications.</string>
     <string name="settings_notifications_permission_missing">Notifications are disabled in the system settings.</string>
     <string name="settings_notifications_grant">Allow notifications</string>
-    <string name="settings_notifications_exact_alarm_desc">Exact alarms are not allowed - the overview may be delayed.</string>
+    <string name="settings_notifications_exact_alarm_desc">Exact alarms are not allowed - the overview and exam reminders may be delayed.</string>
     <string name="settings_notifications_exact_alarm_grant">Allow exact alarms</string>
     <string name="settings_notifications_last_sync">Last sync: %1$s</string>
     <string name="settings_notifications_changes">Schedule changes</string>
@@ -314,4 +318,12 @@
     <string name="settings_notifications_overview_time_desc">Before 12:00 you get the lessons for today, from 12:00 the lessons for tomorrow.</string>
     <string name="settings_notifications_overview_detailed">Show rooms and teachers</string>
     <string name="settings_notifications_overview_show_changes">Show changes</string>
+    <string name="settings_notifications_exams">Exam reminders</string>
+    <string name="settings_notifications_exams_enable">Remind me of exams</string>
+    <string name="settings_notifications_exams_days">Days before</string>
+    <plurals name="settings_notifications_exams_days_value">
+        <item quantity="one">%1$d day before</item>
+        <item quantity="other">%1$d days before</item>
+    </plurals>
+    <string name="settings_notifications_exams_time">Time</string>
 </resources>

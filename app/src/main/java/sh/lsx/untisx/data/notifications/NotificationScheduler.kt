@@ -22,14 +22,17 @@ object NotificationScheduler {
 
     private const val SYNC_WORK_NAME = "untisx_timetable_sync"
     private const val OVERVIEW_REQUEST_CODE = 4201
+    private const val EXAM_REQUEST_CODE = 4202
 
     fun ensureAll(context: Context) {
         ensureSyncWork(context)
         ensureOverviewAlarm(context)
+        ensureExamReminderAlarm(context)
     }
 
     fun onAccountRemoved(context: Context, accountId: String) {
         ChangeBaseline.clear(context, accountId)
+        NotificationPrefs.clearExamReminderSentKeys(context, accountId)
 
         if (AccountPrefs.getActive(context) == null) {
             cancelAll(context)
@@ -41,6 +44,7 @@ object NotificationScheduler {
     fun cancelAll(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(SYNC_WORK_NAME)
         cancelOverviewAlarm(context)
+        cancelExamReminderAlarm(context)
         Notifications.cancelAll(context)
     }
 
@@ -113,6 +117,44 @@ object NotificationScheduler {
         pendingIntent.cancel()
     }
 
+    fun ensureExamReminderAlarm(context: Context) {
+        cancelExamReminderAlarm(context)
+
+        val enabled = NotificationPrefs.isEnabled(context) &&
+            NotificationPrefs.examRemindersEnabled(context) &&
+            Notifications.canPost(context)
+
+        if (!enabled) return
+
+        scheduleNextExamReminder(context)
+    }
+
+    fun scheduleNextExamReminder(context: Context) {
+        val enabled = NotificationPrefs.isEnabled(context) &&
+            NotificationPrefs.examRemindersEnabled(context) &&
+            Notifications.canPost(context)
+
+        if (!enabled) return
+
+        val trigger = nextExamTrigger(context) ?: return
+        val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
+        val pendingIntent = examReminderPendingIntent(context)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pendingIntent)
+        } else {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pendingIntent)
+        }
+    }
+
+    fun cancelExamReminderAlarm(context: Context) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
+        val pendingIntent = examReminderPendingIntent(context)
+
+        alarmManager.cancel(pendingIntent)
+        pendingIntent.cancel()
+    }
+
     fun canScheduleExactAlarms(context: Context): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
             context.getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true
@@ -155,6 +197,30 @@ object NotificationScheduler {
         return PendingIntent.getBroadcast(
             context,
             OVERVIEW_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun nextExamTrigger(context: Context): Long {
+        val now = ZonedDateTime.now()
+        val minute = NotificationPrefs.examReminderMinute(context)
+
+        val today = LocalDate.now()
+            .atStartOfDay(ZoneId.systemDefault())
+            .plusMinutes(minute.toLong())
+
+        val candidate = if (today.isAfter(now)) today else today.plusDays(1)
+
+        return candidate.toInstant().toEpochMilli()
+    }
+
+    private fun examReminderPendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, ExamReminderReceiver::class.java)
+
+        return PendingIntent.getBroadcast(
+            context,
+            EXAM_REQUEST_CODE,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

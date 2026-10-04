@@ -37,6 +37,9 @@ data class NotificationSettingsBackup(
     val overviewShowChanges: Boolean? = null,
     val overviewDetailed: Boolean? = null,
     val overviewSilent: Boolean? = null,
+    val examRemindersEnabled: Boolean? = null,
+    val examReminderDays: Int? = null,
+    val examReminderMinute: Int? = null,
 )
 
 @Serializable
@@ -142,6 +145,9 @@ object SettingsBackupManager {
                 overviewShowChanges = NotificationPrefs.overviewShowChanges(context),
                 overviewDetailed = NotificationPrefs.overviewDetailed(context),
                 overviewSilent = NotificationPrefs.overviewSilent(context),
+                examRemindersEnabled = NotificationPrefs.examRemindersEnabled(context),
+                examReminderDays = NotificationPrefs.examReminderDaysBefore(context),
+                examReminderMinute = NotificationPrefs.examReminderMinute(context),
             ),
             timetable = TimetableSettingsBackup(
                 subjectColors = SubjectColorsPrefs.getColors(context).mapValues { colorToHex(it.value) },
@@ -190,6 +196,9 @@ object SettingsBackupManager {
             notifications.overviewShowChanges?.let { NotificationPrefs.setOverviewShowChanges(context, it) }
             notifications.overviewDetailed?.let { NotificationPrefs.setOverviewDetailed(context, it) }
             notifications.overviewSilent?.let { NotificationPrefs.setOverviewSilent(context, it) }
+            notifications.examRemindersEnabled?.let { NotificationPrefs.setExamRemindersEnabled(context, it) }
+            notifications.examReminderDays?.let { NotificationPrefs.setExamReminderDaysBefore(context, it) }
+            notifications.examReminderMinute?.let { NotificationPrefs.setExamReminderMinute(context, it) }
 
             NotificationScheduler.ensureAll(context)
         }

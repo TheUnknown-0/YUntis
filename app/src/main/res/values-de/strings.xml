@@ -274,6 +274,10 @@
     <string name="notif_channel_overview_desc">Informiert dich über den nächsten Schultag.</string>
     <string name="notif_channel_overview_silent">Stundenplan-Übersicht (lautlos)</string>
     <string name="notif_channel_overview_silent_desc">Wie die Stundenplan-Übersicht, aber ohne Ton.</string>
+    <string name="notif_channel_exams">Klausur-Erinnerungen</string>
+    <string name="notif_channel_exams_desc">Erinnert dich an anstehende Klausuren.</string>
+    <string name="notif_channel_exams_silent">Klausur-Erinnerungen (lautlos)</string>
+    <string name="notif_channel_exams_silent_desc">Wie Klausur-Erinnerungen, aber ohne Ton.</string>
     <string name="notif_change_cancelled_title">Stunde entfällt</string>
     <string name="notif_change_room_title">Raumwechsel</string>
     <string name="notif_change_teacher_title">Lehrerwechsel</string>
@@ -295,7 +299,7 @@
     <string name="settings_notifications_master_desc">UntisX erlauben, Benachrichtigungen zu senden.</string>
     <string name="settings_notifications_permission_missing">Benachrichtigungen sind in den Systemeinstellungen deaktiviert.</string>
     <string name="settings_notifications_grant">Benachrichtigungen erlauben</string>
-    <string name="settings_notifications_exact_alarm_desc">Exakte Alarme sind nicht erlaubt - die Übersicht kann sich verzögern.</string>
+    <string name="settings_notifications_exact_alarm_desc">Exakte Alarme sind nicht erlaubt - die Übersicht und Klausur-Erinnerungen können sich verzögern.</string>
     <string name="settings_notifications_exact_alarm_grant">Exakte Alarme erlauben</string>
     <string name="settings_notifications_last_sync">Letzte Prüfung: %1$s</string>
     <string name="settings_notifications_changes">Stundenplanänderungen</string>
@@ -314,4 +318,12 @@
     <string name="settings_notifications_overview_time_desc">Vor 12:00 Uhr bekommst du die Stunden von heute, ab 12:00 Uhr die von morgen.</string>
     <string name="settings_notifications_overview_detailed">Räume und Lehrer anzeigen</string>
     <string name="settings_notifications_overview_show_changes">Änderungen anzeigen</string>
+    <string name="settings_notifications_exams">Klausur-Erinnerungen</string>
+    <string name="settings_notifications_exams_enable">An Klausuren erinnern</string>
+    <string name="settings_notifications_exams_days">Tage vorher</string>
+    <plurals name="settings_notifications_exams_days_value">
+        <item quantity="one">%1$d Tag vorher</item>
+        <item quantity="other">%1$d Tage vorher</item>
+    </plurals>
+    <string name="settings_notifications_exams_time">Uhrzeit</string>
 </resources>

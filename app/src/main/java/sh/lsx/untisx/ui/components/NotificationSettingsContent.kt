@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -53,6 +54,10 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
     var detailed by remember { mutableStateOf(NotificationPrefs.overviewDetailed(context)) }
     var showChanges by remember { mutableStateOf(NotificationPrefs.overviewShowChanges(context)) }
     var overviewSilent by remember { mutableStateOf(NotificationPrefs.overviewSilent(context)) }
+
+    var examRemindersEnabled by remember { mutableStateOf(NotificationPrefs.examRemindersEnabled(context)) }
+    var examDaysBefore by remember { mutableIntStateOf(NotificationPrefs.examReminderDaysBefore(context)) }
+    var examMinute by remember { mutableIntStateOf(NotificationPrefs.examReminderMinute(context)) }
 
     var notificationsAllowed by remember { mutableStateOf(Notifications.canPost(context)) }
     var exactAlarmsAllowed by remember {
@@ -241,6 +246,62 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
                 onCheckedChange = {
                     silentDuringLessons = it
                     NotificationPrefs.setSilentDuringLessons(context, it)
+                    reschedule()
+                },
+            )
+        }
+
+        SettingsSectionCard(
+            title = stringResource(R.string.settings_notifications_exams),
+        ) {
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_notifications_exams_enable),
+                checked = examRemindersEnabled,
+                onCheckedChange = {
+                    examRemindersEnabled = it
+                    NotificationPrefs.setExamRemindersEnabled(context, it)
+                    reschedule()
+                },
+            )
+
+            if (!examRemindersEnabled) return@SettingsSectionCard
+
+            Spacer(Modifier.height(6.dp))
+
+            Text(
+                text = stringResource(R.string.settings_notifications_exams_days),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+
+            Text(
+                text = pluralStringResource(
+                    R.plurals.settings_notifications_exams_days_value,
+                    examDaysBefore,
+                    examDaysBefore,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Slider(
+                value = examDaysBefore.toFloat(),
+                onValueChange = { examDaysBefore = it.roundToInt() },
+                onValueChangeFinished = {
+                    NotificationPrefs.setExamReminderDaysBefore(context, examDaysBefore)
+                    reschedule()
+                },
+                valueRange = NotificationPrefs.MIN_EXAM_REMINDER_DAYS.toFloat()..
+                    NotificationPrefs.MAX_EXAM_REMINDER_DAYS.toFloat(),
+                steps = NotificationPrefs.MAX_EXAM_REMINDER_DAYS -
+                    NotificationPrefs.MIN_EXAM_REMINDER_DAYS - 1,
+            )
+
+            SettingsTimeRow(
+                label = stringResource(R.string.settings_notifications_exams_time),
+                minute = examMinute,
+                onPick = {
+                    examMinute = it
+                    NotificationPrefs.setExamReminderMinute(context, it)
                     reschedule()
                 },
             )
