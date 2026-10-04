@@ -38,7 +38,7 @@ object TimetableSource {
 
             Fetched(entries, fresh)
         } catch (e: UntisException.Api) {
-            if (e.code != -7004 && e.code != -8507) throw e
+            if (e.code != UntisClient.RPC_NO_TIMETABLE && e.code != UntisClient.RPC_NO_RIGHTS) throw e
 
             val password = PasswordVault.retrieve(context, AccountPrefs.accountId(auth))
                 ?: throw UntisException.BadCredentials

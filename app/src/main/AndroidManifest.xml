@@ -49,7 +49,8 @@
         <receiver
             android:name=".data.notifications.BootReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="false">
+
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
@@ -67,6 +68,16 @@
             android:enabled="true"
             android:exported="false"
         />
+
+        <receiver
+            android:name=".data.notifications.ExactAlarmPermissionReceiver"
+            android:enabled="true"
+            android:exported="false">
+
+            <intent-filter>
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

@@ -40,7 +40,12 @@ object ScheduleChangeDetector {
         val changes = ArrayList<ScheduleChange>()
 
         for (entry in fresh.sortedWith(compareBy({ it.date }, { it.startTime }))) {
-            val old = remaining[slotKey(entry)]?.removeFirstOrNull()
+            val candidates = remaining[slotKey(entry)] ?: continue
+
+            val old = candidates.find { candidate ->
+                signatures(candidate.room) == signatures(entry.room) &&
+                    signatures(candidate.teacher) == signatures(entry.teacher)
+            }?.also { candidates.remove(it) } ?: candidates.removeFirstOrNull()
 
             if (old == null) continue
             if (old.code == "cancelled" && entry.code != "cancelled") continue
@@ -104,6 +109,12 @@ object ScheduleChangeDetector {
         }
         .joinToString(", ")
 
-    private fun signatures(elements: List<TimetableElement>): List<String> =
-        elements.map { "${it.id}:${it.name}" }
+    private fun signatures(elements: List<TimetableElement>): Set<String> =
+        elements.mapNotNull { element ->
+            when {
+                element.id > 0 -> "id:${element.id}"
+                element.name.isNotBlank() -> "name:${element.name}"
+                else -> null
+            }
+        }.toSet()
 }

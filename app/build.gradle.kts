@@ -67,6 +67,21 @@ android {
     buildFeatures {
         compose = true
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+
+            all { test ->
+                test.jvmArgs(
+                    "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
+                    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+                    "--add-opens=java.base/java.util=ALL-UNNAMED",
+                    "--add-opens=java.base/java.io=ALL-UNNAMED",
+                )
+            }
+        }
+    }
 }
 
 kotlin {
@@ -94,6 +109,11 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.work.runtime.ktx)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.androidx.work.testing)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

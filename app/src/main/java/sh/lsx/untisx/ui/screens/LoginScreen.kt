@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
@@ -53,6 +54,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -62,6 +65,7 @@ import kotlinx.coroutines.launch
 import sh.lsx.untisx.R
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.prefs.AccountPrefs
+import sh.lsx.untisx.data.prefs.AccountUnavailableException
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.School
@@ -197,6 +201,8 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
                 error = UiText.Res(R.string.error_network)
             } catch (e: UntisException.BadCredentials) {
                 error = UiText.Res(R.string.error_bad_credentials)
+            } catch (e: AccountUnavailableException) {
+                error = UiText.Res(R.string.error_account_unavailable)
             } catch (e: UntisException.Api) {
                 error = UiText.Res(
                     R.string.error_untis_generic,
@@ -257,6 +263,15 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text = stringResource(R.string.login_teacher_notice),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
 
         Spacer(Modifier.height(24.dp))
 
@@ -364,6 +379,11 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
             singleLine = true,
             enabled = !signedIn,
             visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                autoCorrectEnabled = false,
+                imeAction = ImeAction.Done,
+            ),
             modifier = Modifier.fillMaxWidth(),
         )
 

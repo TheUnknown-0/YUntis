@@ -10,9 +10,6 @@ import sh.lsx.untisx.data.model.TimegridDay
 import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.model.toUntisWeekStart
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-
-internal val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
 
 internal val GUTTER_WIDTH = 48.dp
 internal val MINUTE_HEIGHT = 1.15.dp

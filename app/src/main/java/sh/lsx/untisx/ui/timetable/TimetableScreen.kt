@@ -46,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,23 +64,24 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import sh.lsx.untisx.data.ExamsMatcher
 import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
-import sh.lsx.untisx.data.model.plusUntisWeeks
 import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.model.toUntisWeekStart
-import sh.lsx.untisx.data.model.toVisibleWeekStart
 import sh.lsx.untisx.R
 import sh.lsx.untisx.ui.util.AppMotion
 import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 import sh.lsx.untisx.ui.util.motionEffects
 import sh.lsx.untisx.ui.util.rememberDateFormat
+import sh.lsx.untisx.ui.util.rememberTimeFormat
 import sh.lsx.untisx.ui.util.tapHaptic
 import java.time.Duration
 import java.time.Instant
@@ -88,7 +90,6 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.TextStyle
-import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,16 +98,13 @@ internal enum class DayPlaceholder {
     RESTRICTED,
 }
 
-private fun focusPageFor(date: Int): Int {
+private fun focusPageFor(vm: TimetableViewModel, date: Int): Int {
     if (date <= 0) return TimetableViewModel.CENTER
 
     val target = runCatching { date.toUntisLocalDate().toUntisWeekStart() }.getOrNull()
         ?: return TimetableViewModel.CENTER
 
-    val current = LocalDate.now().toVisibleWeekStart()
-    val weeks = ChronoUnit.WEEKS.between(current, target).toInt()
-
-    return (TimetableViewModel.CENTER + weeks).coerceIn(0, TimetableViewModel.WEEK_SPAN - 1)
+    return vm.pageForMonday(target)
 }
 
 @Composable
@@ -143,10 +141,11 @@ fun TimetableScreen(
         initialPage = vm.lastPage.coerceIn(0, TimetableViewModel.WEEK_SPAN - 1),
         pageCount = { TimetableViewModel.WEEK_SPAN },
     )
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(focusNonce) {
         if (focusDate > 0) {
-            val target = focusPageFor(focusDate)
+            val target = focusPageFor(vm, focusDate)
 
             if (animations && abs(target - pagerState.currentPage) <= 2) {
                 pagerState.animateScrollToPage(target)
@@ -160,6 +159,22 @@ fun TimetableScreen(
 
     LaunchedEffect(pagerState.settledPage) {
         vm.ensureWeekPage(pagerState.settledPage)
+    }
+
+    LifecycleResumeEffect(pagerState) {
+        val visibleMonday = vm.mondayForPage(pagerState.settledPage)
+        val previousAnchor = vm.anchorMonday
+
+        vm.reanchorIfNeeded()
+
+        if (vm.anchorMonday != previousAnchor) {
+            val target = vm.pageForMonday(visibleMonday)
+
+            scope.launch { pagerState.scrollToPage(target) }
+            vm.ensureWeekPage(target)
+        }
+
+        onPauseOrDispose { }
     }
 
     LaunchedEffect(error) {
@@ -177,14 +192,14 @@ fun TimetableScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        val offset = vm.pageToOffset(pagerState.settledPage)
+        val visibleMonday = vm.mondayForPage(pagerState.settledPage)
 
         val slots = remember(vm.timegrid) { hourMarkersFrom(vm.timegrid) }
         val grid = remember(slots) { gridMetricsFrom(slots) }
 
         PullToRefreshBox(
             isRefreshing = refreshing,
-            onRefresh = { vm.refreshVisibleWeek(offset) },
+            onRefresh = { vm.refreshVisibleWeek(visibleMonday) },
             modifier = Modifier.fillMaxSize(),
         ) {
             Row(
@@ -208,17 +223,18 @@ fun TimetableScreen(
                         .weight(1f)
                         .height(grid.height + HEADER_HEIGHT),
                 ) { page ->
-                    val pageOffset = vm.pageToOffset(page)
+                    val weekStart = vm.mondayForPage(page)
+                    val weekKey = weekStart.toUntisDate()
 
                     WeekPage(
-                        entries = vm.weeks[pageOffset],
-                        loading = pageOffset in vm.loadingWeeks,
+                        entries = vm.weeks[weekKey],
+                        loading = weekKey in vm.loadingWeeks,
                         restrictedDays = vm.restrictedDays,
                         subjectsById = vm.subjectsById,
                         teachersById = vm.teachersById,
                         roomsById = vm.roomsById,
                         holidays = vm.holidays,
-                        weekStart = LocalDate.now().toVisibleWeekStart().plusUntisWeeks(pageOffset.toLong()),
+                        weekStart = weekStart,
                         dayStart = grid.dayStart,
                         dayEnd = grid.dayEnd,
                         gridHeight = grid.height,
@@ -397,7 +413,7 @@ private fun DayHeader(
     onEventClick: (TimetableEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val dateFormat = rememberDateFormat("d. MMM")
+    val dateFormat = rememberDateFormat("dMMM")
 
     Column(
         modifier = modifier,
@@ -516,6 +532,8 @@ private fun PeriodGutter(
     dayStart: Int,
     gridHeight: Dp,
 ) {
+    val timeFormat = rememberTimeFormat()
+
     Box(
         modifier = Modifier
             .width(GUTTER_WIDTH)
@@ -533,7 +551,7 @@ private fun PeriodGutter(
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = slot.start.toUntisLocalTime().format(TIME_FORMAT),
+                    text = slot.start.toUntisLocalTime().format(timeFormat),
                     fontSize = 10.sp,
                     lineHeight = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -550,7 +568,7 @@ private fun PeriodGutter(
                 )
 
                 Text(
-                    text = slot.end.toUntisLocalTime().format(TIME_FORMAT),
+                    text = slot.end.toUntisLocalTime().format(timeFormat),
                     fontSize = 10.sp,
                     lineHeight = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -844,7 +862,7 @@ private fun relativeTimeText(timestamp: Long, now: Long): String {
             pluralStringResource(R.plurals.time_days_ago, days, days)
         }
 
-        else -> rememberDateFormat("d. MMM, HH:mm")
+        else -> rememberDateFormat("dMMMjm")
             .format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
     }
 }

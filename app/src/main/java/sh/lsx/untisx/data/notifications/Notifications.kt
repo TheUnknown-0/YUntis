@@ -1,6 +1,7 @@
 package sh.lsx.untisx.data.notifications
 
 import android.annotation.SuppressLint
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -15,9 +16,8 @@ import sh.lsx.untisx.data.model.DirectMessage
 import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDate
-import sh.lsx.untisx.data.appLocale
 import sh.lsx.untisx.data.model.toUntisLocalTime
-import java.time.format.DateTimeFormatter
+import sh.lsx.untisx.ui.util.AppDateFormats
 
 data class ExamReminder(
     val exam: ExamInfo,
@@ -38,6 +38,7 @@ object Notifications {
 
     const val FOCUS_MESSAGES = "messages"
     const val FOCUS_EVENTS = "events"
+    const val FOCUS_ACCOUNT = "account"
 
     private const val CHANNEL_CHANGES = "schedule_changes"
     private const val CHANNEL_CHANGES_SILENT = "schedule_changes_silent"
@@ -51,21 +52,24 @@ object Notifications {
     private const val CHANNEL_NEWS_EVENTS_SILENT = "new_events_silent"
     private const val CHANNEL_NEWS_ANNOUNCEMENTS = "new_announcements"
     private const val CHANNEL_NEWS_ANNOUNCEMENTS_SILENT = "new_announcements_silent"
+    private const val CHANNEL_ACCOUNT = "account_alerts"
+    private const val CHANNEL_SYNC = "sync_status"
 
     private const val OVERVIEW_ID = 2001
-    private const val INDIVIDUAL_BASE = 10_000
-    private const val CHANGE_ID_RANGE = 100_000
-    private const val EXAM_BASE = 200_000
-    private const val EXAM_ID_RANGE = 10_000
-    private const val NEWS_MESSAGES_BASE = 300_000
-    private const val NEWS_EVENTS_BASE = 310_000
-    private const val NEWS_ANNOUNCEMENTS_BASE = 320_000
-    private const val NEWS_ID_RANGE = 10_000
+    private const val CHANGE_NOTIFICATION_ID = 110_001
+    private const val EXAM_NOTIFICATION_ID = 210_001
+    private const val NEWS_MESSAGES_ID = 310_001
+    private const val NEWS_EVENTS_ID = 320_001
+    private const val NEWS_ANNOUNCEMENTS_ID = 330_001
+    private const val LOGIN_REQUIRED_ID = 400_001
+
+    const val FOREGROUND_SYNC_ID = 500_001
+    const val FOREGROUND_OVERVIEW_ID = 500_002
+    const val FOREGROUND_EXAM_ID = 500_003
 
     private const val REQUEST_MESSAGES = 4301
     private const val REQUEST_EVENTS = 4302
-
-    private val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
+    private const val REQUEST_ACCOUNT = 4303
 
     fun ensureChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
@@ -165,7 +169,33 @@ object Notifications {
                 NotificationManager.IMPORTANCE_LOW,
             ).apply { description = context.getString(R.string.notif_channel_new_announcements_silent_desc) },
         )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ACCOUNT,
+                context.getString(R.string.notif_channel_account),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply { description = context.getString(R.string.notif_channel_account_desc) },
+        )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_SYNC,
+                context.getString(R.string.notif_channel_sync),
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply { description = context.getString(R.string.notif_channel_sync_desc) },
+        )
     }
+
+    fun foregroundNotification(context: Context): Notification =
+        NotificationCompat.Builder(context, CHANNEL_SYNC)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.app_name))
+            .setContentText(context.getString(R.string.notif_foreground_sync))
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
+            .build()
 
     fun canPost(context: Context): Boolean =
         NotificationManagerCompat.from(context).areNotificationsEnabled()
@@ -189,7 +219,7 @@ object Notifications {
                 .setContentIntent(contentIntent(context, change.entry.date))
                 .build()
 
-            manager.notify(changeNotificationId(change), notification)
+            manager.notify(changeTag(change), CHANGE_NOTIFICATION_ID, notification)
         }
     }
 
@@ -244,7 +274,7 @@ object Notifications {
                 .setAutoCancel(true)
                 .build()
 
-            manager.notify(examNotificationId(reminder.exam), notification)
+            manager.notify(examTag(reminder.exam), EXAM_NOTIFICATION_ID, notification)
         }
     }
 
@@ -264,12 +294,11 @@ object Notifications {
         val exam = reminder.exam
 
         val date = runCatching {
-            DateTimeFormatter.ofPattern("EEE, d. MMM", context.appLocale())
-                .format(exam.date.toUntisLocalDate())
+            AppDateFormats.formatter(context, "EEEdMMM").format(exam.date.toUntisLocalDate())
         }.getOrDefault("")
 
         val time = if (exam.startTime != 0 || exam.endTime != 0) {
-            "${exam.startTime.toUntisLocalTime().format(timeFormat)}–${exam.endTime.toUntisLocalTime().format(timeFormat)}"
+            "${exam.startTime.toUntisLocalTime().format(AppDateFormats.time(context))}–${exam.endTime.toUntisLocalTime().format(AppDateFormats.time(context))}"
         } else {
             null
         }
@@ -283,14 +312,7 @@ object Notifications {
         ).joinToString(" · ")
     }
 
-    private fun examNotificationId(exam: ExamInfo): Int {
-        val key = "${exam.id}|${exam.date}"
-
-        var hash = 17
-        for (character in key) hash = hash * 31 + character.code
-
-        return EXAM_BASE + (hash and 0x7FFFFFFF) % EXAM_ID_RANGE
-    }
+    private fun examTag(exam: ExamInfo): String = "exam:${exam.id}|${exam.date}"
 
     @SuppressLint("MissingPermission")
     fun notifyNewMessages(
@@ -318,7 +340,7 @@ object Notifications {
 
             if (sender.isNotBlank()) builder.setContentText(sender)
 
-            manager.notify(newsNotificationId(NEWS_MESSAGES_BASE, key), builder.build())
+            manager.notify(key, NEWS_MESSAGES_ID, builder.build())
         }
     }
 
@@ -338,12 +360,11 @@ object Notifications {
             val key = NewsSignatures.event(event)
 
             val date = runCatching {
-                DateTimeFormatter.ofPattern("EEE, d. MMM", context.appLocale())
-                    .format(event.date.toUntisLocalDate())
+                AppDateFormats.formatter(context, "EEEdMMM").format(event.date.toUntisLocalDate())
             }.getOrDefault("")
 
             val time = if (event.startTime != 0 || event.endTime != 0) {
-                "${event.startTime.toUntisLocalTime().format(timeFormat)}–${event.endTime.toUntisLocalTime().format(timeFormat)}"
+                "${event.startTime.toUntisLocalTime().format(AppDateFormats.time(context))}–${event.endTime.toUntisLocalTime().format(AppDateFormats.time(context))}"
             } else {
                 null
             }
@@ -367,7 +388,7 @@ object Notifications {
                 .setAutoCancel(true)
                 .build()
 
-            manager.notify(newsNotificationId(NEWS_EVENTS_BASE, key), notification)
+            manager.notify(key, NEWS_EVENTS_ID, notification)
         }
     }
 
@@ -397,24 +418,35 @@ object Notifications {
                 .setAutoCancel(true)
                 .build()
 
-            manager.notify(newsNotificationId(NEWS_ANNOUNCEMENTS_BASE, key), notification)
+            manager.notify(key, NEWS_ANNOUNCEMENTS_ID, notification)
         }
     }
 
-    private fun newsNotificationId(base: Int, key: String): Int {
-        var hash = 17
-        for (character in key) hash = hash * 31 + character.code
+    @SuppressLint("MissingPermission")
+    fun notifyLoginRequired(context: Context) {
+        ensureChannels(context)
 
-        return base + (hash and 0x7FFFFFFF) % NEWS_ID_RANGE
+        if (!canPost(context)) return
+
+        val text = context.getString(R.string.notif_login_required_text)
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ACCOUNT)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notif_login_required_title))
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setContentIntent(screenIntent(context, FOCUS_ACCOUNT, REQUEST_ACCOUNT))
+            .setAutoCancel(true)
+            .build()
+
+        NotificationManagerCompat.from(context).notify(LOGIN_REQUIRED_ID, notification)
     }
 
-    private fun changeNotificationId(change: ScheduleChange): Int {
-        val key = "${change.entry.date}|${change.entry.startTime}|${change.type}"
+    private fun changeTag(change: ScheduleChange): String {
+        val subjects = change.entry.subject.map { it.id }.sorted().joinToString(",")
 
-        var hash = 17
-        for (character in key) hash = hash * 31 + character.code
-
-        return INDIVIDUAL_BASE + (hash and 0x7FFFFFFF) % CHANGE_ID_RANGE
+        return "chg:${change.entry.date}|${change.entry.startTime}|${change.type}|$subjects" +
+            "|${change.previousValue}|${change.newValue}"
     }
 
     private fun baseBuilder(context: Context, channel: String): NotificationCompat.Builder =
@@ -434,7 +466,7 @@ object Notifications {
             R.string.notif_change_cancelled_text,
             change.subject,
             date(context, change.entry),
-            time(change.entry),
+            time(context, change.entry),
         )
 
         ChangeType.ROOM -> context.getString(
@@ -442,7 +474,7 @@ object Notifications {
             change.subject,
             fromTo(context, change),
             date(context, change.entry),
-            time(change.entry),
+            time(context, change.entry),
         )
 
         ChangeType.TEACHER -> context.getString(
@@ -450,7 +482,7 @@ object Notifications {
             change.subject,
             fromTo(context, change),
             date(context, change.entry),
-            time(change.entry),
+            time(context, change.entry),
         )
     }
 
@@ -466,13 +498,11 @@ object Notifications {
 
     private fun date(context: Context, entry: TimetableEntry): String =
         runCatching {
-            DateTimeFormatter.ofPattern("EEE, d. MMM", context.appLocale())
-                .format(entry.date.toUntisLocalDate())
+            AppDateFormats.formatter(context, "EEEdMMM").format(entry.date.toUntisLocalDate())
         }.getOrDefault("")
 
-    private fun time(entry: TimetableEntry): String =
-        "${entry.startTime.toUntisLocalTime().format(timeFormat)}–${entry.endTime.toUntisLocalTime().format(timeFormat)}"
-
+    private fun time(context: Context, entry: TimetableEntry): String =
+        "${entry.startTime.toUntisLocalTime().format(AppDateFormats.time(context))}–${entry.endTime.toUntisLocalTime().format(AppDateFormats.time(context))}"
     private fun channel(normal: String, silent: String, silentEnabled: Boolean): String =
         if (silentEnabled) silent else normal
 

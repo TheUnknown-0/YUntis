@@ -38,12 +38,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import sh.lsx.untisx.R
-import sh.lsx.untisx.data.TimetableCache
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.data.prefs.AccountPrefs
+import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.prefs.AuthPrefs
 import sh.lsx.untisx.ui.util.Haptics
@@ -55,14 +56,14 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var accounts by remember { mutableStateOf(AccountPrefs.loadAccounts(context)) }
-    var activeId by remember { mutableStateOf(AccountPrefs.getActiveId(context)) }
+    val accounts by AccountStore.accounts.collectAsStateWithLifecycle()
+    val activeId by AccountStore.activeId.collectAsStateWithLifecycle()
+
     var adding by remember { mutableStateOf(false) }
     var removing by remember { mutableStateOf<AuthData?>(null) }
 
-    fun refresh() {
-        accounts = AccountPrefs.loadAccounts(context)
-        activeId = AccountPrefs.getActiveId(context)
+    fun selectAccount(id: String) {
+        scope.launch { AccountStore.setActive(context, id) }
     }
 
     fun removeAccountFully(account: AuthData) {
@@ -71,28 +72,23 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
 
             UntisClient.logout(account)
             UntisClient.clearSessionCache(id)
-            TimetableCache.clear(context, id)
-            AccountPrefs.removeAccount(context, id)
+            AccountStore.removeAccount(context, id)
             AuthPrefs.clear(context)
             NotificationScheduler.onAccountRemoved(context, id)
-
-            refresh()
         }
     }
 
     if (adding) {
         LoginScreen(
             modifier = modifier,
-            onDone = {
-                adding = false
-                refresh()
-            },
+            onDone = { adding = false },
         )
 
         return
     }
 
     val active = accounts.firstOrNull { AccountPrefs.accountId(it) == activeId }
+        ?: accounts.firstOrNull()
 
     Column(
         modifier = modifier
@@ -139,8 +135,7 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                             .clip(RoundedCornerShape(14.dp))
                             .clickable(onClick = Haptics.haptic {
                                 if (!isActive) {
-                                    AccountPrefs.setActive(context, id)
-                                    refresh()
+                                    selectAccount(id)
                                 }
                             })
                             .padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),

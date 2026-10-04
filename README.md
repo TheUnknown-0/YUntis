@@ -41,7 +41,7 @@ Your username and password are sent exclusively to your school's Untis server an
 
 The only external contact besides your Untis server is this project's releases for updates.
 
-If you enable notifications, UntisX periodically checks your timetable on your school's Untis server in the background (you can choose the interval and restrict it to Wi-Fi or school days). The data is compared locally on your device to detect changes - nothing is sent anywhere else.
+If you enable notifications, UntisX periodically checks your timetable on your school's Untis server in the background (you can choose the interval). The data is compared locally on your device to detect changes - nothing is sent anywhere else.
 
 ---
 

@@ -152,7 +152,7 @@ private fun MessageCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val dateFormat = rememberDateFormat("d. MMM, HH:mm")
+    val dateFormat = rememberDateFormat("dMMMjm")
     val time = remember(message.sentDateTime) { parseMessageDateTime(message.sentDateTime) }
     val preview = remember(message.preview) { stripHtml(message.preview) }
 

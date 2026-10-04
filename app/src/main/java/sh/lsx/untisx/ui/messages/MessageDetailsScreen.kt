@@ -97,7 +97,7 @@ fun MessageDetailsScreen(
 
 @Composable
 private fun MessageHeader(message: DirectMessage) {
-    val dateFormat = rememberDateFormat("EEEE, d. MMMM yyyy, HH:mm")
+    val dateFormat = rememberDateFormat("EEEEdMMMMyyyyjm")
     val time = remember(message.sentDateTime) { parseMessageDateTime(message.sentDateTime) }
 
     Box(
@@ -199,7 +199,7 @@ private fun AttachmentRow(attachment: MessageAttachment) {
 
 @Composable
 private fun ReplyRow(reply: DirectMessage) {
-    val dateFormat = rememberDateFormat("d. MMM, HH:mm")
+    val dateFormat = rememberDateFormat("dMMMjm")
     val time = remember(reply.sentDateTime) { parseMessageDateTime(reply.sentDateTime) }
     val content = remember(reply.content, reply.contentPreview) {
         stripHtml(reply.content ?: reply.contentPreview.orEmpty())

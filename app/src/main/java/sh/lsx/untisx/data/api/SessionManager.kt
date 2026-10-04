@@ -2,10 +2,15 @@ package sh.lsx.untisx.data.api
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import sh.lsx.untisx.data.notifications.Notifications
 import sh.lsx.untisx.data.prefs.AccountPrefs
+import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.data.prefs.CredentialsPrefs
 import sh.lsx.untisx.data.prefs.PasswordVault
 
 object SessionManager {
@@ -25,27 +30,53 @@ object SessionManager {
             Log.d(TAG, "session expired -> re-authenticating")
 
             val fresh = reauthLock.withLock {
-                val accounts = AccountPrefs.loadAccounts(context)
-                val stored = accounts.firstOrNull { AccountPrefs.accountId(it) == AccountPrefs.accountId(auth) }
+                AccountStore.ensureLoaded(context)
 
-                UntisClient.authenticate(
-                    server = (stored ?: auth).server,
-                    loginName = (stored ?: auth).loginName,
-                    user = (stored ?: auth).user,
-                    password = retrievePassword(context, stored ?: auth),
-                )
+                val id = AccountPrefs.accountId(auth)
+                val stored = AccountStore.accounts.value
+                    .firstOrNull { AccountPrefs.accountId(it) == id }
+                    ?: auth
+
+                if (stored.session.sessionId.isNotBlank() &&
+                    stored.session.sessionId != auth.session.sessionId
+                ) {
+                    return@withLock stored.session
+                }
+
+                val password = withContext(Dispatchers.IO) {
+                    PasswordVault.retrieve(context, id)
+                } ?: run {
+                    markInvalid(context, id)
+                    throw UntisException.BadCredentials
+                }
+
+                val result = try {
+                    UntisClient.authenticate(
+                        server = stored.server,
+                        loginName = stored.loginName,
+                        user = stored.user,
+                        password = password,
+                    )
+                } catch (e: UntisException.BadCredentials) {
+                    markInvalid(context, id)
+                    throw e
+                }
+
+                AccountStore.updateSession(context, stored.copy(session = result))
+                CredentialsPrefs.clear(context, id)
+
+                result
             }
 
             val updated = auth.copy(session = fresh)
 
-            AccountPrefs.updateSession(context, updated)
             request(updated) to updated
         }
     }
 
-    private fun retrievePassword(context: Context, auth: AuthData): String {
-        val id = AccountPrefs.accountId(auth)
-        return PasswordVault.retrieve(context, id)
-            ?: throw UntisException.BadCredentials
+    private fun markInvalid(context: Context, accountId: String) {
+        if (CredentialsPrefs.markInvalid(context, accountId)) {
+            Notifications.notifyLoginRequired(context)
+        }
     }
 }

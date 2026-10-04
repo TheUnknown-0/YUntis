@@ -48,15 +48,18 @@ import sh.lsx.untisx.data.model.TimegridUnit
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.security.generateTotp
 import sh.lsx.untisx.data.stripHtml
+import sh.lsx.untisx.data.net.Http
 import java.io.IOException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import javax.net.ssl.SSLException
 
 sealed class UntisException(message: String) : Exception(message) {
     data object Network : UntisException("No connection to the Untis server.")
+    data object Certificate : UntisException("The server certificate could not be verified.")
     data object BadCredentials : UntisException("Wrong username or password.")
     data object TooManyResults : UntisException("Too many schools match your search.")
     data object SessionExpired : UntisException("Session expired.")
@@ -64,6 +67,12 @@ sealed class UntisException(message: String) : Exception(message) {
 }
 
 object UntisClient {
+    const val RPC_INVALID = -1
+    const val RPC_NO_TIMETABLE = -7004
+    const val RPC_TOO_MANY_SCHOOLS = -6003
+    const val RPC_BAD_CREDENTIALS = -8500
+    const val RPC_NO_RIGHTS = -8507
+    const val RPC_SESSION_EXPIRED = -8520
 
     private const val SCHOOL_SEARCH_URL = "https://mobile.webuntis.com/ms/schoolquery2"
     private const val CLIENT_NAME = "UntisX"
@@ -80,9 +89,10 @@ object UntisClient {
 
     private val DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
 
-    private val http = OkHttpClient.Builder()
+    private val http = Http.base.newBuilder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(30, TimeUnit.SECONDS)
         .build()
     private val nextId = AtomicInteger(1)
 
@@ -125,7 +135,7 @@ object UntisClient {
             schools.take(20)
         } catch (e: UntisException.Api) {
             log("school search API error ${e.code}")
-            if (e.code == -6003) throw UntisException.TooManyResults
+            if (e.code == RPC_TOO_MANY_SCHOOLS) throw UntisException.TooManyResults
             emptyList()
         }
     }
@@ -229,10 +239,12 @@ object UntisClient {
 
         fun call(secret: String): JsonElement {
             val now = System.currentTimeMillis()
+            val otp = generateTotp(secret, now)
+                ?: throw UntisException.Api(RPC_INVALID, "Invalid app shared secret.")
 
             val credentials = buildJsonObject {
                 put("user", auth.user)
-                put("otp", generateTotp(secret, now))
+                put("otp", otp)
                 put("clientTime", now)
             }
 
@@ -246,6 +258,8 @@ object UntisClient {
         return try {
             call(cached.secret)
         } catch (e: UntisException.Network) {
+            throw e
+        } catch (e: UntisException.BadCredentials) {
             throw e
         } catch (e: UntisException) {
             log("'$method' rejected the cached secret -> requesting a new one")
@@ -271,7 +285,7 @@ object UntisClient {
                 })
             },
         ).jsonPrimitive.contentOrNull
-            ?: throw UntisException.Api(-1, "No app shared secret.")
+            ?: throw UntisException.Api(RPC_INVALID, "No app shared secret.")
 
         sharedSecrets[key] = CachedSecret(secret, System.currentTimeMillis())
 
@@ -764,11 +778,12 @@ object UntisClient {
         return null
     }
 
-    private fun webuntisUrl(server: String, path: String): String {
-        val host = server.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
-
-        return "https://$host/WebUntis/$path"
-    }
+    private fun webuntisUrl(server: String, path: String): String =
+        serverBase(server).newBuilder()
+            .addPathSegment("WebUntis")
+            .addPathSegments(path)
+            .build()
+            .toString()
 
     private fun parseSchoolYear(body: String): SchoolYear? {
         val year = runCatching {
@@ -795,8 +810,13 @@ object UntisClient {
         jwts[key]?.let { if (now - it.at < JWT_TTL_MS) return it.jwt }
 
         return try {
-            val host = auth.server.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
-            val url = "https://$host/WebUntis/api/mobile/v2/${auth.loginName}/authentication"
+            val url = serverBase(auth.server).newBuilder()
+                .addPathSegment("WebUntis")
+                .addPathSegments("api/mobile/v2")
+                .addPathSegment(auth.loginName)
+                .addPathSegment("authentication")
+                .build()
+                .toString()
             val payload = buildJsonObject {
                 put("username", auth.user)
                 put("password", password)
@@ -856,13 +876,10 @@ object UntisClient {
         val start = date.atTime(startTime.toUntisLocalTime()).format(DATE_TIME_FORMAT)
         val end = date.atTime(endTime.toUntisLocalTime()).format(DATE_TIME_FORMAT)
 
-        val url = webuntisUrl(
-            auth.server,
-            "api/rest/view/v2/calendar-entry/detail" +
-                "?elementId=$elementId&elementType=$elementType" +
-                "&startDateTime=$start&endDateTime=$end" +
-                "&initialSelectedPeriodId=$entryId&initialIsBlockSelected=false",
-        )
+        val url = webuntisUrl(auth.server, "api/rest/view/v2/calendar-entry/detail") +
+            "?elementId=$elementId&elementType=$elementType" +
+            "&startDateTime=$start&endDateTime=$end" +
+            "&initialSelectedPeriodId=$entryId&initialIsBlockSelected=false"
 
         val body = authenticatedGet(auth, password, url)
 
@@ -1086,23 +1103,28 @@ object UntisClient {
     private fun buildInternalRpcUrl(server: String, loginName: String): HttpUrl =
         buildUrl(server, loginName, "jsonrpc_intern.do")
 
-    private fun buildUrl(server: String, loginName: String, rpcPath: String): HttpUrl {
-        val trimmed = server.trim()
-        val raw = buildString {
-            if (!trimmed.contains("://")) append("https://")
-            append(trimmed.removePrefix("https://").removePrefix("http://").trimEnd('/'))
-        }
-
-        val base = raw.toHttpUrlOrNull() ?: throw UntisException.Api(-1, "Invalid server URL: $trimmed")
-
-        if (!base.isHttps) {
-            throw UntisException.Api(-1, "Only HTTPS servers are supported: $trimmed")
-        }
-
-        return base.newBuilder()
+    private fun buildUrl(server: String, loginName: String, rpcPath: String): HttpUrl =
+        serverBase(server).newBuilder()
             .addPathSegments("WebUntis/$rpcPath")
             .addQueryParameter("school", loginName.trim())
             .build()
+
+    @Volatile
+    internal var allowHttpForTests = false
+
+    private fun serverBase(server: String): HttpUrl {
+        val trimmed = server.trim().trimEnd('/')
+
+        if (trimmed.isBlank()) throw UntisException.Api(RPC_INVALID, "Empty server URL")
+
+        val raw = if (trimmed.contains("://")) trimmed else "https://$trimmed"
+        val base = raw.toHttpUrlOrNull() ?: throw UntisException.Api(RPC_INVALID, "Invalid server URL: $trimmed")
+
+        if (!base.isHttps && !allowHttpForTests) {
+            throw UntisException.Api(RPC_INVALID, "Only HTTPS servers are supported: $trimmed")
+        }
+
+        return base
     }
 
     private fun executeRpc(
@@ -1127,8 +1149,8 @@ object UntisClient {
                     log("rpc '$method' error ${err.code}")
 
                     throw when (err.code) {
-                        -8500 -> UntisException.BadCredentials
-                        -8520 -> UntisException.SessionExpired
+                        RPC_BAD_CREDENTIALS -> UntisException.BadCredentials
+                        RPC_SESSION_EXPIRED -> UntisException.SessionExpired
                         else -> UntisException.Api(err.code, err.message)
                     }
                 }
@@ -1143,8 +1165,11 @@ object UntisClient {
                     throw UntisException.Network
                 }
 
-                rpc.result ?: throw UntisException.Api(-1, "Empty result.")
+                rpc.result ?: throw UntisException.Api(RPC_INVALID, "Empty result.")
             }
+        } catch (e: SSLException) {
+            log("rpc '$method' failed TLS verification")
+            throw UntisException.Certificate
         } catch (e: IOException) {
             log("rpc '$method' network failure")
             throw UntisException.Network

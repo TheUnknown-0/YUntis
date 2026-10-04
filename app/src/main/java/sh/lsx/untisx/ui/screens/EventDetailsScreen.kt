@@ -26,10 +26,10 @@ import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.model.toUntisLocalTime
-import sh.lsx.untisx.ui.timetable.TIME_FORMAT
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.timetable.resolveNames
 import sh.lsx.untisx.ui.util.rememberDateFormat
+import sh.lsx.untisx.ui.util.rememberTimeFormat
 import sh.lsx.untisx.ui.util.sharedElementBounds
 
 @Composable
@@ -43,6 +43,7 @@ fun EventDetailsScreen(
     val title = entry.eventTitle?.takeIf { it.isNotBlank() }
         ?: stringResource(R.string.events_untitled)
 
+    val timeFormat = rememberTimeFormat()
     val date = remember(entry.date) { entry.date.toUntisLocalDateOrNull() }
     val rooms = remember(entry.room, roomsById) { resolveNames(entry.room, roomsById) }
     val teachers = remember(entry.teacher, teachersById) { resolveNames(entry.teacher, teachersById) }
@@ -85,7 +86,7 @@ fun EventDetailsScreen(
 
                 date?.let {
                     Text(
-                        text = rememberDateFormat("EEEE, d. MMMM yyyy").format(it),
+                        text = rememberDateFormat("EEEEdMMMMyyyy").format(it),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                     )
@@ -93,8 +94,8 @@ fun EventDetailsScreen(
 
                 Text(
                     text = if (entry.startTime != 0 || entry.endTime != 0) {
-                        "${entry.startTime.toUntisLocalTime().format(TIME_FORMAT)} - " +
-                            entry.endTime.toUntisLocalTime().format(TIME_FORMAT)
+                        "${entry.startTime.toUntisLocalTime().format(timeFormat)} - " +
+                            entry.endTime.toUntisLocalTime().format(timeFormat)
                     } else {
                         stringResource(R.string.events_all_day)
                     },

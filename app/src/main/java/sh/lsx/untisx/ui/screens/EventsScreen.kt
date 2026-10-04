@@ -45,10 +45,10 @@ import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
-import sh.lsx.untisx.ui.timetable.TIME_FORMAT
 import sh.lsx.untisx.ui.util.animatedItem
 import sh.lsx.untisx.ui.util.entranceEffect
 import sh.lsx.untisx.ui.util.rememberDateFormat
+import sh.lsx.untisx.ui.util.rememberTimeFormat
 import sh.lsx.untisx.ui.util.sharedElementBounds
 import sh.lsx.untisx.ui.util.tapHaptic
 import sh.lsx.untisx.ui.timetable.rememberToday
@@ -296,7 +296,7 @@ private fun DayLabel(
     today: LocalDate,
     modifier: Modifier = Modifier,
 ) {
-    val dayFormat = rememberDateFormat("EEE, d. MMM")
+    val dayFormat = rememberDateFormat("EEEdMMM")
 
     val text = when (date) {
         null -> "?"
@@ -322,9 +322,10 @@ private fun EventCard(
     modifier: Modifier = Modifier,
 ) {
     val timed = event.startTime != 0 && event.endTime != 0
+    val timeFormat = rememberTimeFormat()
 
     val timeText = if (timed) {
-        "${event.startTime.toUntisLocalTime().format(TIME_FORMAT)} – ${event.endTime.toUntisLocalTime().format(TIME_FORMAT)}"
+        "${event.startTime.toUntisLocalTime().format(timeFormat)} - ${event.endTime.toUntisLocalTime().format(timeFormat)}"
     } else {
         stringResource(R.string.events_all_day)
     }
@@ -383,6 +384,7 @@ private fun ExamCard(
     modifier: Modifier = Modifier,
 ) {
     val type = exam.examType.takeIf { it.isNotBlank() } ?: stringResource(R.string.lesson_exam)
+    val timeFormat = rememberTimeFormat()
     val subject = subjectsById[exam.subjectId]?.name?.takeIf { it.isNotBlank() }
     val rooms = exam.roomIds.mapNotNull { roomsById[it]?.name?.takeIf { name -> name.isNotBlank() } }.distinct()
     val teachers = exam.teacherIds.mapNotNull { teachersById[it]?.name?.takeIf { name -> name.isNotBlank() } }.distinct()
@@ -445,8 +447,8 @@ private fun ExamCard(
 
             if (timed) {
                 Text(
-                    text = "${exam.startTime.toUntisLocalTime().format(TIME_FORMAT)} – " +
-                        exam.endTime.toUntisLocalTime().format(TIME_FORMAT),
+                    text = "${exam.startTime.toUntisLocalTime().format(timeFormat)} – " +
+                        exam.endTime.toUntisLocalTime().format(timeFormat),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
@@ -492,8 +494,8 @@ private fun HolidayCard(
                     Text(
                         text = stringResource(
                             R.string.events_date_range,
-                            rememberDateFormat("d. MMM").format(start),
-                            rememberDateFormat("d. MMM").format(end),
+                            rememberDateFormat("dMMM").format(start),
+                            rememberDateFormat("dMMM").format(end),
                         ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -521,7 +523,7 @@ private fun holidayCountdown(
     today: LocalDate,
 ): String {
     val days = ChronoUnit.DAYS.between(today, start)
-    val dateFormat = rememberDateFormat("d. MMM")
+    val dateFormat = rememberDateFormat("dMMM")
 
     return when {
         days <= 0L -> stringResource(R.string.events_holiday_running, dateFormat.format(end))

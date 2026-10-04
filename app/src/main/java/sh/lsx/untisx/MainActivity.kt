@@ -50,6 +50,7 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -72,6 +73,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,7 +95,9 @@ import sh.lsx.untisx.data.AppTheme
 import sh.lsx.untisx.data.LanguagePrefs
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.data.prefs.AccountLoadError
 import sh.lsx.untisx.data.prefs.AccountPrefs
+import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.prefs.AnimationPrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
 import sh.lsx.untisx.data.prefs.TimetablePrefs
@@ -219,9 +223,9 @@ private fun AppRoot(
     onFocusConsumed: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var theme by remember { mutableStateOf(ThemePrefs.get(context)) }
     var onboardingDone by remember { mutableStateOf(readOnboardingDone(context)) }
-    var auth by remember { mutableStateOf(AccountPrefs.getActive(context)) }
     var hapticsEnabled by remember { mutableStateOf(HapticsPrefs.isEnabled(context)) }
     var showLastRefreshed by remember { mutableStateOf(TimetablePrefs.showLastRefreshed(context)) }
     var animationsEnabled by remember { mutableStateOf(AnimationPrefs.isEnabled(context)) }
@@ -230,6 +234,18 @@ private fun AppRoot(
     var defaultSubjectColor by remember { mutableStateOf(SubjectColorsPrefs.getDefaultColor(context)) }
     var lessonTextColor by remember { mutableStateOf(SubjectColorsPrefs.getTextColor(context)) }
     var cancelledStrike by remember { mutableStateOf(SubjectColorsPrefs.isCancelledStrike(context)) }
+
+    val accounts by AccountStore.accounts.collectAsStateWithLifecycle()
+    val activeId by AccountStore.activeId.collectAsStateWithLifecycle()
+    val accountsLoaded by AccountStore.loaded.collectAsStateWithLifecycle()
+    val accountError by AccountStore.error.collectAsStateWithLifecycle()
+    val currentAuth = remember(accounts, activeId) {
+        accounts.firstOrNull { AccountPrefs.accountId(it) == activeId } ?: accounts.firstOrNull()
+    }
+
+    LaunchedEffect(Unit) {
+        AccountStore.refresh(context)
+    }
 
     DisposableEffect(Unit) {
         val prefs = context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
@@ -240,10 +256,6 @@ private fun AppRoot(
 
             if (key == UntisXApp.KEY_ONBOARDING_DONE) {
                 onboardingDone = readOnboardingDone(context)
-            }
-
-            if (key == AccountPrefs.KEY_ACCOUNTS || key == AccountPrefs.KEY_ACTIVE) {
-                auth = AccountPrefs.getActive(context)
             }
 
             if (key == HapticsPrefs.KEY) {
@@ -278,8 +290,6 @@ private fun AppRoot(
         LocalAnimationsEnabled provides animationsEnabled,
     ) {
         UntisXTheme(mode = theme.mode, preset = theme.preset) {
-            val currentAuth = auth
-
             val updateVm: UpdateViewModel = viewModel()
 
             LaunchedEffect(Unit) {
@@ -298,12 +308,22 @@ private fun AppRoot(
                 NotificationScheduler.ensureAll(context)
             }
 
-            LaunchedEffect(currentAuth) {
+            LaunchedEffect(currentAuth?.let { AccountPrefs.accountId(it) }) {
                 NotificationScheduler.ensureAll(context)
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
+                    accountError is AccountLoadError.Transient -> AccountsUnavailableScreen {
+                        scope.launch { AccountStore.refresh(context) }
+                    }
+
+                    accountError is AccountLoadError.KeyLost -> AccountsUnreadableScreen {
+                        scope.launch { AccountStore.discardUnreadable(context) }
+                    }
+
+                    !accountsLoaded -> Unit
+
                     !onboardingDone -> OnboardingScreen(
                         theme = theme,
                         onThemeChange = ::saveTheme,
@@ -349,6 +369,58 @@ private fun AppRoot(
                     onInstall = updateVm::install,
                     onDismiss = updateVm::dismiss,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountsUnavailableScreen(onRetry: () -> Unit) {
+    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.accounts_transient),
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            Button(onClick = onRetry) {
+                Text(stringResource(R.string.accounts_retry))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountsUnreadableScreen(onStartOver: () -> Unit) {
+    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.accounts_unreadable),
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            Button(onClick = onStartOver) {
+                Text(stringResource(R.string.accounts_start_over))
             }
         }
     }
@@ -463,10 +535,10 @@ private fun MainApp(
     val spatialSpec = motionSpatial<IntOffset>()
     val scope = rememberCoroutineScope()
     val timetableVm: TimetableViewModel = viewModel(
-        key = "${auth.loginName}:${auth.session.personId}",
+        key = AccountPrefs.accountId(auth),
     )
     val messagesVm: MessagesViewModel = viewModel(
-        key = "messages:${auth.loginName}:${auth.session.personId}",
+        key = "messages:${AccountPrefs.accountId(auth)}",
     )
     val updateVm: UpdateViewModel = viewModel()
 
@@ -495,6 +567,11 @@ private fun MainApp(
             Notifications.FOCUS_EVENTS -> {
                 timetableVm.ensureEvents()
                 currentScreen = Screen.EVENTS
+                onFocusConsumed()
+            }
+
+            Notifications.FOCUS_ACCOUNT -> {
+                currentScreen = Screen.PROFILE
                 onFocusConsumed()
             }
         }

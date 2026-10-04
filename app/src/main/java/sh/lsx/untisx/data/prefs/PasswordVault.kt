@@ -2,8 +2,8 @@ package sh.lsx.untisx.data.prefs
 
 import android.content.Context
 import androidx.core.content.edit
-import sh.lsx.untisx.data.security.Crypto
-import sh.lsx.untisx.data.prefs.AuthPrefs.json
+import sh.lsx.untisx.UntisXApp
+import sh.lsx.untisx.data.security.DecryptResult
 
 object PasswordVault {
 
@@ -12,18 +12,21 @@ object PasswordVault {
     private fun key(accountId: String) = PREFIX + accountId
 
     private fun prefs(context: Context) =
-        context.getSharedPreferences("untisx_prefs", Context.MODE_PRIVATE)
+        context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
 
     fun store(context: Context, accountId: String, password: String) {
         if (password.isBlank()) return
 
-        prefs(context).edit { putString(key(accountId), Crypto.encrypt(password)) }
+        prefs(context).edit { putString(key(accountId), AccountStore.cryptor.encrypt(password)) }
     }
 
     fun retrieve(context: Context, accountId: String): String? {
         val encoded = prefs(context).getString(key(accountId), null) ?: return null
 
-        return Crypto.decrypt(encoded)
+        return when (val decrypted = AccountStore.cryptor.decrypt(encoded)) {
+            is DecryptResult.Value -> decrypted.plaintext
+            DecryptResult.Missing, DecryptResult.KeyLost, DecryptResult.Transient -> null
+        }
     }
 
     fun clear(context: Context, accountId: String) {

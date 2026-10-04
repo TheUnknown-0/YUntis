@@ -25,7 +25,7 @@ object NotificationRules {
     }
 
     fun isHoliday(context: Context, date: LocalDate): Boolean {
-        val auth = AccountPrefs.getActive(context) ?: return false
+        val auth = AccountPrefs.getActive() ?: return false
         val cache = TimetableCache.load(context, AccountPrefs.accountId(auth)) ?: return false
         val dateInt = date.toUntisDate()
 
@@ -33,7 +33,7 @@ object NotificationRules {
     }
 
     private fun cachedEntries(context: Context, date: LocalDate): List<TimetableEntry> {
-        val auth = AccountPrefs.getActive(context) ?: return emptyList()
+        val auth = AccountPrefs.getActive() ?: return emptyList()
         val cache = TimetableCache.load(context, AccountPrefs.accountId(auth)) ?: return emptyList()
         val key = date.toUntisWeekStart().toUntisDate().toString()
 

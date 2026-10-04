@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.OkHttpClient
+import sh.lsx.untisx.data.net.Http
 import okhttp3.Request
 import java.io.File
 import java.security.MessageDigest
@@ -25,6 +25,13 @@ data class UpdateInfo(
     val changelog: String,
     val downloadUrl: String,
 )
+
+internal data class Version(
+    val numbers: List<Int>,
+    val preRelease: List<String>,
+) {
+    val normalized: String = numbers.joinToString(".") + if (preRelease.isEmpty()) "" else "-" + preRelease.joinToString(".")
+}
 
 @Serializable
 private data class CodebergRelease(
@@ -49,7 +56,7 @@ object UpdateClient {
     private const val KEEP_OLD_APKS = 2
 
     private val json = Json { ignoreUnknownKeys = true }
-    private val http = OkHttpClient()
+    private val http = Http.base
 
     fun installedVersionName(context: Context): String =
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
@@ -80,42 +87,67 @@ object UpdateClient {
             ?: throw IllegalStateException("No APK attached to ${newest.first.tagName}.")
 
         UpdateInfo(
-            versionName = newest.second.joinToString("."),
+            versionName = newest.second.normalized,
             forced = newest.first.tagName.endsWith("-forced", ignoreCase = true),
             changelog = newest.first.body.trim(),
             downloadUrl = asset.downloadUrl,
         )
     }
 
-    internal fun parseTag(tag: String): List<Int>? =
-        tag.trim()
-            .removePrefix("v")
-            .substringBefore("-")
-            .split(".")
-            .map { it.toIntOrNull() ?: return null }
+    internal fun parseTag(tag: String): Version? {
+        var value = tag.trim().removePrefix("v")
 
-    internal fun compareVersions(a: List<Int>, b: List<Int>): Int {
-        for (i in 0 until maxOf(a.size, b.size)) {
-            val left = a.getOrElse(i) { 0 }
-            val right = b.getOrElse(i) { 0 }
-
-            if (left != right) return left - right
+        if (value.endsWith("-forced", ignoreCase = true)) {
+            value = value.dropLast("-forced".length)
         }
 
-        return 0
+        val separator = value.indexOf('-')
+        val core = if (separator >= 0) value.substring(0, separator) else value
+        val preRelease = if (separator >= 0) value.substring(separator + 1) else ""
+
+        return Version(
+            numbers = core.split(".").map { it.toIntOrNull() ?: return null },
+            preRelease = preRelease.split('.').filter { it.isNotEmpty() },
+        )
     }
 
-    internal fun isNewer(candidate: List<Int>, installedName: String): Boolean {
-        val installed = parseTag(installedName) ?: return true
+    internal fun compareVersions(a: Version, b: Version): Int {
+        for (i in 0 until maxOf(a.numbers.size, b.numbers.size)) {
+            val left = a.numbers.getOrElse(i) { 0 }
+            val right = b.numbers.getOrElse(i) { 0 }
 
-        for (i in 0 until maxOf(candidate.size, installed.size)) {
-            val c = candidate.getOrElse(i) { 0 }
-            val current = installed.getOrElse(i) { 0 }
-
-            if (c != current) return c > current
+            if (left != right) return left.compareTo(right)
         }
 
-        return false
+        if (a.preRelease.isEmpty() && b.preRelease.isEmpty()) return 0
+        if (a.preRelease.isEmpty()) return 1
+        if (b.preRelease.isEmpty()) return -1
+
+        for (i in 0 until minOf(a.preRelease.size, b.preRelease.size)) {
+            val result = comparePreReleaseIdentifier(a.preRelease[i], b.preRelease[i])
+
+            if (result != 0) return result
+        }
+
+        return a.preRelease.size.compareTo(b.preRelease.size)
+    }
+
+    internal fun isNewer(candidate: Version, installedName: String): Boolean {
+        val installed = parseTag(installedName) ?: return true
+
+        return compareVersions(candidate, installed) > 0
+    }
+
+    private fun comparePreReleaseIdentifier(a: String, b: String): Int {
+        val aNumeric = a.toBigIntegerOrNull()
+        val bNumeric = b.toBigIntegerOrNull()
+
+        return when {
+            aNumeric != null && bNumeric != null -> aNumeric.compareTo(bNumeric)
+            aNumeric != null -> -1
+            bNumeric != null -> 1
+            else -> a.compareTo(b)
+        }
     }
 
     suspend fun download(
@@ -197,20 +229,20 @@ object UpdateClient {
         val expected = installedCertificateSha256(context) ?: return false
         val actual = archiveCertificateSha256(context, apk) ?: return false
 
-        return expected == actual
+        return expected.isNotEmpty() && actual.isNotEmpty() && expected == actual
     }
 
-    private fun installedCertificateSha256(context: Context): String? =
+    private fun installedCertificateSha256(context: Context): Set<String>? =
         context.packageManager.getPackageInfo(context.packageName, signatureFlags)
-            .certificateSha256()
+            .signerCertificatesSha256()
 
-    private fun archiveCertificateSha256(context: Context, apk: File): String? {
+    private fun archiveCertificateSha256(context: Context, apk: File): Set<String>? {
         val info = context.packageManager.getPackageArchiveInfo(apk.absolutePath, signatureFlags)
             ?: return null
 
         if (info.packageName != context.packageName) return null
 
-        return info.certificateSha256()
+        return info.signerCertificatesSha256()
     }
 
     @Suppress("DEPRECATION")
@@ -222,16 +254,20 @@ object UpdateClient {
         }
 
     @Suppress("DEPRECATION")
-    private fun PackageInfo.certificateSha256(): String? {
-        val signer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            signingInfo?.apkContentsSigners?.firstOrNull()
+    private fun PackageInfo.signerCertificatesSha256(): Set<String>? {
+        val signers = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            signingInfo?.apkContentsSigners
         } else {
-            signatures?.firstOrNull()
+            signatures
         } ?: return null
 
-        val digest = MessageDigest.getInstance("SHA-256").digest(signer.toByteArray())
+        if (signers.isEmpty()) return null
 
-        return digest.joinToString("") { "%02x".format(it) }
+        return signers.mapTo(mutableSetOf()) { signer ->
+            MessageDigest.getInstance("SHA-256")
+                .digest(signer.toByteArray())
+                .joinToString("") { "%02x".format(it) }
+        }
     }
 
     private fun pruneOldApks(dir: File?) {

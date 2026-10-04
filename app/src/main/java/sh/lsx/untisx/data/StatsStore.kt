@@ -13,8 +13,6 @@ import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import java.io.File
-import java.io.IOException
-import java.security.MessageDigest
 import java.time.LocalDate
 
 @Serializable
@@ -87,19 +85,17 @@ object StatsStore {
             ?: emptySet()
 
     fun load(context: Context, accountId: String): StatsData {
-        val file = file(context, accountId)
-
-        if (!file.exists()) return StatsData()
+        val text = AtomicJsonFile.read(file(context, accountId)) ?: return StatsData()
 
         return runCatching {
-            val data = json.decodeFromString<StatsData>(file.readText())
+            val data = json.decodeFromString<StatsData>(text)
 
             if (data.version != VERSION) StatsData() else data
         }.getOrDefault(StatsData())
     }
 
     fun clear(context: Context, accountId: String) {
-        runCatching { file(context, accountId).delete() }
+        AtomicJsonFile.delete(file(context, accountId))
     }
 
     suspend fun recordWeek(
@@ -207,23 +203,13 @@ object StatsStore {
         any { (it.orgId != null && it.orgId > 0 && it.orgId != it.id) || !it.orgName.isNullOrBlank() }
 
     private fun save(context: Context, accountId: String, data: StatsData) {
-        runCatching {
-            val target = file(context, accountId)
-            val temp = File(target.parentFile, "${target.name}.tmp")
+        val encoded = json.encodeToString(data.copy(version = VERSION))
 
-            temp.writeText(json.encodeToString(data.copy(version = VERSION)))
-
-            if (!temp.renameTo(target)) {
-                temp.delete()
-                throw IOException("Could not replace stats cache")
-            }
-        }.onFailure { Log.d(TAG, "stats save failed: ${it.message}") }
+        if (!AtomicJsonFile.write(file(context, accountId), encoded)) {
+            Log.d(TAG, "stats save failed")
+        }
     }
 
-    private fun file(context: Context, accountId: String): File {
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest(accountId.toByteArray(Charsets.UTF_8))
-
-        return File(context.filesDir, FILE_PREFIX + digest.joinToString("") { "%02x".format(it) } + ".json")
-    }
+    private fun file(context: Context, accountId: String): File =
+        accountFile(context, FILE_PREFIX, accountId)
 }

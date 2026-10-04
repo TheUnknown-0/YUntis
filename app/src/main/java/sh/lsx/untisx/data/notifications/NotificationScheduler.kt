@@ -7,11 +7,13 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import androidx.core.net.toUri
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import sh.lsx.untisx.data.AppClock
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import java.time.LocalDate
 import java.time.ZoneId
@@ -21,6 +23,8 @@ import java.util.concurrent.TimeUnit
 object NotificationScheduler {
 
     private const val SYNC_WORK_NAME = "untisx_timetable_sync"
+    const val OVERVIEW_WORK_NAME = "untisx_day_overview"
+    const val EXAM_WORK_NAME = "untisx_exam_reminder"
     private const val OVERVIEW_REQUEST_CODE = 4201
     private const val EXAM_REQUEST_CODE = 4202
 
@@ -35,7 +39,7 @@ object NotificationScheduler {
         NewsBaseline.clear(context, accountId)
         NotificationPrefs.clearExamReminderSentKeys(context, accountId)
 
-        if (AccountPrefs.getActive(context) == null) {
+        if (AccountPrefs.getActive() == null) {
             cancelAll(context)
         } else {
             ensureAll(context)
@@ -70,6 +74,7 @@ object NotificationScheduler {
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build(),
             )
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .setInitialDelay(1, TimeUnit.MINUTES)
             .build()
 
@@ -180,16 +185,9 @@ object NotificationScheduler {
     }
 
     private fun nextTrigger(context: Context): Long? {
-        val now = ZonedDateTime.now()
         val minute = NotificationPrefs.overviewMinute(context)
 
-        val today = LocalDate.now()
-            .atStartOfDay(ZoneId.systemDefault())
-            .plusMinutes(minute.toLong())
-
-        val candidate = if (today.isAfter(now)) today else today.plusDays(1)
-
-        return candidate.toInstant().toEpochMilli()
+        return NotificationTimes.nextOccurrence(minute, AppClock.now()).toInstant().toEpochMilli()
     }
 
     private fun overviewPendingIntent(context: Context): PendingIntent {
@@ -204,16 +202,9 @@ object NotificationScheduler {
     }
 
     private fun nextExamTrigger(context: Context): Long {
-        val now = ZonedDateTime.now()
         val minute = NotificationPrefs.examReminderMinute(context)
 
-        val today = LocalDate.now()
-            .atStartOfDay(ZoneId.systemDefault())
-            .plusMinutes(minute.toLong())
-
-        val candidate = if (today.isAfter(now)) today else today.plusDays(1)
-
-        return candidate.toInstant().toEpochMilli()
+        return NotificationTimes.nextOccurrence(minute, AppClock.now()).toInstant().toEpochMilli()
     }
 
     private fun examReminderPendingIntent(context: Context): PendingIntent {

@@ -3,18 +3,23 @@ package sh.lsx.untisx.data.notifications
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import sh.lsx.untisx.data.TimetableCache
 import kotlinx.coroutines.CancellationException
 import sh.lsx.untisx.data.api.UntisClient
+import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.DayMessage
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisWeekStart
 import sh.lsx.untisx.data.prefs.AccountPrefs
+import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.data.prefs.CredentialsPrefs
 import sh.lsx.untisx.data.prefs.PasswordVault
+import java.io.IOException
 import java.time.LocalDate
 
 class TimetableSyncWorker(
@@ -36,8 +41,12 @@ class TimetableSyncWorker(
 
         if (!Notifications.canPost(context)) return Result.success()
 
-        val auth = AccountPrefs.getActive(context) ?: return Result.success()
+        AccountStore.ensureLoaded(context)
+
+        val auth = AccountStore.active ?: return Result.success()
         val accountId = AccountPrefs.accountId(auth)
+
+        if (CredentialsPrefs.isInvalid(context, accountId)) return Result.success()
 
         return try {
             val cache = TimetableCache.load(context, accountId)
@@ -61,10 +70,34 @@ class TimetableSyncWorker(
             Result.success()
         } catch (e: CancellationException) {
             throw e
+        } catch (e: UntisException.BadCredentials) {
+            Log.d(TAG, "sync stopped: bad credentials")
+            markCredentialsInvalid(context, accountId)
+            Result.success()
+        } catch (e: UntisException.Api) {
+            Log.d(TAG, "sync stopped: api error ${e.code}")
+            Result.success()
+        } catch (e: UntisException.Network) {
+            Log.d(TAG, "sync failed: network")
+            if (runAttemptCount < 3) Result.retry() else Result.success()
+        } catch (e: IOException) {
+            Log.d(TAG, "sync failed: io")
+            if (runAttemptCount < 3) Result.retry() else Result.success()
         } catch (e: Exception) {
             Log.d(TAG, "sync failed: ${e.javaClass.simpleName}")
+            Result.success()
+        }
+    }
 
-            if (runAttemptCount < 3) Result.retry() else Result.success()
+    override suspend fun getForegroundInfo(): ForegroundInfo =
+        ForegroundInfo(
+            Notifications.FOREGROUND_SYNC_ID,
+            Notifications.foregroundNotification(applicationContext),
+        )
+
+    private fun markCredentialsInvalid(context: Context, accountId: String) {
+        if (CredentialsPrefs.markInvalid(context, accountId)) {
+            Notifications.notifyLoginRequired(context)
         }
     }
 

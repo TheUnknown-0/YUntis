@@ -423,6 +423,6 @@ private fun snapInterval(minutes: Int): Int {
 private fun formatTimestamp(timestamp: Long): String {
     if (timestamp <= 0L) return "–"
 
-    return rememberDateFormat("d. MMM, HH:mm")
+    return rememberDateFormat("dMMMjm")
         .format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
 }

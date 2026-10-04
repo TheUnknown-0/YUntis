@@ -43,11 +43,10 @@ import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.model.toUntisLocalTime
-import sh.lsx.untisx.ui.timetable.TIME_FORMAT
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.util.motionEffects
-import sh.lsx.untisx.ui.util.rememberDateFormat
+import sh.lsx.untisx.ui.util.rememberTimeFormat
 import sh.lsx.untisx.ui.util.sharedElementBounds
 import java.time.LocalDate
 
@@ -63,6 +62,8 @@ fun LessonDetailsScreen(
     notes: TimetableViewModel.NotesState? = null,
     exam: ExamInfo? = null,
 ) {
+    val timeFormat = rememberTimeFormat()
+
     val subjectEl = entry.subject.firstOrNull()
     val subjectName = subjectEl
         ?.let { subjectsById[it.id]?.name?.takeIf { name -> name.isNotBlank() } ?: it.name }
@@ -152,8 +153,8 @@ fun LessonDetailsScreen(
                         DetailRow(
                             stringResource(R.string.lesson_time),
                             AnnotatedString(
-                                "${examInfo.startTime.toUntisLocalTime().format(TIME_FORMAT)} - " +
-                                    examInfo.endTime.toUntisLocalTime().format(TIME_FORMAT),
+                                "${examInfo.startTime.toUntisLocalTime().format(timeFormat)} - " +
+                                    examInfo.endTime.toUntisLocalTime().format(timeFormat),
                             ),
                         )
                     }
@@ -186,14 +187,17 @@ fun LessonDetailsScreen(
         }
 
         DetailCard {
-            DetailRow(stringResource(R.string.lesson_time), AnnotatedString("${entry.startTime.toUntisLocalTime().format(TIME_FORMAT)} - ${entry.endTime.toUntisLocalTime().format(TIME_FORMAT)}"))
+            DetailRow(stringResource(R.string.lesson_time), AnnotatedString("${entry.startTime.toUntisLocalTime().format(timeFormat)} - ${entry.endTime.toUntisLocalTime().format(timeFormat)}"))
             ElementRow(stringResource(R.string.lesson_teacher), entry.teacher, teachersById)
             ElementRow(stringResource(R.string.lesson_room), entry.room, roomsById)
         }
 
         val loaded = notes as? TimetableViewModel.NotesState.Loaded
 
-        (loaded?.info ?: entry.lessonText)?.takeIf { it.isNotBlank() }?.let { info ->
+        val infoText = (loaded?.info ?: entry.info ?: entry.lessonText ?: entry.lstext).takeAsContent()
+        val substitutionText = (loaded?.substitution ?: entry.substText).takeAsContent()
+
+        infoText?.let { info ->
             DetailCard {
                 Text(
                     text = stringResource(R.string.lesson_info),
@@ -209,7 +213,7 @@ fun LessonDetailsScreen(
             }
         }
 
-        (loaded?.substitution ?: entry.lstext)?.takeIf { it.isNotBlank() }?.let { info ->
+        substitutionText?.takeIf { it != infoText }?.let { substitution ->
             DetailCard {
                 Text(
                     text = stringResource(R.string.lesson_substitution),
@@ -218,7 +222,7 @@ fun LessonDetailsScreen(
                 )
 
                 Text(
-                    text = info,
+                    text = substitution,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -337,9 +341,17 @@ private fun strikethroughChange(orig: String, current: String): AnnotatedString 
         append(current)
     }
 
+private fun String?.takeAsContent(): String? {
+    val value = this?.trim() ?: return null
+
+    if (value.isBlank() || value == "-" || value == "–" || value == "—") return null
+
+    return value
+}
+
 @Composable
 private fun formatLessonDate(date: LocalDate, entry: TimetableEntry): String {
-    val dayName = rememberDateFormat("EEEE, d. MMMM yyyy").format(date)
+    val dayName = rememberDateFormat("EEEEdMMMMyyyy").format(date)
 
     return if (date == LocalDate.now()) {
         stringResource(R.string.lesson_date_today, dayName)

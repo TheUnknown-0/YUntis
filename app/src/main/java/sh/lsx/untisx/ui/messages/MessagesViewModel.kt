@@ -17,6 +17,7 @@ import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.DirectMessage
 import sh.lsx.untisx.data.prefs.AccountPrefs
+import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.prefs.PasswordVault
 import sh.lsx.untisx.ui.util.UiText
 
@@ -42,7 +43,9 @@ class MessagesViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            val account = withContext(Dispatchers.IO) { AccountPrefs.getActive(getApplication()) } ?: return@launch
+            AccountStore.ensureLoaded(getApplication())
+
+            val account = AccountPrefs.getActive() ?: return@launch
 
             val cached = withContext(Dispatchers.IO) {
                 MessagesStore.load(getApplication(), AccountPrefs.accountId(account))
@@ -65,7 +68,9 @@ class MessagesViewModel(app: Application) : AndroidViewModel(app) {
 
         viewModelScope.launch {
             try {
-                val account = withContext(Dispatchers.IO) { AccountPrefs.getActive(getApplication()) }
+                AccountStore.ensureLoaded(getApplication())
+
+                val account = AccountPrefs.getActive()
                     ?: throw UntisException.BadCredentials
 
                 val password = withContext(Dispatchers.IO) {
@@ -110,7 +115,9 @@ class MessagesViewModel(app: Application) : AndroidViewModel(app) {
 
         viewModelScope.launch {
             try {
-                val account = withContext(Dispatchers.IO) { AccountPrefs.getActive(getApplication()) } ?: return@launch
+                AccountStore.ensureLoaded(getApplication())
+
+                val account = AccountPrefs.getActive() ?: return@launch
 
                 val password = withContext(Dispatchers.IO) {
                     PasswordVault.retrieve(getApplication(), AccountPrefs.accountId(account))

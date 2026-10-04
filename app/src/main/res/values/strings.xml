@@ -44,6 +44,7 @@
     <!-- Login -->
     <string name="login_connect_account">Connect your Account</string>
     <string name="login_privacy">Your username and password are encrypted using the Android Keystore and stored only on this device. They are sent exclusively to your school\'s Untis server.</string>
+    <string name="login_teacher_notice">UntisX is built for students; teacher accounts are not supported.</string>
     <string name="login_school_label">Your school</string>
     <string name="login_school_selected">%1$s, \"%2$s\"</string>
     <string name="login_searching">Searching…</string>
@@ -217,6 +218,8 @@
 
     <!-- Errors / status messages -->
     <string name="error_network">No connection to the Untis server.</string>
+    <string name="error_certificate">Secure connection to the Untis server failed.</string>
+    <string name="error_account_unavailable">Your saved accounts are temporarily unavailable. Please try again.</string>
     <string name="error_bad_credentials">Wrong username or password.</string>
     <string name="error_too_many_results">Too many schools match your search.</string>
     <string name="error_session_expired">Session expired.</string>
@@ -312,6 +315,19 @@
     <string name="notif_change_room_text">%1$s on %2$s, %3$s: room %4$s.</string>
     <string name="notif_change_teacher_text">%1$s on %2$s, %3$s: teacher %4$s.</string>
     <string name="notif_change_from_to">%1$s → %2$s</string>
+    <string name="notif_channel_account">Account</string>
+    <string name="notif_channel_account_desc">Warns when the saved credentials are no longer valid.</string>
+    <string name="notif_channel_sync">Sync status</string>
+    <string name="notif_channel_sync_desc">Ongoing notification while the app checks for changes.</string>
+    <string name="notif_foreground_sync">Checking for changes...</string>
+    <string name="notif_login_required_title">Please sign in again</string>
+    <string name="notif_login_required_text">Your password was rejected by the Untis server. Tap to update your credentials.</string>
+
+    <!-- Accounts -->
+    <string name="accounts_transient">Your saved accounts are temporarily unavailable.</string>
+    <string name="accounts_retry">Try again</string>
+    <string name="accounts_unreadable">Your saved accounts could not be decrypted anymore. Please sign in again.</string>
+    <string name="accounts_start_over">Sign in again</string>
 
     <!-- Onboarding: exact alarms -->
     <string name="onboarding_exact_alarm_title">Exact alarms (optional)</string>

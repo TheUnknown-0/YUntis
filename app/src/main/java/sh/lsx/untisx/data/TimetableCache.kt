@@ -11,8 +11,6 @@ import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.TimegridDay
 import java.io.File
-import java.io.IOException
-import java.security.MessageDigest
 
 object TimetableCache {
 
@@ -43,48 +41,33 @@ object TimetableCache {
         val version: Int = 0,
     )
 
-    private fun fileName(accountId: String): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest(accountId.toByteArray(Charsets.UTF_8))
-
-        return FILE_PREFIX + digest.joinToString("") { "%02x".format(it) } + ".json"
-    }
-
     private fun file(context: Context, accountId: String) =
-        File(context.filesDir, fileName(accountId))
+        accountFile(context, FILE_PREFIX, accountId)
 
     private fun legacyFile(context: Context) = File(context.filesDir, LEGACY_FILE_NAME)
 
     fun load(context: Context, accountId: String): Data? {
         migrateLegacy(context, accountId)
 
-        val file = file(context, accountId)
-
-        if (!file.exists()) return null
+        val text = AtomicJsonFile.read(file(context, accountId)) ?: return null
 
         return runCatching {
-            val data = json.decodeFromString<Data>(file.readText())
+            val data = json.decodeFromString<Data>(text)
 
             if (data.version != VERSION) null else data
         }.getOrNull()
     }
 
     fun save(context: Context, accountId: String, data: Data) {
-        runCatching {
-            val target = file(context, accountId)
-            val temp = File(target.parentFile, "${target.name}.tmp")
+        val encoded = json.encodeToString(data.copy(version = VERSION))
 
-            temp.writeText(json.encodeToString(data.copy(version = VERSION)))
-
-            if (!temp.renameTo(target)) {
-                temp.delete()
-                throw IOException("Could not replace timetable cache")
-            }
-        }.onFailure { Log.d(TAG, "cache save failed: ${it.message}") }
+        if (!AtomicJsonFile.write(file(context, accountId), encoded)) {
+            Log.d(TAG, "cache save failed")
+        }
     }
 
     fun clear(context: Context, accountId: String) {
-        runCatching { file(context, accountId).delete() }
+        AtomicJsonFile.delete(file(context, accountId))
     }
 
     private fun migrateLegacy(context: Context, accountId: String) {

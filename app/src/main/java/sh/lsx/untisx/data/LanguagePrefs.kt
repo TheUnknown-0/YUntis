@@ -1,6 +1,8 @@
 package sh.lsx.untisx.data
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.edit
 import androidx.core.os.LocaleListCompat
@@ -40,7 +42,13 @@ object LanguagePrefs {
             LocaleListCompat.forLanguageTags(language.tag)
         }
 
-        AppCompatDelegate.setApplicationLocales(locales)
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            AppCompatDelegate.setApplicationLocales(locales)
+        } else {
+            Handler(Looper.getMainLooper()).post {
+                AppCompatDelegate.setApplicationLocales(locales)
+            }
+        }
     }
 }
 

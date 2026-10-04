@@ -44,6 +44,7 @@
     <!-- Login -->
     <string name="login_connect_account">Konto verbinden</string>
     <string name="login_privacy">"Dein Benutzername und Passwort werden sicher im Android Keystore verschlüsselt und ausschließlich an den Untis-Server deiner Schule gesendet. "</string>
+    <string name="login_teacher_notice">UntisX ist für Schüler:innen gedacht; Lehrer-Konten werden nicht unterstützt.</string>
     <string name="login_school_label">Deine Schule</string>
     <string name="login_school_selected">%1$s, „%2$s“</string>
     <string name="login_searching">Suche…</string>
@@ -217,6 +218,8 @@
 
     <!-- Errors / status messages -->
     <string name="error_network">Keine Verbindung zum Untis-Server möglich.</string>
+    <string name="error_certificate">Sichere Verbindung zum Untis-Server fehlgeschlagen.</string>
+    <string name="error_account_unavailable">Deine gespeicherten Konten sind vorübergehend nicht verfügbar. Bitte versuche es erneut.</string>
     <string name="error_bad_credentials">Benutzername oder Passwort ist falsch.</string>
     <string name="error_too_many_results">Deine Suche passt zu zu vielen Schulen.</string>
     <string name="error_session_expired">Deine Sitzung ist abgelaufen.</string>
@@ -312,6 +315,19 @@
     <string name="notif_change_room_text">%1$s am %2$s, %3$s: Raum %4$s.</string>
     <string name="notif_change_teacher_text">%1$s am %2$s, %3$s: Lehrer %4$s.</string>
     <string name="notif_change_from_to">%1$s → %2$s</string>
+    <string name="notif_channel_account">Konto</string>
+    <string name="notif_channel_account_desc">Warnt, wenn die gespeicherten Zugangsdaten nicht mehr gültig sind.</string>
+    <string name="notif_channel_sync">Sync-Status</string>
+    <string name="notif_channel_sync_desc">Dauerhafte Benachrichtigung, während die App nach Änderungen sucht.</string>
+    <string name="notif_foreground_sync">Suche nach Änderungen...</string>
+    <string name="notif_login_required_title">Bitte erneut anmelden</string>
+    <string name="notif_login_required_text">Dein Passwort wurde vom Untis-Server abgelehnt. Tippe, um deine Zugangsdaten zu aktualisieren.</string>
+
+    <!-- Accounts -->
+    <string name="accounts_transient">Deine gespeicherten Konten sind vorübergehend nicht verfügbar.</string>
+    <string name="accounts_retry">Erneut versuchen</string>
+    <string name="accounts_unreadable">Deine gespeicherten Konten konnten nicht mehr entschlüsselt werden. Bitte melde dich erneut an.</string>
+    <string name="accounts_start_over">Erneut anmelden</string>
 
     <!-- Onboarding: exact alarms -->
     <string name="onboarding_exact_alarm_title">Exakte Alarme (optional)</string>

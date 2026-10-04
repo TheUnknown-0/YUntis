@@ -32,9 +32,16 @@ object ExamsMatcher {
         val entryStart = minutes(entry.startTime)
         val entryEnd = if (entry.endTime == 0) entryStart else minutes(entry.endTime)
         val examStart = minutes(exam.startTime)
-        val examEnd = if (exam.endTime == 0) examStart else minutes(exam.endTime)
 
-        return examStart <= entryEnd && entryStart <= examEnd
+        if (exam.endTime == 0) {
+            if (entryStart == entryEnd) return examStart == entryStart
+
+            return examStart in entryStart..<entryEnd
+        }
+
+        val examEnd = minutes(exam.endTime)
+
+        return examStart < entryEnd && entryStart < examEnd
     }
 
     private fun distanceMinutes(a: Int, b: Int): Int = abs(minutes(a) - minutes(b))

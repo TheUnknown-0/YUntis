@@ -3,11 +3,12 @@ package sh.lsx.untisx.data.notifications
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import sh.lsx.untisx.R
 import sh.lsx.untisx.data.TimetableCache
 import kotlinx.coroutines.CancellationException
-import sh.lsx.untisx.data.appLocale
+import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
@@ -15,8 +16,11 @@ import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.model.toUntisWeekStart
 import sh.lsx.untisx.data.prefs.AccountPrefs
+import sh.lsx.untisx.data.prefs.AccountStore
+import sh.lsx.untisx.data.prefs.CredentialsPrefs
+import sh.lsx.untisx.ui.util.AppDateFormats
+import java.io.IOException
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 class DayOverviewWorker(
     appContext: Context,
@@ -38,16 +42,35 @@ class DayOverviewWorker(
         val today = LocalDate.now()
         val target = NotificationTimes.overviewTargetDate(today, overviewMinute)
 
+        AccountStore.ensureLoaded(context)
+
+        val auth = AccountStore.active ?: return Result.success()
+        val accountId = AccountPrefs.accountId(auth)
+
+        if (CredentialsPrefs.isInvalid(context, accountId)) return Result.success()
+
         if (NotificationRules.isHoliday(context, target)) return Result.success()
 
-        val auth = AccountPrefs.getActive(context) ?: return Result.success()
-        val accountId = AccountPrefs.accountId(auth)
         val cache = TimetableCache.load(context, accountId)
 
         val entries = try {
             TimetableSource.fetchRange(context, auth, target, target).entries
         } catch (e: CancellationException) {
             throw e
+        } catch (e: UntisException.BadCredentials) {
+            Log.d(TAG, "overview stopped: bad credentials")
+
+            if (CredentialsPrefs.markInvalid(context, accountId)) {
+                Notifications.notifyLoginRequired(context)
+            }
+
+            return Result.success()
+        } catch (e: UntisException.Api) {
+            Log.d(TAG, "overview stopped: api error ${e.code}")
+            return Result.success()
+        } catch (e: IOException) {
+            Log.d(TAG, "overview fetch failed, using cache: io")
+            cachedEntries(context, accountId, target)
         } catch (e: Exception) {
             Log.d(TAG, "overview fetch failed, using cache: ${e.javaClass.simpleName}")
             cachedEntries(context, accountId, target)
@@ -74,6 +97,12 @@ class DayOverviewWorker(
 
         return Result.success()
     }
+
+    override suspend fun getForegroundInfo(): ForegroundInfo =
+        ForegroundInfo(
+            Notifications.FOREGROUND_OVERVIEW_ID,
+            Notifications.foregroundNotification(applicationContext),
+        )
 
     private fun cachedEntries(context: Context, accountId: String, date: LocalDate): List<TimetableEntry> {
         val cache = TimetableCache.load(context, accountId) ?: return emptyList()
@@ -119,7 +148,7 @@ class DayOverviewWorker(
         val showChanges = NotificationPrefs.overviewShowChanges(context)
 
         return sorted.joinToString("\n") { entry ->
-            val time = entry.startTime.toUntisLocalTime().format(TIME_FORMAT)
+            val time = entry.startTime.toUntisLocalTime().format(AppDateFormats.time(context))
             val subject = names(entry.subject, subjects).ifBlank { "?" }
 
             val details = ArrayList<String>(3)
@@ -154,10 +183,9 @@ class DayOverviewWorker(
         .joinToString(", ")
 
     private fun formatDate(context: Context, date: LocalDate): String =
-        DateTimeFormatter.ofPattern("EEEE, d. MMMM", context.appLocale()).format(date)
+        AppDateFormats.formatter(context, "EEEEdMMMM").format(date)
 
     companion object {
         private const val TAG = "DayOverviewWorker"
-        private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
     }
 }

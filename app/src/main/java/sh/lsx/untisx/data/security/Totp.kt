@@ -7,9 +7,9 @@ import javax.crypto.spec.SecretKeySpec
 private const val BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 private const val TOTP_PERIOD_MILLIS = 30_000L
 
-internal fun generateTotp(base32Secret: String, nowMillis: Long): Long {
-    val key = decodeBase32(base32Secret) ?: return 0L
-    if (key.isEmpty()) return 0L
+internal fun generateTotp(base32Secret: String, nowMillis: Long): Long? {
+    val key = decodeBase32(base32Secret) ?: return null
+    if (key.isEmpty()) return null
 
     val counterBytes = ByteArray(8)
     var counter = nowMillis / TOTP_PERIOD_MILLIS
@@ -41,7 +41,7 @@ internal fun decodeBase32(encoded: String): ByteArray? {
 
     for (c in clean) {
         val index = BASE32_ALPHABET.indexOf(c)
-        if (index < 0) continue
+        if (index < 0) return null
 
         buffer = (buffer shl 5) or index
         bits += 5

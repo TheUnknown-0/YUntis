@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -49,6 +50,7 @@ import sh.lsx.untisx.data.SchoolYearStats
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.SchoolYear
 import sh.lsx.untisx.data.model.toUntisLocalDate
+import sh.lsx.untisx.ui.util.AppDateFormats
 import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import java.time.LocalDate
@@ -317,7 +319,7 @@ private fun HeaderCard(
             )
 
             if (start != null && end != null) {
-                val dateFormat = rememberDateFormat("d. MMM yyyy")
+                val dateFormat = rememberDateFormat("dMMMyyyy")
 
                 Text(
                     text = "${dateFormat.format(start)} – ${dateFormat.format(end)}",
@@ -333,9 +335,10 @@ private fun HeaderCard(
             )
 
             if (lastUpdated > 0L) {
+                val context = LocalContext.current
                 val locale = LocalConfiguration.current.locales[0]
                 val timestamp = remember(lastUpdated, locale) {
-                    DateTimeFormatter.ofPattern("d. MMM, HH:mm", locale)
+                    AppDateFormats.formatter(context, "dMMMjm")
                         .format(java.time.Instant.ofEpochMilli(lastUpdated).atZone(java.time.ZoneId.systemDefault()))
                 }
 
@@ -597,7 +600,7 @@ private fun formatPercentValue(value: Float, locale: Locale): String =
     String.format(locale, "%.1f%%", value)
 
 private fun monthLabel(month: YearMonth, locale: Locale): String =
-    month.format(DateTimeFormatter.ofPattern("MMM yyyy", locale))
+    month.format(DateTimeFormatter.ofPattern(AppDateFormats.pattern(locale, "MMMyyyy"), locale))
 
 private fun subjectName(id: Int, data: Map<Int, MasterDataItem>): String =
     data[id]?.name?.takeIf { it.isNotBlank() } ?: "#$id"
