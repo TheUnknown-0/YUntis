@@ -80,6 +80,7 @@
     <string name="settings_animations">Animations</string>
     <string name="settings_animations_desc">Transitions, morphs and animated details</string>
     <string name="settings_haptics">Haptic feedback</string>
+    <string name="settings_show_last_refreshed">Last refreshed indicator</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_system">System</string>
     <string name="settings_timetable_colors">Timetable colors</string>
@@ -121,6 +122,20 @@
     <string name="timetable_holiday">Holiday</string>
     <string name="timetable_restricted">Restricted</string>
     <string name="timetable_today">Today</string>
+    <string name="timetable_last_refreshed">Last refreshed: %1$s</string>
+    <string name="time_now">just now</string>
+    <plurals name="time_minutes_ago">
+        <item quantity="one">%1$d min ago</item>
+        <item quantity="other">%1$d min ago</item>
+    </plurals>
+    <plurals name="time_hours_ago">
+        <item quantity="one">%1$d h ago</item>
+        <item quantity="other">%1$d h ago</item>
+    </plurals>
+    <plurals name="time_days_ago">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
 
     <!-- Lesson details -->
     <string name="lesson_cancelled">Cancelled</string>

@@ -96,6 +96,7 @@ import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AnimationPrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
+import sh.lsx.untisx.data.prefs.TimetablePrefs
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.ThemePrefs
 import sh.lsx.untisx.data.notifications.NotificationScheduler
@@ -222,6 +223,7 @@ private fun AppRoot(
     var onboardingDone by remember { mutableStateOf(readOnboardingDone(context)) }
     var auth by remember { mutableStateOf(AccountPrefs.getActive(context)) }
     var hapticsEnabled by remember { mutableStateOf(HapticsPrefs.isEnabled(context)) }
+    var showLastRefreshed by remember { mutableStateOf(TimetablePrefs.showLastRefreshed(context)) }
     var animationsEnabled by remember { mutableStateOf(AnimationPrefs.isEnabled(context)) }
     var subjectColors by remember { mutableStateOf(SubjectColorsPrefs.getColors(context)) }
     var knownSubjects by remember { mutableStateOf(SubjectColorsPrefs.getKnown(context)) }
@@ -246,6 +248,10 @@ private fun AppRoot(
 
             if (key == HapticsPrefs.KEY) {
                 hapticsEnabled = HapticsPrefs.isEnabled(context)
+            }
+
+            if (key == TimetablePrefs.KEY_SHOW_LAST_REFRESHED) {
+                showLastRefreshed = TimetablePrefs.showLastRefreshed(context)
             }
 
             if (key == AnimationPrefs.KEY) {
@@ -317,6 +323,8 @@ private fun AppRoot(
                         onThemeChange = ::saveTheme,
                         hapticsEnabled = hapticsEnabled,
                         onHapticsChange = { HapticsPrefs.setEnabled(context, it) },
+                        showLastRefreshed = showLastRefreshed,
+                        onShowLastRefreshedChange = { TimetablePrefs.setShowLastRefreshed(context, it) },
                         animationsEnabled = animationsEnabled,
                         onAnimationsChange = { AnimationPrefs.setEnabled(context, it) },
                         subjectColors = subjectColors,
@@ -431,6 +439,8 @@ private fun MainApp(
     onThemeChange: (AppTheme) -> Unit,
     hapticsEnabled: Boolean,
     onHapticsChange: (Boolean) -> Unit,
+    showLastRefreshed: Boolean,
+    onShowLastRefreshedChange: (Boolean) -> Unit,
     animationsEnabled: Boolean,
     onAnimationsChange: (Boolean) -> Unit,
     subjectColors: Map<String, Int>,
@@ -840,6 +850,8 @@ private fun MainApp(
                                         SettingsCategory.GENERAL -> GeneralSettingsScreen(
                                             hapticsEnabled = hapticsEnabled,
                                             onHapticsChange = onHapticsChange,
+                                            showLastRefreshed = showLastRefreshed,
+                                            onShowLastRefreshedChange = onShowLastRefreshedChange,
                                             modifier = settingsModifier,
                                         )
 
@@ -910,6 +922,7 @@ private fun MainApp(
                             defaultColor = Color(defaultSubjectColor),
                             textColor = Color(lessonTextColor),
                             cancelledStrike = cancelledStrike,
+                            showLastRefreshed = showLastRefreshed,
                             focusDate = focusDate,
                             focusNonce = focusNonce,
                             onFocusConsumed = onFocusConsumed,
@@ -986,6 +999,7 @@ private fun MainApp(
                             defaultColor = Color(defaultSubjectColor),
                             textColor = Color(lessonTextColor),
                             cancelledStrike = cancelledStrike,
+                            showLastRefreshed = showLastRefreshed,
                             focusDate = focusDate,
                             focusNonce = focusNonce,
                             onFocusConsumed = onFocusConsumed,
@@ -1006,6 +1020,7 @@ private fun MainApp(
                             defaultColor = Color(defaultSubjectColor),
                             textColor = Color(lessonTextColor),
                             cancelledStrike = cancelledStrike,
+                            showLastRefreshed = showLastRefreshed,
                             focusDate = focusDate,
                             focusNonce = focusNonce,
                             onFocusConsumed = onFocusConsumed,

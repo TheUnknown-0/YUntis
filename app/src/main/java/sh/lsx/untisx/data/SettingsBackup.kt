@@ -7,12 +7,14 @@ import sh.lsx.untisx.data.notifications.NotificationPrefs
 import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.data.prefs.AnimationPrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
+import sh.lsx.untisx.data.prefs.TimetablePrefs
 import java.util.Locale
 
 @Serializable
 data class GeneralSettingsBackup(
     val language: String? = null,
     val haptics: Boolean? = null,
+    val showLastRefreshed: Boolean? = null,
 )
 
 @Serializable
@@ -128,6 +130,7 @@ object SettingsBackupManager {
             general = GeneralSettingsBackup(
                 language = LanguagePrefs.get(context).name,
                 haptics = HapticsPrefs.isEnabled(context),
+                showLastRefreshed = TimetablePrefs.showLastRefreshed(context),
             ),
             appearance = AppearanceSettingsBackup(
                 themeMode = theme.mode.name,
@@ -172,6 +175,7 @@ object SettingsBackupManager {
                 ?.let { LanguagePrefs.save(context, it) }
 
             general.haptics?.let { HapticsPrefs.setEnabled(context, it) }
+            general.showLastRefreshed?.let { TimetablePrefs.setShowLastRefreshed(context, it) }
         }
 
         backup.appearance?.let { appearance ->

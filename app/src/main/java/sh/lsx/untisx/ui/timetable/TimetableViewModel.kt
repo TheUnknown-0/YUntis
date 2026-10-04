@@ -160,7 +160,9 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     private val flightLock = Mutex()
     private val notesCache = HashMap<Int, NotesState.Loaded>()
     private var notesRequestId = 0
-    private var lastFetch = 0L
+
+    var lastFetch by mutableLongStateOf(0L)
+        private set
 
     private val backgroundJob = SupervisorJob(viewModelScope.coroutineContext[Job])
     private val backgroundScope = CoroutineScope(viewModelScope.coroutineContext + backgroundJob)

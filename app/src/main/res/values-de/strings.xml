@@ -80,6 +80,7 @@
     <string name="settings_animations">Animationen</string>
     <string name="settings_animations_desc">Übergänge, Morphs und animierte Details</string>
     <string name="settings_haptics">Haptisches Feedback</string>
+    <string name="settings_show_last_refreshed">Zuletzt aktualisiert anzeigen</string>
     <string name="settings_language">Sprache</string>
     <string name="settings_language_system">System</string>
     <string name="settings_timetable_colors">Stundenplan-Farben</string>
@@ -121,6 +122,20 @@
     <string name="timetable_holiday">Ferien</string>
     <string name="timetable_restricted">Gesperrt</string>
     <string name="timetable_today">Heute</string>
+    <string name="timetable_last_refreshed">Zuletzt aktualisiert: %1$s</string>
+    <string name="time_now">gerade eben</string>
+    <plurals name="time_minutes_ago">
+        <item quantity="one">vor %1$d Min.</item>
+        <item quantity="other">vor %1$d Min.</item>
+    </plurals>
+    <plurals name="time_hours_ago">
+        <item quantity="one">vor %1$d Std.</item>
+        <item quantity="other">vor %1$d Std.</item>
+    </plurals>
+    <plurals name="time_days_ago">
+        <item quantity="one">vor %1$d Tag</item>
+        <item quantity="other">vor %1$d Tagen</item>
+    </plurals>
 
     <!-- Lesson details -->
     <string name="lesson_cancelled">Entfällt</string>

@@ -43,6 +43,8 @@ import java.time.LocalDate
 fun GeneralSettingsScreen(
     hapticsEnabled: Boolean,
     onHapticsChange: (Boolean) -> Unit,
+    showLastRefreshed: Boolean,
+    onShowLastRefreshedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -100,6 +102,12 @@ fun GeneralSettingsScreen(
                 title = stringResource(R.string.settings_haptics),
                 checked = hapticsEnabled,
                 onCheckedChange = onHapticsChange,
+            )
+
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_show_last_refreshed),
+                checked = showLastRefreshed,
+                onCheckedChange = onShowLastRefreshedChange,
             )
         }
 

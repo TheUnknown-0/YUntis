@@ -43,6 +43,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -59,6 +60,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
@@ -80,9 +82,11 @@ import sh.lsx.untisx.ui.util.motionEffects
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.util.tapHaptic
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import kotlin.math.abs
@@ -118,6 +122,7 @@ fun TimetableScreen(
     defaultColor: Color = Color(0xFF81D4FA),
     textColor: Color = Color(0xFF212121),
     cancelledStrike: Boolean = true,
+    showLastRefreshed: Boolean = true,
     onLessonClick: (TimetableEntry) -> Unit = {},
     onEventClick: (TimetableEntry) -> Unit = {},
     focusDate: Int = 0,
@@ -226,6 +231,15 @@ fun TimetableScreen(
                     )
                 }
             }
+        }
+
+        if (showLastRefreshed && vm.weeks.isNotEmpty()) {
+            LastRefreshedLabel(
+                lastFetch = vm.lastFetch,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 52.dp, bottom = 24.dp),
+            )
         }
     }
 }
@@ -778,5 +792,59 @@ private fun DayColumn(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LastRefreshedLabel(
+    lastFetch: Long,
+    modifier: Modifier = Modifier,
+) {
+    if (lastFetch <= 0L) return
+
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(lastFetch) {
+        while (true) {
+            delay(30_000)
+            now = System.currentTimeMillis()
+        }
+    }
+
+    Text(
+        text = stringResource(R.string.timetable_last_refreshed, relativeTimeText(lastFetch, now)),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+    )
+}
+
+@Composable
+private fun relativeTimeText(timestamp: Long, now: Long): String {
+    val elapsed = (now - timestamp).coerceAtLeast(0L)
+
+    return when {
+        elapsed < 45_000L -> stringResource(R.string.time_now)
+
+        elapsed < 60 * 60_000L -> {
+            val minutes = (elapsed / 60_000L).toInt()
+            pluralStringResource(R.plurals.time_minutes_ago, minutes, minutes)
+        }
+
+        elapsed < 24 * 60 * 60_000L -> {
+            val hours = (elapsed / 3_600_000L).toInt()
+            pluralStringResource(R.plurals.time_hours_ago, hours, hours)
+        }
+
+        elapsed < 7 * 24 * 60 * 60_000L -> {
+            val days = (elapsed / 86_400_000L).toInt()
+            pluralStringResource(R.plurals.time_days_ago, days, days)
+        }
+
+        else -> rememberDateFormat("d. MMM, HH:mm")
+            .format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
     }
 }
