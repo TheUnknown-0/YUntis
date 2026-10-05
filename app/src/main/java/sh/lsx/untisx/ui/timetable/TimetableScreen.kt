@@ -111,7 +111,10 @@ fun TimetableScreen(
     subjectColors: Map<String, Color> = emptyMap(),
     defaultColor: Color = Color(0xFF81D4FA),
     textColor: Color = Color(0xFF212121),
+    subjectTextColors: Map<String, Color> = emptyMap(),
     cancelledStrike: Boolean = true,
+    cancelledDim: Float = 1f,
+    pastDim: Float = 0.12f,
     showLastRefreshed: Boolean = true,
     onLessonClick: (TimetableEntry) -> Unit = {},
     onEventClick: (TimetableEntry) -> Unit = {},
@@ -127,6 +130,10 @@ fun TimetableScreen(
 
     val colorFor = remember(subjectColors, defaultColor) {
         { name: String -> subjectColors[name] ?: defaultColor }
+    }
+
+    val textColorFor = remember(subjectTextColors, textColor) {
+        { name: String -> subjectTextColors[name] ?: textColor }
     }
 
     val pagerState = rememberPagerState(
@@ -231,8 +238,10 @@ fun TimetableScreen(
                         dayEnd = grid.dayEnd,
                         gridHeight = grid.height,
                         colorFor = colorFor,
-                        textColor = textColor,
+                        textColorFor = textColorFor,
                         cancelledStrike = cancelledStrike,
+                        cancelledDim = cancelledDim,
+                        pastDim = pastDim,
                         onLessonClick = onLessonClick,
                         onEventClick = onEventClick,
                         exams = vm.exams,
@@ -266,8 +275,10 @@ private fun WeekPage(
     dayEnd: Int,
     gridHeight: Dp,
     colorFor: (String) -> Color,
-    textColor: Color,
+    textColorFor: (String) -> Color,
     cancelledStrike: Boolean,
+    cancelledDim: Float,
+    pastDim: Float,
     onLessonClick: (TimetableEntry) -> Unit,
     onEventClick: (TimetableEntry) -> Unit,
     exams: List<ExamInfo>,
@@ -344,8 +355,10 @@ private fun WeekPage(
                     dayEnd = dayEnd,
                     gridHeight = gridHeight,
                     colorFor = colorFor,
-                    textColor = textColor,
+                    textColorFor = textColorFor,
                     cancelledStrike = cancelledStrike,
+                    cancelledDim = cancelledDim,
+                    pastDim = pastDim,
                     onLessonClick = onLessonClick,
                     onEventClick = onEventClick,
                 )
@@ -475,8 +488,10 @@ private fun WeekGrid(
     dayEnd: Int,
     gridHeight: Dp,
     colorFor: (String) -> Color,
-    textColor: Color,
+    textColorFor: (String) -> Color,
     cancelledStrike: Boolean,
+    cancelledDim: Float,
+    pastDim: Float,
     onLessonClick: (TimetableEntry) -> Unit,
     onEventClick: (TimetableEntry) -> Unit,
 ) {
@@ -508,8 +523,10 @@ private fun WeekGrid(
                 dayEnd = dayEnd,
                 gridHeight = gridHeight,
                 colorFor = colorFor,
-                textColor = textColor,
+                textColorFor = textColorFor,
                 cancelledStrike = cancelledStrike,
+                cancelledDim = cancelledDim,
+                pastDim = pastDim,
                 onLessonClick = onLessonClick,
                 onEventClick = onEventClick,
                 modifier = Modifier.weight(1f),
@@ -585,8 +602,10 @@ private fun DayColumn(
     dayEnd: Int,
     gridHeight: Dp,
     colorFor: (String) -> Color,
-    textColor: Color,
+    textColorFor: (String) -> Color,
     cancelledStrike: Boolean,
+    cancelledDim: Float,
+    pastDim: Float,
     onLessonClick: (TimetableEntry) -> Unit,
     onEventClick: (TimetableEntry) -> Unit,
     modifier: Modifier = Modifier,
@@ -712,8 +731,9 @@ private fun DayColumn(
                     LessonCard(
                         lesson = lesson,
                         color = colorFor(lesson.subject),
-                        textColor = textColor,
+                        textColor = textColorFor(lesson.subject),
                         strike = cancelledStrike,
+                        cancelledDim = cancelledDim,
                         modifier = Modifier
                             .width(cardWidth)
                             .offset(x = left, y = top)
@@ -743,7 +763,7 @@ private fun DayColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(overlayHeight)
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = pastDim)),
                 )
             }
 

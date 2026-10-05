@@ -14,9 +14,16 @@ class SettingsBackupCodecTest {
             appVersion = "0.5.0",
             exportedAt = 1234L,
             general = GeneralSettingsBackup(language = "GERMAN", haptics = false),
-            appearance = AppearanceSettingsBackup(themeMode = "DARK", animations = true),
+            appearance = AppearanceSettingsBackup(
+                themeMode = "DARK",
+                themeCustomSeed = "#445566",
+                animations = true,
+            ),
             notifications = NotificationSettingsBackup(enabled = false, syncIntervalMinutes = 90),
-            timetable = TimetableSettingsBackup(defaultSubjectColor = "#AABBCC"),
+            timetable = TimetableSettingsBackup(
+                defaultSubjectColor = "#AABBCC",
+                subjectTextColors = mapOf("MA" to "#112233"),
+            ),
         )
 
         val decoded = SettingsBackupCodec.decode(SettingsBackupCodec.encode(backup))
@@ -43,6 +50,32 @@ class SettingsBackupCodecTest {
         val text = """{"type":"untisx-settings","version":${SettingsBackupCodec.CURRENT_VERSION + 1}}"""
 
         assertTrue(SettingsBackupCodec.decode(text) is DecodeResult.UnsupportedVersion)
+    }
+
+    @Test
+    fun `display dims round trip`() {
+        val backup = SettingsBackup(
+            timetable = TimetableSettingsBackup(cancelledDim = 0.4f, pastDim = 0.2f),
+        )
+
+        val decoded = SettingsBackupCodec.decode(SettingsBackupCodec.encode(backup))
+
+        assertTrue(decoded is DecodeResult.Valid)
+        val timetable = (decoded as DecodeResult.Valid).backup.timetable
+        assertEquals(0.4f, timetable?.cancelledDim)
+        assertEquals(0.2f, timetable?.pastDim)
+    }
+
+    @Test
+    fun `backups without display dims stay valid`() {
+        val text = """{"type":"untisx-settings","version":1,"timetable":{"cancelledStrike":true}}"""
+
+        val decoded = SettingsBackupCodec.decode(text)
+
+        assertTrue(decoded is DecodeResult.Valid)
+        val timetable = (decoded as DecodeResult.Valid).backup.timetable
+        assertNull(timetable?.cancelledDim)
+        assertNull(timetable?.pastDim)
     }
 
     @Test

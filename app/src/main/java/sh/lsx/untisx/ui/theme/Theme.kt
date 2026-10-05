@@ -23,6 +23,7 @@ import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 fun UntisXTheme(
     mode: ThemeMode = ThemeMode.SYSTEM,
     preset: ThemePreset = ThemePreset.DEVICE,
+    customSeed: Int = ThemePreset.ORANGE.seed,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = when (mode) {
@@ -35,7 +36,12 @@ fun UntisXTheme(
     val colorScheme = if (preset == ThemePreset.DEVICE && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     } else {
-        val seed = if (preset.seed != 0) preset.seed else ThemePreset.ORANGE.seed
+        val seed = when {
+            preset == ThemePreset.CUSTOM && customSeed != 0 -> customSeed
+            preset.seed != 0 -> preset.seed
+            else -> ThemePreset.ORANGE.seed
+        }
+
         seedScheme(if (darkTheme) Scheme.dark(seed) else Scheme.light(seed), darkTheme)
     }
 

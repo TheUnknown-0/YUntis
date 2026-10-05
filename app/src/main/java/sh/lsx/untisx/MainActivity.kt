@@ -99,6 +99,7 @@ import sh.lsx.untisx.data.prefs.AccountLoadError
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.prefs.AnimationPrefs
+import sh.lsx.untisx.data.prefs.AppearancePrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
 import sh.lsx.untisx.data.prefs.TimetablePrefs
 import sh.lsx.untisx.data.SubjectColorsPrefs
@@ -230,10 +231,13 @@ private fun AppRoot(
     var showLastRefreshed by remember { mutableStateOf(TimetablePrefs.showLastRefreshed(context)) }
     var animationsEnabled by remember { mutableStateOf(AnimationPrefs.isEnabled(context)) }
     var subjectColors by remember { mutableStateOf(SubjectColorsPrefs.getColors(context)) }
+    var subjectTextColors by remember { mutableStateOf(SubjectColorsPrefs.getSubjectTextColors(context)) }
     var knownSubjects by remember { mutableStateOf(SubjectColorsPrefs.getKnown(context)) }
     var defaultSubjectColor by remember { mutableStateOf(SubjectColorsPrefs.getDefaultColor(context)) }
     var lessonTextColor by remember { mutableStateOf(SubjectColorsPrefs.getTextColor(context)) }
     var cancelledStrike by remember { mutableStateOf(SubjectColorsPrefs.isCancelledStrike(context)) }
+    var cancelledDim by remember { mutableStateOf(AppearancePrefs.getCancelledDim(context)) }
+    var pastDim by remember { mutableStateOf(AppearancePrefs.getPastDim(context)) }
 
     val accounts by AccountStore.accounts.collectAsStateWithLifecycle()
     val activeId by AccountStore.activeId.collectAsStateWithLifecycle()
@@ -272,10 +276,16 @@ private fun AppRoot(
 
             if (key in SubjectColorsPrefs.KEYS) {
                 subjectColors = SubjectColorsPrefs.getColors(context)
+                subjectTextColors = SubjectColorsPrefs.getSubjectTextColors(context)
                 knownSubjects = SubjectColorsPrefs.getKnown(context)
                 defaultSubjectColor = SubjectColorsPrefs.getDefaultColor(context)
                 lessonTextColor = SubjectColorsPrefs.getTextColor(context)
                 cancelledStrike = SubjectColorsPrefs.isCancelledStrike(context)
+            }
+
+            if (key in AppearancePrefs.KEYS) {
+                cancelledDim = AppearancePrefs.getCancelledDim(context)
+                pastDim = AppearancePrefs.getPastDim(context)
             }
         }
 
@@ -289,7 +299,7 @@ private fun AppRoot(
         LocalHapticsEnabled provides hapticsEnabled,
         LocalAnimationsEnabled provides animationsEnabled,
     ) {
-        UntisXTheme(mode = theme.mode, preset = theme.preset) {
+        UntisXTheme(mode = theme.mode, preset = theme.preset, customSeed = theme.customSeed) {
             val updateVm: UpdateViewModel = viewModel()
 
             LaunchedEffect(Unit) {
@@ -350,12 +360,18 @@ private fun AppRoot(
                         subjectColors = subjectColors,
                         knownSubjects = knownSubjects,
                         onSubjectColor = { name, argb -> SubjectColorsPrefs.setColor(context, name, argb) },
+                        subjectTextColors = subjectTextColors,
+                        onSubjectTextColor = { name, argb -> SubjectColorsPrefs.setSubjectTextColor(context, name, argb) },
                         defaultSubjectColor = defaultSubjectColor,
                         onDefaultSubjectColor = { SubjectColorsPrefs.setDefaultColor(context, it) },
                         lessonTextColor = lessonTextColor,
                         onLessonTextColor = { SubjectColorsPrefs.setTextColor(context, it) },
                         cancelledStrike = cancelledStrike,
                         onCancelledStrike = { SubjectColorsPrefs.setCancelledStrike(context, it) },
+                        cancelledDim = cancelledDim,
+                        onCancelledDim = { AppearancePrefs.setCancelledDim(context, it) },
+                        pastDim = pastDim,
+                        onPastDim = { AppearancePrefs.setPastDim(context, it) },
                         focusDate = focusDate,
                         focusScreen = focusScreen,
                         focusNonce = focusNonce,
@@ -518,12 +534,18 @@ private fun MainApp(
     subjectColors: Map<String, Int>,
     knownSubjects: List<String>,
     onSubjectColor: (String, Int?) -> Unit,
+    subjectTextColors: Map<String, Int>,
+    onSubjectTextColor: (String, Int?) -> Unit,
     defaultSubjectColor: Int,
     onDefaultSubjectColor: (Int) -> Unit,
     lessonTextColor: Int,
     onLessonTextColor: (Int) -> Unit,
     cancelledStrike: Boolean,
     onCancelledStrike: (Boolean) -> Unit,
+    cancelledDim: Float,
+    onCancelledDim: (Float) -> Unit,
+    pastDim: Float,
+    onPastDim: (Float) -> Unit,
     focusDate: Int,
     focusScreen: String?,
     focusNonce: Int,
@@ -949,12 +971,18 @@ private fun MainApp(
                                             knownSubjects = knownSubjects,
                                             subjectColors = subjectColors,
                                             onSubjectColor = onSubjectColor,
+                                            subjectTextColors = subjectTextColors,
+                                            onSubjectTextColor = onSubjectTextColor,
                                             defaultSubjectColor = defaultSubjectColor,
                                             onDefaultSubjectColor = onDefaultSubjectColor,
                                             lessonTextColor = lessonTextColor,
                                             onLessonTextColor = onLessonTextColor,
                                             cancelledStrike = cancelledStrike,
                                             onCancelledStrike = onCancelledStrike,
+                                            cancelledDim = cancelledDim,
+                                            onCancelledDim = onCancelledDim,
+                                            pastDim = pastDim,
+                                            onPastDim = onPastDim,
                                             modifier = settingsModifier,
                                         )
                                     }
@@ -998,7 +1026,10 @@ private fun MainApp(
                             subjectColors = subjectColors.mapValues { Color(it.value) },
                             defaultColor = Color(defaultSubjectColor),
                             textColor = Color(lessonTextColor),
+                            subjectTextColors = subjectTextColors.mapValues { Color(it.value) },
                             cancelledStrike = cancelledStrike,
+                            cancelledDim = cancelledDim,
+                            pastDim = pastDim,
                             showLastRefreshed = showLastRefreshed,
                             focusDate = focusDate,
                             focusNonce = focusNonce,
@@ -1054,16 +1085,18 @@ private fun MainApp(
                         )
 
                         Screen.LESSON_DETAILS -> selectedLesson?.let { lesson ->
+                            val subjectName = lesson.subject.firstOrNull()
+                                ?.let { timetableVm.subjectsById[it.id]?.name?.takeIf { name -> name.isNotBlank() } ?: it.name }
+
                             LessonDetailsScreen(
                                 entry = lesson,
                                 subjectsById = timetableVm.subjectsById,
                                 teachersById = timetableVm.teachersById,
                                 roomsById = timetableVm.roomsById,
-                                color = subjectColors[
-                                    lesson.subject.firstOrNull()
-                                        ?.let { timetableVm.subjectsById[it.id]?.name?.takeIf { name -> name.isNotBlank() } ?: it.name }
-                                ]?.let { Color(it) } ?: Color(defaultSubjectColor),
-                                textColor = Color(lessonTextColor),
+                                color = subjectColors[subjectName]?.let { Color(it) } ?: Color(defaultSubjectColor),
+                                textColor = Color(
+                                    subjectName?.let { subjectTextColors[it] } ?: lessonTextColor,
+                                ),
                                 notes = timetableVm.lessonNotes,
                                 exam = timetableVm.examFor(lesson),
                                 modifier = Modifier
@@ -1075,7 +1108,10 @@ private fun MainApp(
                             subjectColors = subjectColors.mapValues { Color(it.value) },
                             defaultColor = Color(defaultSubjectColor),
                             textColor = Color(lessonTextColor),
+                            subjectTextColors = subjectTextColors.mapValues { Color(it.value) },
                             cancelledStrike = cancelledStrike,
+                            cancelledDim = cancelledDim,
+                            pastDim = pastDim,
                             showLastRefreshed = showLastRefreshed,
                             focusDate = focusDate,
                             focusNonce = focusNonce,
@@ -1096,7 +1132,10 @@ private fun MainApp(
                             subjectColors = subjectColors.mapValues { Color(it.value) },
                             defaultColor = Color(defaultSubjectColor),
                             textColor = Color(lessonTextColor),
+                            subjectTextColors = subjectTextColors.mapValues { Color(it.value) },
                             cancelledStrike = cancelledStrike,
+                            cancelledDim = cancelledDim,
+                            pastDim = pastDim,
                             showLastRefreshed = showLastRefreshed,
                             focusDate = focusDate,
                             focusNonce = focusNonce,

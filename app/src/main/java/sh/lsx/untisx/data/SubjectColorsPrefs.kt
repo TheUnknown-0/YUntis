@@ -8,6 +8,7 @@ import androidx.core.content.edit
 object SubjectColorsPrefs {
 
     const val KEY_COLORS = "subject_colors"
+    const val KEY_TEXT_COLORS = "subject_text_colors"
     const val KEY_KNOWN = "known_subjects"
     const val KEY_CANCELLED_STRIKE = "cancelled_strike"
     const val KEY_DEFAULT_COLOR = "subject_default_color"
@@ -15,6 +16,7 @@ object SubjectColorsPrefs {
 
     val KEYS = listOf(
         KEY_COLORS,
+        KEY_TEXT_COLORS,
         KEY_KNOWN,
         KEY_CANCELLED_STRIKE,
         KEY_DEFAULT_COLOR,
@@ -44,6 +46,24 @@ object SubjectColorsPrefs {
 
         prefs(context).edit {
             putString(KEY_COLORS, json.encodeToString(current))
+        }
+    }
+
+    fun getSubjectTextColors(context: Context): Map<String, Int> {
+        val raw = prefs(context).getString(KEY_TEXT_COLORS, null) ?: return emptyMap()
+
+        return runCatching {
+            json.decodeFromString<Map<String, Int>>(raw)
+        }.getOrDefault(emptyMap())
+    }
+
+    fun setSubjectTextColor(context: Context, name: String, argb: Int?) {
+        val current = getSubjectTextColors(context).toMutableMap()
+
+        if (argb == null) current.remove(name) else current[name] = argb
+
+        prefs(context).edit {
+            putString(KEY_TEXT_COLORS, json.encodeToString(current))
         }
     }
 
@@ -91,6 +111,7 @@ object SubjectColorsPrefs {
     fun clear(context: Context) {
         prefs(context).edit {
             remove(KEY_COLORS)
+            remove(KEY_TEXT_COLORS)
             remove(KEY_KNOWN)
             remove(KEY_DEFAULT_COLOR)
             remove(KEY_TEXT_COLOR)

@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import sh.lsx.untisx.data.notifications.NotificationPrefs
 import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.data.prefs.AnimationPrefs
+import sh.lsx.untisx.data.prefs.AppearancePrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
 import sh.lsx.untisx.data.prefs.TimetablePrefs
 import java.util.Locale
@@ -21,6 +22,7 @@ data class GeneralSettingsBackup(
 data class AppearanceSettingsBackup(
     val themeMode: String? = null,
     val themePreset: String? = null,
+    val themeCustomSeed: String? = null,
     val animations: Boolean? = null,
 )
 
@@ -50,10 +52,13 @@ data class NotificationSettingsBackup(
 @Serializable
 data class TimetableSettingsBackup(
     val subjectColors: Map<String, String>? = null,
+    val subjectTextColors: Map<String, String>? = null,
     val knownSubjects: List<String>? = null,
     val defaultSubjectColor: String? = null,
     val lessonTextColor: String? = null,
     val cancelledStrike: Boolean? = null,
+    val cancelledDim: Float? = null,
+    val pastDim: Float? = null,
 )
 
 @Serializable
@@ -135,6 +140,7 @@ object SettingsBackupManager {
             appearance = AppearanceSettingsBackup(
                 themeMode = theme.mode.name,
                 themePreset = theme.preset.name,
+                themeCustomSeed = colorToHex(theme.customSeed),
                 animations = AnimationPrefs.isEnabled(context),
             ),
             notifications = NotificationSettingsBackup(
@@ -160,10 +166,13 @@ object SettingsBackupManager {
             ),
             timetable = TimetableSettingsBackup(
                 subjectColors = SubjectColorsPrefs.getColors(context).mapValues { colorToHex(it.value) },
+                subjectTextColors = SubjectColorsPrefs.getSubjectTextColors(context).mapValues { colorToHex(it.value) },
                 knownSubjects = SubjectColorsPrefs.getKnown(context),
                 defaultSubjectColor = colorToHex(SubjectColorsPrefs.getDefaultColor(context)),
                 lessonTextColor = colorToHex(SubjectColorsPrefs.getTextColor(context)),
                 cancelledStrike = SubjectColorsPrefs.isCancelledStrike(context),
+                cancelledDim = AppearancePrefs.getCancelledDim(context),
+                pastDim = AppearancePrefs.getPastDim(context),
             ),
         )
     }
@@ -186,8 +195,9 @@ object SettingsBackupManager {
             val preset = appearance.themePreset
                 ?.let { name -> ThemePreset.entries.firstOrNull { it.name == name } }
                 ?: current.preset
+            val customSeed = appearance.themeCustomSeed?.let(::hexToColor) ?: current.customSeed
 
-            ThemePrefs.save(context, AppTheme(mode = mode, preset = preset))
+            ThemePrefs.save(context, AppTheme(mode = mode, preset = preset, customSeed = customSeed))
 
             appearance.animations?.let { AnimationPrefs.setEnabled(context, it) }
         }
@@ -226,6 +236,17 @@ object SettingsBackupManager {
                     if (subject != null) hexToColor(hex)?.let { SubjectColorsPrefs.setColor(context, subject, it) }
                 }
 
+            timetable.subjectTextColors
+                ?.entries
+                ?.take(MAX_SUBJECT_ENTRIES)
+                ?.forEach { (name, hex) ->
+                    val subject = name.trim().takeIf { it.isNotBlank() && it.length <= MAX_SUBJECT_NAME_LENGTH }
+
+                    if (subject != null) {
+                        hexToColor(hex)?.let { SubjectColorsPrefs.setSubjectTextColor(context, subject, it) }
+                    }
+                }
+
             timetable.knownSubjects
                 ?.asSequence()
                 ?.map { it.trim() }
@@ -243,6 +264,8 @@ object SettingsBackupManager {
                 ?.let(::hexToColor)
                 ?.let { SubjectColorsPrefs.setTextColor(context, it) }
             timetable.cancelledStrike?.let { SubjectColorsPrefs.setCancelledStrike(context, it) }
+            timetable.cancelledDim?.let { AppearancePrefs.setCancelledDim(context, it) }
+            timetable.pastDim?.let { AppearancePrefs.setPastDim(context, it) }
         }
     }
 

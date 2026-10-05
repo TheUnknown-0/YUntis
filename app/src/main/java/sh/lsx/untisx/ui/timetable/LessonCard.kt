@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -77,38 +78,69 @@ internal fun changedText(orig: String?, current: String): AnnotatedString =
         }
     }
 
+internal data class LessonCardColors(
+    val container: Color,
+    val title: Color,
+    val body: Color,
+)
+
+internal fun cancelledCardColors(color: Color, textColor: Color, dim: Float): LessonCardColors {
+    val amount = dim.coerceIn(0f, 1f)
+    val gray = (0.299f * color.red + 0.587f * color.green + 0.114f * color.blue) * 0.42f
+    val desaturated = Color(gray, gray, gray, color.alpha)
+
+    return LessonCardColors(
+        container = lerp(color, desaturated, amount),
+        title = textColor.copy(alpha = 1f - 0.3f * amount),
+        body = textColor.copy(alpha = 0.8f - 0.25f * amount),
+    )
+}
+
 @Composable
 internal fun LessonCard(
     lesson: LessonDisplay,
     color: Color,
     textColor: Color,
     strike: Boolean = true,
+    cancelledDim: Float = 1f,
+    sharedElement: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val entry = lesson.entry
     val cancelled = entry.cancelled
 
-    fun Color.desaturated(): Color {
-        val gray = (0.299f * red + 0.587f * green + 0.114f * blue) * 0.42f
-        return Color(gray, gray, gray, alpha)
+    val bounds = if (sharedElement) {
+        Modifier.sharedElementBounds("lesson-${entry.id}-${entry.date}-${entry.startTime}")
+    } else {
+        Modifier
+    }
+
+    val target = if (cancelled) {
+        cancelledCardColors(color, textColor, cancelledDim)
+    } else {
+        LessonCardColors(
+            container = color,
+            title = textColor,
+            body = textColor.copy(alpha = 0.8f),
+        )
     }
 
     val animations = LocalAnimationsEnabled.current
 
     val container by animateColorAsState(
-        targetValue = if (cancelled) color.desaturated() else color,
+        targetValue = target.container,
         animationSpec = if (animations) AppMotion.effects() else snap(),
         label = "lessonContainer",
     )
 
     val titleColor by animateColorAsState(
-        targetValue = if (cancelled) textColor.copy(alpha = 0.7f) else textColor,
+        targetValue = target.title,
         animationSpec = if (animations) AppMotion.effects() else snap(),
         label = "lessonTitleColor",
     )
 
     val bodyColor by animateColorAsState(
-        targetValue = if (cancelled) textColor.copy(alpha = 0.55f) else textColor.copy(alpha = 0.8f),
+        targetValue = target.body,
         animationSpec = if (animations) AppMotion.effects() else snap(),
         label = "lessonBodyColor",
     )
@@ -125,7 +157,7 @@ internal fun LessonCard(
 
     Box(
         modifier = modifier
-            .sharedElementBounds("lesson-${entry.id}-${entry.date}-${entry.startTime}")
+            .then(bounds)
             .onSizeChanged { cell = it },
     ) {
         Column(

@@ -94,6 +94,13 @@
     <string name="settings_custom">custom</string>
     <string name="settings_strike_cancelled">Strike through cancelled</string>
     <string name="settings_strike_cancelled_desc">Cut a red line through cancelled lessons</string>
+    <string name="settings_display">Display</string>
+    <string name="settings_cancelled_dim">Dim cancelled lessons</string>
+    <string name="settings_cancelled_dim_desc">How strongly cancelled lessons are greyed out</string>
+    <string name="settings_past_dim">Dim past lessons</string>
+    <string name="settings_past_dim_desc">Opacity of the overlay on lessons that already happened</string>
+    <string name="settings_preview_past">Past</string>
+    <string name="settings_preview_cancelled">Cancelled</string>
     <string name="settings_backup">Backup</string>
     <string name="settings_backup_desc">Export or import your settings as a JSON file. Accounts and passwords are not included.</string>
     <string name="settings_backup_export">Export settings</string>
@@ -118,6 +125,7 @@
     <string name="theme_preset_green">Green</string>
     <string name="theme_preset_purple">Purple</string>
     <string name="theme_preset_red">Red</string>
+    <string name="theme_preset_custom">Custom color</string>
 
     <!-- Timetable -->
     <string name="timetable_holiday">Holiday</string>
@@ -286,6 +294,10 @@
     <string name="color_picker_use_default">Use default color</string>
     <string name="color_picker_custom_hex">Custom hex</string>
     <string name="color_picker_invalid_hex">Invalid hex color.</string>
+    <string name="color_picker_low_contrast">Low contrast with the card text color</string>
+    <string name="color_picker_target_card">Card</string>
+    <string name="color_picker_target_text">Text</string>
+    <string name="color_picker_use_default_text">Use default text color</string>
 
     <!-- Notifications -->
     <string name="notif_channel_changes">Schedule changes</string>

@@ -13,18 +13,21 @@ enum class ThemePreset(val seed: Int) {
     GREEN(0xFF388E3C.toInt()),
     PURPLE(0xFF7B1FA2.toInt()),
     RED(0xFFD32F2F.toInt()),
+    CUSTOM(0),
 }
 
 data class AppTheme(
     val mode: ThemeMode = ThemeMode.SYSTEM,
     val preset: ThemePreset = ThemePreset.DEVICE,
+    val customSeed: Int = ThemePreset.ORANGE.seed,
 )
 
 object ThemePrefs {
     private const val KEY_MODE = "theme_mode"
     private const val KEY_PRESET = "theme_color"
+    private const val KEY_CUSTOM_SEED = "theme_custom_color"
 
-    val KEYS = listOf(KEY_MODE, KEY_PRESET)
+    val KEYS = listOf(KEY_MODE, KEY_PRESET, KEY_CUSTOM_SEED)
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
@@ -37,13 +40,18 @@ object ThemePrefs {
         val preset = runCatching { ThemePreset.valueOf(prefs.getString(KEY_PRESET, ThemePreset.DEVICE.name)!!) }
             .getOrDefault(ThemePreset.DEVICE)
 
-        return AppTheme(mode = mode, preset = preset)
+        return AppTheme(
+            mode = mode,
+            preset = preset,
+            customSeed = prefs.getInt(KEY_CUSTOM_SEED, ThemePreset.ORANGE.seed),
+        )
     }
 
     fun save(context: Context, theme: AppTheme) {
         prefs(context).edit {
             putString(KEY_MODE, theme.mode.name)
             putString(KEY_PRESET, theme.preset.name)
+            putInt(KEY_CUSTOM_SEED, theme.customSeed)
         }
     }
 }

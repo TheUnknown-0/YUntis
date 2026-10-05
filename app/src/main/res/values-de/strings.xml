@@ -94,6 +94,13 @@
     <string name="settings_custom">eigene Farbe</string>
     <string name="settings_strike_cancelled">Ausfälle durchstreichen</string>
     <string name="settings_strike_cancelled_desc">Entfallene Stunden werden rot durchgestrichen</string>
+    <string name="settings_display">Darstellung</string>
+    <string name="settings_cancelled_dim">Ausfälle ausgrauen</string>
+    <string name="settings_cancelled_dim_desc">Wie stark ausgefallene Stunden ausgegraut werden</string>
+    <string name="settings_past_dim">Vergangene Stunden abdunkeln</string>
+    <string name="settings_past_dim_desc">Stärke der Abdunklung für bereits vergangene Stunden</string>
+    <string name="settings_preview_past">Vergangen</string>
+    <string name="settings_preview_cancelled">Ausfall</string>
     <string name="settings_backup">Backup</string>
     <string name="settings_backup_desc">Einstellungen als JSON-Datei exportieren/importieren. Konten und Passwörter werden nicht gespeichert.</string>
     <string name="settings_backup_export">Einstellungen exportieren</string>
@@ -118,6 +125,7 @@
     <string name="theme_preset_green">Grün</string>
     <string name="theme_preset_purple">Lila</string>
     <string name="theme_preset_red">Rot</string>
+    <string name="theme_preset_custom">Eigene Farbe</string>
 
     <!-- Timetable -->
     <string name="timetable_holiday">Ferien</string>
@@ -286,6 +294,10 @@
     <string name="color_picker_use_default">Standardfarbe verwenden</string>
     <string name="color_picker_custom_hex">Eigener Hex-Code</string>
     <string name="color_picker_invalid_hex">Das ist kein gültiger Hex-Code.</string>
+    <string name="color_picker_low_contrast">Geringer Kontrast zur Textfarbe der Karten</string>
+    <string name="color_picker_target_card">Karte</string>
+    <string name="color_picker_target_text">Text</string>
+    <string name="color_picker_use_default_text">Standard verwenden</string>
 
     <!-- Notifications -->
     <string name="notif_channel_changes">Stundenplanänderungen</string>

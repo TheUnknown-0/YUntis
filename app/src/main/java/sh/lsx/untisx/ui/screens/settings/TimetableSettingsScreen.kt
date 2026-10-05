@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -30,13 +31,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sh.lsx.untisx.R
+import sh.lsx.untisx.data.prefs.AppearancePrefs
 import sh.lsx.untisx.ui.components.ColorPickerDialog
 import sh.lsx.untisx.ui.components.SettingsColorRow
 import sh.lsx.untisx.ui.components.SettingsSectionCard
+import sh.lsx.untisx.ui.components.SettingsSliderRow
 import sh.lsx.untisx.ui.components.SettingsSwitchRow
+import sh.lsx.untisx.ui.components.SubjectColorDialog
+import sh.lsx.untisx.ui.timetable.LessonCard
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
+import sh.lsx.untisx.ui.timetable.previewLesson
 import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.tapHaptic
+import kotlin.math.roundToInt
 
 @Composable
 fun TimetableSettingsScreen(
@@ -44,12 +51,18 @@ fun TimetableSettingsScreen(
     knownSubjects: List<String>,
     subjectColors: Map<String, Int>,
     onSubjectColor: (String, Int?) -> Unit,
+    subjectTextColors: Map<String, Int>,
+    onSubjectTextColor: (String, Int?) -> Unit,
     defaultSubjectColor: Int,
     onDefaultSubjectColor: (Int) -> Unit,
     lessonTextColor: Int,
     onLessonTextColor: (Int) -> Unit,
     cancelledStrike: Boolean,
     onCancelledStrike: (Boolean) -> Unit,
+    cancelledDim: Float,
+    onCancelledDim: (Float) -> Unit,
+    pastDim: Float,
+    onPastDim: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
 
@@ -111,6 +124,17 @@ fun TimetableSettingsScreen(
                                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
                         )
 
+                        subjectTextColors[name]?.let { textOverride ->
+                            Spacer(Modifier.size(6.dp))
+
+                            Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .background(Color(textOverride), CircleShape)
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+                            )
+                        }
+
                         Spacer(Modifier.size(10.dp))
 
                         Text(
@@ -147,15 +171,47 @@ fun TimetableSettingsScreen(
                 onCheckedChange = onCancelledStrike,
             )
         }
+
+        SettingsSectionCard(title = stringResource(R.string.settings_display)) {
+            SettingsSliderRow(
+                title = stringResource(R.string.settings_cancelled_dim),
+                description = stringResource(R.string.settings_cancelled_dim_desc),
+                value = cancelledDim,
+                onValueChange = onCancelledDim,
+                valueLabel = percentLabel(cancelledDim),
+            )
+
+            SettingsSliderRow(
+                title = stringResource(R.string.settings_past_dim),
+                description = stringResource(R.string.settings_past_dim_desc),
+                value = pastDim,
+                onValueChange = onPastDim,
+                valueRange = 0f..AppearancePrefs.MAX_PAST_DIM,
+                valueLabel = percentLabel(pastDim),
+            )
+
+            Spacer(Modifier.size(4.dp))
+
+            LessonPreview(
+                cancelledDim = cancelledDim,
+                pastDim = pastDim,
+                cancelledStrike = cancelledStrike,
+                color = Color(defaultSubjectColor),
+                textColor = Color(lessonTextColor),
+            )
+        }
     }
 
     colorDialogFor?.let { subjectName ->
-        ColorPickerDialog(
-            title = subjectName,
-            currentColor = subjectColors[subjectName],
-            allowUseDefault = true,
-            onPick = { argb ->
-                onSubjectColor(subjectName, argb)
+        SubjectColorDialog(
+            subject = subjectName,
+            cardColor = subjectColors[subjectName],
+            textColor = subjectTextColors[subjectName],
+            defaultCardColor = defaultSubjectColor,
+            defaultTextColor = lessonTextColor,
+            onApply = { card, text ->
+                onSubjectColor(subjectName, card)
+                onSubjectTextColor(subjectName, text)
                 colorDialogFor = null
             },
             onDismiss = { colorDialogFor = null },
@@ -167,7 +223,8 @@ fun TimetableSettingsScreen(
             title = stringResource(R.string.settings_default_subject_color),
             currentColor = defaultSubjectColor,
             allowUseDefault = false,
-            onPick = { argb ->
+            previewTextColor = lessonTextColor,
+            onApply = { argb ->
                 argb?.let(onDefaultSubjectColor)
                 pickDefaultColor = false
             },
@@ -180,7 +237,8 @@ fun TimetableSettingsScreen(
             title = stringResource(R.string.settings_card_text_color),
             currentColor = lessonTextColor,
             allowUseDefault = false,
-            onPick = { argb ->
+            previewCardColor = defaultSubjectColor,
+            onApply = { argb ->
                 argb?.let(onLessonTextColor)
                 pickTextColor = false
             },
@@ -188,3 +246,88 @@ fun TimetableSettingsScreen(
         )
     }
 }
+
+@Composable
+private fun LessonPreview(
+    cancelledDim: Float,
+    pastDim: Float,
+    cancelledStrike: Boolean,
+    color: Color,
+    textColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        PreviewLesson(
+            label = stringResource(R.string.settings_preview_past),
+            cancelled = false,
+            pastDim = pastDim,
+            strike = true,
+            color = color,
+            textColor = textColor,
+            cancelledDim = cancelledDim,
+            modifier = Modifier.weight(1f),
+        )
+
+        PreviewLesson(
+            label = stringResource(R.string.settings_preview_cancelled),
+            cancelled = true,
+            pastDim = null,
+            strike = cancelledStrike,
+            color = color,
+            textColor = textColor,
+            cancelledDim = cancelledDim,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun PreviewLesson(
+    label: String,
+    cancelled: Boolean,
+    pastDim: Float?,
+    strike: Boolean,
+    color: Color,
+    textColor: Color,
+    cancelledDim: Float,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp),
+        ) {
+            LessonCard(
+                lesson = previewLesson(cancelled = cancelled),
+                color = color,
+                textColor = textColor,
+                strike = strike,
+                cancelledDim = cancelledDim,
+            )
+
+            if (pastDim != null) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .padding(1.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = pastDim)),
+                )
+            }
+        }
+
+        Spacer(Modifier.size(6.dp))
+
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun percentLabel(value: Float): String = "${(value * 100).roundToInt()} %"
