@@ -27,6 +27,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,6 +51,7 @@ import sh.lsx.untisx.data.SchoolYearStats
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.SchoolYear
 import sh.lsx.untisx.data.model.toUntisLocalDate
+import sh.lsx.untisx.data.prefs.StatsPrefs
 import sh.lsx.untisx.ui.util.AppDateFormats
 import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 import sh.lsx.untisx.ui.util.rememberDateFormat
@@ -81,6 +83,9 @@ fun StatsScreen(
 
     var selectedMonth by remember { mutableStateOf<YearMonth?>(null) }
 
+    val context = LocalContext.current
+    var includeEvents by remember { mutableStateOf(StatsPrefs.includeEvents(context)) }
+
     val months = remember(start, lastDay) {
         if (start == null || lastDay == null) {
             emptyList()
@@ -105,10 +110,17 @@ fun StatsScreen(
             .orEmpty()
     }
 
-    val lessons = filteredDays.sumOf { it.lessons }
-    val cancelled = filteredDays.sumOf { it.cancelled }
-    val changes = filteredDays.sumOf { it.changes }
+    val eventLessons = filteredDays.sumOf { it.eventLessons }
+    val eventCancelled = filteredDays.sumOf { it.eventCancelled }
+    val eventChanges = filteredDays.sumOf { it.eventChanges }
+
+    val lessons = filteredDays.sumOf { it.lessons } - if (includeEvents) 0 else eventLessons
+    val cancelled = filteredDays.sumOf { it.cancelled } - if (includeEvents) 0 else eventCancelled
+    val changes = filteredDays.sumOf { it.changes } - if (includeEvents) 0 else eventChanges
     val taught = (lessons - cancelled).coerceAtLeast(0)
+
+    val excludedLessons = if (includeEvents) 0 else eventLessons
+    val excludedDays = if (includeEvents) 0 else filteredDays.count { it.eventLessons > 0 }
 
     val rangeStart = selectedMonth?.atDay(1) ?: start
     val rangeEnd = selectedMonth?.let { minOf(it.atEndOfMonth(), today) } ?: lastDay
@@ -132,8 +144,17 @@ fun StatsScreen(
         }
     }
 
-    val subjects = remember(yearStats, selectedMonth, subjectsById) {
-        mergeCounts(filteredDays) { it.subjectCounts }
+    val subjects = remember(yearStats, selectedMonth, subjectsById, includeEvents) {
+        val counts = HashMap(mergeCounts(filteredDays) { it.subjectCounts })
+
+        if (!includeEvents) {
+            mergeCounts(filteredDays) { it.eventSubjectCounts }.forEach { (key, value) ->
+                counts[key] = (counts[key] ?: 0) - value
+            }
+        }
+
+        counts
+            .filterValues { it > 0 }
             .map { EntryCount(subjectName(it.key, subjectsById), it.value) }
             .sortedByDescending { it.count }
     }
@@ -155,6 +176,8 @@ fun StatsScreen(
                 countedDays = collectedWeekdays,
                 totalWeekdays = totalWeekdays,
                 lastUpdated = yearStats?.lastUpdated ?: 0L,
+                eventLessons = excludedLessons,
+                eventDays = excludedDays,
             )
         }
 
@@ -181,6 +204,16 @@ fun StatsScreen(
                     }
                 }
             }
+        }
+
+        item {
+            EventLessonsCard(
+                included = includeEvents,
+                onIncludedChange = {
+                    includeEvents = it
+                    StatsPrefs.setIncludeEvents(context, it)
+                },
+            )
         }
 
         item {
@@ -282,7 +315,7 @@ fun StatsScreen(
                     BreakdownCard(
                         title = stringResource(R.string.stats_by_subject),
                         entries = subjects,
-                        total = lessons,
+                        total = taught,
                         locale = locale,
                     )
                 }
@@ -299,6 +332,8 @@ private fun HeaderCard(
     countedDays: Int,
     totalWeekdays: Int,
     lastUpdated: Long,
+    eventLessons: Int,
+    eventDays: Int,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -334,6 +369,14 @@ private fun HeaderCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
+            if (eventLessons > 0) {
+                Text(
+                    text = stringResource(R.string.stats_events_excluded, eventLessons, eventDays),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
+
             if (lastUpdated > 0L) {
                 val context = LocalContext.current
                 val locale = LocalConfiguration.current.locales[0]
@@ -348,6 +391,49 @@ private fun HeaderCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun EventLessonsCard(
+    included: Boolean,
+    onIncludedChange: (Boolean) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.stats_include_events),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+
+                Text(
+                    text = stringResource(
+                        if (included) R.string.stats_include_events_on else R.string.stats_include_events_off,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Switch(
+                checked = included,
+                onCheckedChange = onIncludedChange,
+            )
         }
     }
 }

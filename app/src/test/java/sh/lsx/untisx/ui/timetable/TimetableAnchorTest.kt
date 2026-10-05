@@ -1,9 +1,11 @@
 package sh.lsx.untisx.ui.timetable
 
 import android.app.Application
+import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -14,7 +16,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import sh.lsx.untisx.UntisXApp
 import sh.lsx.untisx.data.AppClock
+import sh.lsx.untisx.data.prefs.AccountStore
 import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -26,24 +30,44 @@ class TimetableAnchorTest {
     private val saturday = LocalDate.of(2026, 10, 3)
     private val thursday = LocalDate.of(2026, 10, 1)
 
+    private lateinit var dispatcher: TestDispatcher
+    private val viewModels = mutableListOf<TimetableViewModel>()
+
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().clear().commit()
+
+        AccountStore.resetForTests()
+
+        dispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(dispatcher)
         AppClock.set(today = { friday })
     }
 
     @After
     fun tearDown() {
+        viewModels.forEach { it.cancelBackgroundWork() }
+        viewModels.clear()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        AccountStore.resetForTests()
         AppClock.reset()
         Dispatchers.resetMain()
     }
 
-    @Test
-    fun `reanchoring on saturday keeps the previously visible monday`() {
+    private fun createViewModel(): TimetableViewModel {
         val app = ApplicationProvider.getApplicationContext<Application>()
 
-        val vm = TimetableViewModel(app)
-        vm.cancelBackgroundWork()
+        return TimetableViewModel(app)
+            .also { it.cancelBackgroundWork() }
+            .also(viewModels::add)
+    }
+
+    @Test
+    fun `reanchoring on saturday keeps the previously visible monday`() {
+        val vm = createViewModel()
 
         assertEquals(LocalDate.of(2026, 9, 28), vm.anchorMonday)
 
@@ -60,10 +84,7 @@ class TimetableAnchorTest {
 
     @Test
     fun `same week does not reanchor`() {
-        val app = ApplicationProvider.getApplicationContext<Application>()
-
-        val vm = TimetableViewModel(app)
-        vm.cancelBackgroundWork()
+        val vm = createViewModel()
 
         AppClock.set(today = { thursday })
         vm.reanchorIfNeeded()
@@ -73,10 +94,7 @@ class TimetableAnchorTest {
 
     @Test
     fun `pageForMonday clamps to the valid week window`() {
-        val app = ApplicationProvider.getApplicationContext<Application>()
-
-        val vm = TimetableViewModel(app)
-        vm.cancelBackgroundWork()
+        val vm = createViewModel()
 
         assertEquals(0, vm.pageForMonday(LocalDate.of(2000, 1, 3)))
         assertEquals(

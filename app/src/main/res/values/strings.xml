@@ -189,6 +189,10 @@
     <!-- Statistics -->
     <string name="stats">Statistics</string>
     <string name="stats_days_collected">%1$d of %2$d school days collected</string>
+    <string name="stats_events_excluded">%1$d lessons on %2$d days excluded because of events</string>
+    <string name="stats_include_events">Include event lessons</string>
+    <string name="stats_include_events_on">Lessons during events count like regular lessons.</string>
+    <string name="stats_include_events_off">Lessons during events are excluded.</string>
     <string name="stats_last_updated">Updated: %1$s</string>
     <string name="stats_total">Lessons total</string>
     <string name="stats_taught">Held</string>

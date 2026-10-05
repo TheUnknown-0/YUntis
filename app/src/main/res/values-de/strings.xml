@@ -189,6 +189,10 @@
     <!-- Statistics -->
     <string name="stats">Statistiken</string>
     <string name="stats_days_collected">%1$d von %2$d Schultagen erfasst</string>
+    <string name="stats_events_excluded">%1$d Stunden an %2$d Tagen wegen Events ausgenommen</string>
+    <string name="stats_include_events">Event-Stunden mitzählen</string>
+    <string name="stats_include_events_on">Stunden während Events zählen wie normale Stunden.</string>
+    <string name="stats_include_events_off">Stunden während Events werden ausgenommen.</string>
     <string name="stats_last_updated">Aktualisiert: %1$s</string>
     <string name="stats_total">Stunden insgesamt</string>
     <string name="stats_taught">Stattgefunden</string>

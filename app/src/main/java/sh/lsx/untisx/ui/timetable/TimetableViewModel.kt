@@ -42,6 +42,7 @@ import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.SchoolYear
 import sh.lsx.untisx.data.prefs.PasswordVault
+import sh.lsx.untisx.data.prefs.StatsPrefs
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimegridDay
@@ -365,8 +366,14 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     fun currentYearStats(): SchoolYearStats? = StatsStore.currentYear(stats, statsYear)
 
-    fun currentYearLessonCount(): Int =
-        currentYearStats()?.days?.values?.sumOf { it.lessons } ?: 0
+    fun currentYearLessonCount(): Int {
+        val year = currentYearStats() ?: return 0
+        val includeEvents = StatsPrefs.includeEvents(getApplication())
+
+        return year.days.values.sumOf { day ->
+            if (includeEvents) day.lessons else day.lessons - day.eventLessons
+        }
+    }
 
     fun statsSchoolYear(): SchoolYear? = statsYear
 

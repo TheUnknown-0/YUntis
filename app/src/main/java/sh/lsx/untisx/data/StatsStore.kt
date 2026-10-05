@@ -21,9 +21,16 @@ data class DayStats(
     val cancelled: Int = 0,
     val changes: Int = 0,
     val events: Int = 0,
+    val eventLessons: Int = 0,
+    val eventCancelled: Int = 0,
+    val eventChanges: Int = 0,
     val subjectCounts: Map<Int, Int> = emptyMap(),
+    val eventSubjectCounts: Map<Int, Int> = emptyMap(),
     val teacherCounts: Map<Int, Int> = emptyMap(),
+    val eventTeacherCounts: Map<Int, Int> = emptyMap(),
     val roomCounts: Map<Int, Int> = emptyMap(),
+    val eventRoomCounts: Map<Int, Int> = emptyMap(),
+    val ruleVersion: Int = 0,
 )
 
 @Serializable
@@ -46,6 +53,8 @@ object StatsStore {
     private const val FILE_PREFIX = "stats_"
     private const val VERSION = 2
     private const val TAG = "StatsStore"
+
+    internal const val RULE_VERSION = 2
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -79,6 +88,7 @@ object StatsStore {
     fun countedDays(data: StatsData?, year: SchoolYear): Set<Int> =
         data?.years?.get(yearKey(year.startDate))
             ?.days
+            ?.filterValues { day -> day.ruleVersion >= RULE_VERSION }
             ?.keys
             ?.mapNotNull { it.toIntOrNull() }
             ?.toSet()
@@ -154,37 +164,59 @@ object StatsStore {
         var cancelled = 0
         var changes = 0
         var events = 0
+        var eventLessons = 0
+        var eventCancelled = 0
+        var eventChanges = 0
         val subjects = HashMap<Int, Int>()
+        val eventSubjects = HashMap<Int, Int>()
         val teachers = HashMap<Int, Int>()
+        val eventTeachers = HashMap<Int, Int>()
         val rooms = HashMap<Int, Int>()
+        val eventRooms = HashMap<Int, Int>()
+
+        val eventSpans = entries.filter { it.isEvent }.map { it.timeSpan() }
 
         for (entry in entries) {
-            if (entry.subject.isEmpty()) {
+            if (entry.isEvent) {
                 events++
                 continue
             }
 
-            lessons++
-            if (entry.cancelled) cancelled++
-
-            if (entry.code == "irregular" ||
+            val eventOverlap = eventSpans.any { it.overlaps(entry.timeSpan()) }
+            val entryChanged = entry.code == "irregular" ||
                 entry.subject.changed() ||
                 entry.teacher.changed() ||
                 entry.room.changed()
-            ) {
-                changes++
+
+            lessons++
+            if (entry.cancelled) cancelled++
+            if (entryChanged) changes++
+
+            if (eventOverlap) {
+                eventLessons++
+                if (entry.cancelled) eventCancelled++
+                if (entryChanged) eventChanges++
             }
 
-            entry.subject.firstOrNull()?.id?.takeIf { it > 0 }?.let {
-                subjects[it] = (subjects[it] ?: 0) + 1
-            }
+            if (!entry.cancelled) {
+                entry.subject.firstOrNull()?.id?.takeIf { it > 0 }?.let {
+                    subjects[it] = (subjects[it] ?: 0) + 1
+                    if (eventOverlap) eventSubjects[it] = (eventSubjects[it] ?: 0) + 1
+                }
 
-            entry.teacher.forEach { element ->
-                element.id.takeIf { it > 0 }?.let { teachers[it] = (teachers[it] ?: 0) + 1 }
-            }
+                entry.teacher.forEach { element ->
+                    element.id.takeIf { it > 0 }?.let {
+                        teachers[it] = (teachers[it] ?: 0) + 1
+                        if (eventOverlap) eventTeachers[it] = (eventTeachers[it] ?: 0) + 1
+                    }
+                }
 
-            entry.room.forEach { element ->
-                element.id.takeIf { it > 0 }?.let { rooms[it] = (rooms[it] ?: 0) + 1 }
+                entry.room.forEach { element ->
+                    element.id.takeIf { it > 0 }?.let {
+                        rooms[it] = (rooms[it] ?: 0) + 1
+                        if (eventOverlap) eventRooms[it] = (eventRooms[it] ?: 0) + 1
+                    }
+                }
             }
         }
 
@@ -193,9 +225,16 @@ object StatsStore {
             cancelled = cancelled,
             changes = changes,
             events = events,
+            eventLessons = eventLessons,
+            eventCancelled = eventCancelled,
+            eventChanges = eventChanges,
             subjectCounts = subjects,
+            eventSubjectCounts = eventSubjects,
             teacherCounts = teachers,
+            eventTeacherCounts = eventTeachers,
             roomCounts = rooms,
+            eventRoomCounts = eventRooms,
+            ruleVersion = RULE_VERSION,
         )
     }
 
@@ -213,3 +252,19 @@ object StatsStore {
     private fun file(context: Context, accountId: String): File =
         accountFile(context, FILE_PREFIX, accountId)
 }
+
+private const val MINUTES_PER_DAY = 24 * 60
+
+private data class TimeSpan(val start: Int, val end: Int) {
+    fun overlaps(other: TimeSpan): Boolean = start < other.end && other.start < end
+}
+
+private fun TimetableEntry.timeSpan(): TimeSpan {
+    val start = minutesOfDay(startTime)
+    val end = minutesOfDay(endTime)
+
+    return TimeSpan(start, if (endTime == 0) MINUTES_PER_DAY else maxOf(end, start))
+}
+
+private fun minutesOfDay(untisTime: Int): Int =
+    ((untisTime / 100) * 60 + (untisTime % 100)).coerceIn(0, MINUTES_PER_DAY)
