@@ -1,14 +1,8 @@
 package sh.lsx.untisx.ui.timetable
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -28,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -52,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -614,26 +606,6 @@ private fun DayColumn(
         }
     }
 
-    val pulse = if (isToday && animations) rememberInfiniteTransition(label = "nowPulse") else null
-    val pulseScale = pulse?.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "pulseScale",
-    )
-    val pulseAlpha = pulse?.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.45f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "pulseAlpha",
-    )
-
     Box(
         modifier = modifier
             .height(gridHeight),
@@ -784,30 +756,13 @@ private fun DayColumn(
                     label = "nowLine",
                 )
 
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset(y = lineOffset),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(2.dp)
-                            .background(MaterialTheme.colorScheme.primary),
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .graphicsLayer {
-                                scaleX = pulseScale?.value ?: 1f
-                                scaleY = pulseScale?.value ?: 1f
-                                alpha = pulseAlpha?.value ?: 1f
-                            }
-                            .background(MaterialTheme.colorScheme.primary, CircleShape),
-                    )
-                }
+                        .offset(y = lineOffset)
+                        .height(2.dp)
+                        .background(MaterialTheme.colorScheme.primary),
+                )
             }
         }
     }
