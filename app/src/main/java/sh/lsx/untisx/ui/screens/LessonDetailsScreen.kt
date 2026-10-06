@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -44,7 +45,12 @@ import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.ui.util.rememberDateFormat
+import sh.lsx.untisx.ui.timetable.LessonCardColors
+import sh.lsx.untisx.ui.timetable.LessonCardOptions
+import sh.lsx.untisx.ui.timetable.StrikeOverlay
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
+import sh.lsx.untisx.ui.timetable.cancelledCardColors
+import sh.lsx.untisx.ui.timetable.lessonCardBackground
 import sh.lsx.untisx.ui.util.motionEffects
 import sh.lsx.untisx.ui.util.rememberTimeFormat
 import sh.lsx.untisx.ui.util.sharedElementBounds
@@ -61,6 +67,10 @@ fun LessonDetailsScreen(
     modifier: Modifier = Modifier,
     notes: TimetableViewModel.NotesState? = null,
     exam: ExamInfo? = null,
+    lessonOptions: LessonCardOptions = LessonCardOptions(),
+    cancelledStrike: Boolean = true,
+    cancelledDesaturation: Float = 1f,
+    cancelledBrightness: Float = 1f,
 ) {
     val timeFormat = rememberTimeFormat()
 
@@ -77,6 +87,23 @@ fun LessonDetailsScreen(
     val hasExam = examType != null || examName != null || examText != null
     val notesFade = motionEffects<Float>()
 
+    val cancelled = entry.cancelled
+    val cardColors = if (cancelled) {
+        cancelledCardColors(color, textColor, cancelledDesaturation, cancelledBrightness)
+    } else {
+        LessonCardColors(container = color, title = textColor, body = textColor.copy(alpha = 0.8f))
+    }
+    val showExamOutline = exam != null || entry.exam != null
+    val examColor = lessonOptions.examColor ?: MaterialTheme.colorScheme.error
+    val examBadgeText = if (lessonOptions.examColor == null) {
+        MaterialTheme.colorScheme.onError
+    } else if (examColor.luminance() > 0.5f) {
+        Color.Black
+    } else {
+        Color.White
+    }
+    val showExamBadge = showExamOutline && lessonOptions.showExamBadge
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -88,15 +115,22 @@ fun LessonDetailsScreen(
             modifier = Modifier
                 .sharedElementBounds("lesson-${entry.id}-${entry.date}-${entry.startTime}")
                 .fillMaxWidth()
-                .background(color, RoundedCornerShape(16.dp))
-                .padding(horizontal = 16.dp, vertical = 20.dp),
+                .lessonCardBackground(
+                    container = cardColors.container,
+                    cornerRadius = 16.dp,
+                    examColor = if (showExamOutline) examColor else null,
+                    strikeSlit = cancelled && cancelledStrike,
+                ),
         ) {
-            Column {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
+            ) {
                 Text(
                     text = subjectName.ifBlank { entry.lstext?.takeIf { it.isNotBlank() } ?: "?" },
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = textColor,
+                    color = cardColors.title,
+                    modifier = if (showExamBadge) Modifier.padding(end = 84.dp) else Modifier,
                 )
 
                 subjectEl?.let { it -> subjectsById[it.id]?.longName }
@@ -105,7 +139,7 @@ fun LessonDetailsScreen(
                         Text(
                             text = it,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = textColor.copy(alpha = 0.8f),
+                            color = cardColors.body,
                         )
                     }
 
@@ -113,15 +147,34 @@ fun LessonDetailsScreen(
                     Text(
                         text = formatLessonDate(it, entry),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = textColor.copy(alpha = 0.8f),
+                        color = cardColors.body,
                     )
                 }
             }
-        }
 
-        when {
-            entry.cancelled -> Badge(stringResource(R.string.lesson_cancelled), MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
-            entry.irregular -> Badge(stringResource(R.string.lesson_changed), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
+            if (showExamBadge) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                        .background(examColor, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                ) {
+                    Text(
+                        text = examType ?: stringResource(R.string.lesson_exam),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = examBadgeText,
+                    )
+                }
+            }
+
+            if (cancelled && cancelledStrike) {
+                StrikeOverlay(
+                    color = lessonOptions.strikeColor,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
         }
 
         if (hasExam) {
@@ -357,22 +410,6 @@ private fun formatLessonDate(date: LocalDate, entry: TimetableEntry): String {
         stringResource(R.string.lesson_date_today, dayName)
     } else {
         dayName
-    }
-}
-
-@Composable
-private fun Badge(text: String, container: Color, content: Color) {
-    Box(
-        modifier = Modifier
-            .background(container, RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = content,
-            fontWeight = FontWeight.Bold,
-        )
     }
 }
 

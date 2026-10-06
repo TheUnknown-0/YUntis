@@ -126,6 +126,51 @@ internal fun cancelledCardColors(
     )
 }
 
+internal fun Modifier.lessonCardBackground(
+    container: Color,
+    cornerRadius: Dp,
+    examColor: Color?,
+    strikeSlit: Boolean,
+): Modifier = drawBehind {
+    val radius = cornerRadius.toPx()
+
+    drawRoundRect(
+        color = container,
+        cornerRadius = CornerRadius(radius),
+    )
+
+    if (examColor != null) {
+        drawRoundRect(
+            color = examColor,
+            cornerRadius = CornerRadius(radius),
+            style = Stroke(width = 2.dp.toPx()),
+        )
+    }
+
+    if (strikeSlit) {
+        val angle = Math.toDegrees(atan2(size.height.toDouble(), size.width.toDouble())).toFloat()
+        val bandWidth = RibbonWidth.toPx() + 3 * SlitGap.toPx()
+        val bandLength = size.width * 3f
+
+        val cardShape = Path().apply {
+            addRoundRect(
+                RoundRect(0f, 0f, size.width, size.height, CornerRadius(radius)),
+            )
+        }
+
+        clipPath(cardShape) {
+            withTransform({ rotate(degrees = -angle, pivot = center) }) {
+                drawRect(
+                    color = Color.Transparent,
+                    topLeft = Offset(center.x - bandLength / 2f, center.y - bandWidth / 2f),
+                    size = Size(bandLength, bandWidth),
+                    blendMode = BlendMode.Clear,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 internal fun LessonCard(
     lesson: LessonDisplay,
@@ -190,9 +235,6 @@ internal fun LessonCard(
     val density = LocalDensity.current
     val measured = cell.width > 0 && cell.height > 0
     val compact = measured && with(density) { cell.width.toDp() } < 64.dp
-    val angle = if (measured) {
-        Math.toDegrees(atan2(cell.height.toFloat(), cell.width.toFloat()).toDouble()).toFloat()
-    } else 0f
 
     Box(
         modifier = modifier
@@ -203,43 +245,12 @@ internal fun LessonCard(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(1.dp)
-                .drawBehind {
-                    drawRoundRect(
-                        color = container,
-                        cornerRadius = CornerRadius(6.dp.toPx()),
-                    )
-
-                    if (lesson.exam != null) {
-                        drawRoundRect(
-                            color = examColor,
-                            cornerRadius = CornerRadius(6.dp.toPx()),
-                            style = Stroke(width = 2.dp.toPx()),
-                        )
-                    }
-
-                    if (cancelled && strike && measured) {
-                        val radius = 6.dp.toPx()
-                        val bandWidth = RibbonWidth.toPx() + 3 * SlitGap.toPx()
-                        val bandLength = size.width * 3f
-
-                        val cardShape = Path().apply {
-                            addRoundRect(
-                                RoundRect(0f, 0f, size.width, size.height, CornerRadius(radius)),
-                            )
-                        }
-
-                        clipPath(cardShape) {
-                            withTransform({ rotate(degrees = -angle, pivot = center) }) {
-                                drawRect(
-                                    color = Color.Transparent,
-                                    topLeft = Offset(center.x - bandLength / 2, center.y - bandWidth / 2),
-                                    size = Size(bandLength, bandWidth),
-                                    blendMode = BlendMode.Clear,
-                                )
-                            }
-                        }
-                    }
-                }
+                .lessonCardBackground(
+                    container = container,
+                    cornerRadius = 6.dp,
+                    examColor = if (lesson.exam != null) examColor else null,
+                    strikeSlit = cancelled && strike && measured,
+                )
                 .padding(horizontal = if (compact) 2.dp else 4.dp, vertical = 2.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -327,12 +338,7 @@ internal fun LessonCard(
             exit = fadeOut(animationSpec = if (animations) AppMotion.effects() else snap()),
             modifier = Modifier.matchParentSize(),
         ) {
-            val overhangPx = with(density) { 1.dp.toPx() }
-            val diagonal = sqrt(cell.width.toFloat() * cell.width + cell.height.toFloat() * cell.height)
-
-            StrikeRibbon(
-                angle = angle,
-                length = with(density) { (diagonal + overhangPx * 2).toDp() },
+            StrikeOverlay(
                 color = options.strikeColor,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -355,5 +361,34 @@ private fun StrikeRibbon(
                 .graphicsLayer { rotationZ = -angle }
                 .background(color, RoundedCornerShape(3.dp)),
         )
+    }
+}
+
+@Composable
+internal fun StrikeOverlay(
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    var cell by remember { mutableStateOf(IntSize.Zero) }
+    val density = LocalDensity.current
+    val measured = cell.width > 0 && cell.height > 0
+    val angle = if (measured) {
+        Math.toDegrees(atan2(cell.height.toFloat(), cell.width.toFloat()).toDouble()).toFloat()
+    } else {
+        0f
+    }
+
+    Box(modifier = modifier.onSizeChanged { cell = it }) {
+        if (measured) {
+            val overhangPx = with(density) { 1.dp.toPx() }
+            val diagonal = sqrt(cell.width.toFloat() * cell.width + cell.height.toFloat() * cell.height)
+
+            StrikeRibbon(
+                angle = angle,
+                length = with(density) { (diagonal + overhangPx * 2).toDp() },
+                color = color,
+                modifier = Modifier.matchParentSize(),
+            )
+        }
     }
 }

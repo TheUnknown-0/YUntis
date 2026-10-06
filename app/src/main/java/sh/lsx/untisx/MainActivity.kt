@@ -1161,6 +1161,10 @@ private fun MainApp(
                                 ),
                                 notes = timetableVm.lessonNotes,
                                 exam = timetableVm.examFor(lesson),
+                                lessonOptions = lessonOptions,
+                                cancelledStrike = cancelledStrike,
+                                cancelledDesaturation = cancelledDesaturation,
+                                cancelledBrightness = cancelledBrightness,
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(padding),
