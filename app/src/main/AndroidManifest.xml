@@ -24,6 +24,7 @@
             android:exported="true"
             android:label="@string/app_name"
             android:launchMode="singleTop"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.UntisX.Splash"
             android:windowSoftInputMode="adjustResize">
 
