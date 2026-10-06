@@ -11,6 +11,8 @@ object SubjectColorsPrefs {
     const val KEY_TEXT_COLORS = "subject_text_colors"
     const val KEY_KNOWN = "known_subjects"
     const val KEY_CANCELLED_STRIKE = "cancelled_strike"
+    const val KEY_STRIKE_COLOR = "strike_color"
+    const val KEY_EXAM_COLOR = "exam_color"
     const val KEY_DEFAULT_COLOR = "subject_default_color"
     const val KEY_TEXT_COLOR = "lesson_text_color"
 
@@ -19,12 +21,15 @@ object SubjectColorsPrefs {
         KEY_TEXT_COLORS,
         KEY_KNOWN,
         KEY_CANCELLED_STRIKE,
+        KEY_STRIKE_COLOR,
+        KEY_EXAM_COLOR,
         KEY_DEFAULT_COLOR,
         KEY_TEXT_COLOR,
     )
 
     const val DEFAULT_SUBJECT_COLOR = 0xFF78A8CF.toInt()
     const val DEFAULT_TEXT_COLOR = 0xFF111111.toInt()
+    const val DEFAULT_STRIKE_COLOR = 0xFFE53935.toInt()
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -108,11 +113,31 @@ object SubjectColorsPrefs {
         }
     }
 
+    fun getStrikeColor(context: Context): Int? =
+        prefs(context).getInt(KEY_STRIKE_COLOR, 0).takeIf { it != 0 }
+
+    fun setStrikeColor(context: Context, argb: Int?) {
+        prefs(context).edit {
+            if (argb == null) remove(KEY_STRIKE_COLOR) else putInt(KEY_STRIKE_COLOR, argb)
+        }
+    }
+
+    fun getExamColor(context: Context): Int? =
+        prefs(context).getInt(KEY_EXAM_COLOR, 0).takeIf { it != 0 }
+
+    fun setExamColor(context: Context, argb: Int?) {
+        prefs(context).edit {
+            if (argb == null) remove(KEY_EXAM_COLOR) else putInt(KEY_EXAM_COLOR, argb)
+        }
+    }
+
     fun clear(context: Context) {
         prefs(context).edit {
             remove(KEY_COLORS)
             remove(KEY_TEXT_COLORS)
             remove(KEY_KNOWN)
+            remove(KEY_STRIKE_COLOR)
+            remove(KEY_EXAM_COLOR)
             remove(KEY_DEFAULT_COLOR)
             remove(KEY_TEXT_COLOR)
         }

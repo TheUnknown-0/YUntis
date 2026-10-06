@@ -32,6 +32,7 @@ import sh.lsx.untisx.data.colorToHex
 import sh.lsx.untisx.data.hexToColor
 import sh.lsx.untisx.ui.theme.SUBJECT_PALETTE
 import sh.lsx.untisx.ui.timetable.LessonCard
+import sh.lsx.untisx.ui.timetable.LessonCardOptions
 import sh.lsx.untisx.ui.timetable.previewLesson
 import sh.lsx.untisx.ui.util.tapHaptic
 
@@ -88,6 +89,9 @@ internal fun ColorPreviewCard(
     cardColor: Color,
     textColor: Color,
     subject: String,
+    cancelled: Boolean = false,
+    exam: Boolean = false,
+    options: LessonCardOptions = LessonCardOptions(),
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -96,10 +100,11 @@ internal fun ColorPreviewCard(
             .height(64.dp),
     ) {
         LessonCard(
-            lesson = previewLesson(subject = subject),
+            lesson = previewLesson(subject = subject, cancelled = cancelled, exam = exam),
             color = cardColor,
             textColor = textColor,
             sharedElement = false,
+            options = options,
         )
     }
 }

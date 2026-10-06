@@ -32,4 +32,19 @@ class SubjectColorsPrefsTest {
         assertNull(afterReset["MA"])
         assertEquals(0xFF445566.toInt(), afterReset["EN"])
     }
+
+    @Test
+    fun `strike and exam colors round trip and reset`() {
+        SubjectColorsPrefs.setStrikeColor(context, 0xFF00AA00.toInt())
+        SubjectColorsPrefs.setExamColor(context, 0xFF0000AA.toInt())
+
+        assertEquals(0xFF00AA00.toInt(), SubjectColorsPrefs.getStrikeColor(context))
+        assertEquals(0xFF0000AA.toInt(), SubjectColorsPrefs.getExamColor(context))
+
+        SubjectColorsPrefs.setStrikeColor(context, null)
+        SubjectColorsPrefs.setExamColor(context, null)
+
+        assertNull(SubjectColorsPrefs.getStrikeColor(context))
+        assertNull(SubjectColorsPrefs.getExamColor(context))
+    }
 }

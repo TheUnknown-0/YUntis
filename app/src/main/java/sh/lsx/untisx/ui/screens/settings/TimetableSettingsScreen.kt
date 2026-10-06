@@ -27,10 +27,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sh.lsx.untisx.R
+import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.prefs.AppearancePrefs
 import sh.lsx.untisx.ui.components.ColorPickerDialog
 import sh.lsx.untisx.ui.components.SettingsColorRow
@@ -39,6 +41,7 @@ import sh.lsx.untisx.ui.components.SettingsSliderRow
 import sh.lsx.untisx.ui.components.SettingsSwitchRow
 import sh.lsx.untisx.ui.components.SubjectColorDialog
 import sh.lsx.untisx.ui.timetable.LessonCard
+import sh.lsx.untisx.ui.timetable.LessonCardOptions
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.timetable.previewLesson
 import sh.lsx.untisx.ui.util.Haptics
@@ -59,16 +62,28 @@ fun TimetableSettingsScreen(
     onLessonTextColor: (Int) -> Unit,
     cancelledStrike: Boolean,
     onCancelledStrike: (Boolean) -> Unit,
-    cancelledDim: Float,
-    onCancelledDim: (Float) -> Unit,
+    cancelledDesaturation: Float,
+    onCancelledDesaturation: (Float) -> Unit,
+    cancelledBrightness: Float,
+    onCancelledBrightness: (Float) -> Unit,
     pastDim: Float,
     onPastDim: (Float) -> Unit,
+    lessonOptions: LessonCardOptions,
+    onLessonOptionsChange: (LessonCardOptions) -> Unit,
+    strikeColor: Int?,
+    onStrikeColor: (Int?) -> Unit,
+    examColor: Int?,
+    onExamColor: (Int?) -> Unit,
+    hideCancelled: Boolean,
+    onHideCancelledChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
 
     var colorDialogFor by remember { mutableStateOf<String?>(null) }
     var pickDefaultColor by remember { mutableStateOf(false) }
     var pickTextColor by remember { mutableStateOf(false) }
+    var pickStrikeColor by remember { mutableStateOf(false) }
+    var pickExamColor by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -77,7 +92,7 @@ fun TimetableSettingsScreen(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        SettingsSectionCard(title = stringResource(R.string.settings_timetable_colors)) {
+        SettingsSectionCard(title = stringResource(R.string.settings_default_colors)) {
             SettingsColorRow(
                 label = stringResource(R.string.settings_default_subject_color),
                 color = Color(defaultSubjectColor),
@@ -89,9 +104,9 @@ fun TimetableSettingsScreen(
                 color = Color(lessonTextColor),
                 onClick = { pickTextColor = true },
             )
+        }
 
-            Spacer(Modifier.size(10.dp))
-
+        SettingsSectionCard(title = stringResource(R.string.settings_subjects)) {
             if (knownSubjects.isEmpty()) {
                 Text(
                     text = stringResource(R.string.settings_no_subjects),
@@ -161,24 +176,77 @@ fun TimetableSettingsScreen(
                     Text(stringResource(R.string.settings_rescan_subjects))
                 }
             }
+        }
 
-            Spacer(Modifier.size(10.dp))
-
+        SettingsSectionCard(title = stringResource(R.string.settings_extras)) {
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_strike_cancelled),
                 description = stringResource(R.string.settings_strike_cancelled_desc),
                 checked = cancelledStrike,
                 onCheckedChange = onCancelledStrike,
             )
+
+            SettingsColorRow(
+                label = stringResource(R.string.settings_strike_color),
+                color = Color(strikeColor ?: SubjectColorsPrefs.DEFAULT_STRIKE_COLOR),
+                onClick = { pickStrikeColor = true },
+            )
+
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_show_exam_badge),
+                checked = lessonOptions.showExamBadge,
+                onCheckedChange = { onLessonOptionsChange(lessonOptions.copy(showExamBadge = it)) },
+            )
+
+            SettingsColorRow(
+                label = stringResource(R.string.settings_exam_color),
+                color = Color(examColor ?: MaterialTheme.colorScheme.error.toArgb()),
+                onClick = { pickExamColor = true },
+            )
+        }
+
+        SettingsSectionCard(title = stringResource(R.string.settings_cards)) {
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_show_teacher),
+                checked = lessonOptions.showTeacher,
+                onCheckedChange = { onLessonOptionsChange(lessonOptions.copy(showTeacher = it)) },
+            )
+
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_show_room),
+                checked = lessonOptions.showRoom,
+                onCheckedChange = { onLessonOptionsChange(lessonOptions.copy(showRoom = it)) },
+            )
+
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_show_changes),
+                description = stringResource(R.string.settings_show_changes_desc),
+                checked = lessonOptions.showChanges,
+                onCheckedChange = { onLessonOptionsChange(lessonOptions.copy(showChanges = it)) },
+            )
+
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_hide_cancelled),
+                checked = hideCancelled,
+                onCheckedChange = onHideCancelledChange,
+            )
         }
 
         SettingsSectionCard(title = stringResource(R.string.settings_display)) {
             SettingsSliderRow(
-                title = stringResource(R.string.settings_cancelled_dim),
-                description = stringResource(R.string.settings_cancelled_dim_desc),
-                value = cancelledDim,
-                onValueChange = onCancelledDim,
-                valueLabel = percentLabel(cancelledDim),
+                title = stringResource(R.string.settings_cancelled_desaturation),
+                description = stringResource(R.string.settings_cancelled_desaturation_desc),
+                value = cancelledDesaturation,
+                onValueChange = onCancelledDesaturation,
+                valueLabel = percentLabel(cancelledDesaturation),
+            )
+
+            SettingsSliderRow(
+                title = stringResource(R.string.settings_cancelled_darken),
+                description = stringResource(R.string.settings_cancelled_darken_desc),
+                value = cancelledBrightness,
+                onValueChange = onCancelledBrightness,
+                valueLabel = percentLabel(cancelledBrightness),
             )
 
             SettingsSliderRow(
@@ -193,9 +261,11 @@ fun TimetableSettingsScreen(
             Spacer(Modifier.size(4.dp))
 
             LessonPreview(
-                cancelledDim = cancelledDim,
+                cancelledDesaturation = cancelledDesaturation,
+                cancelledBrightness = cancelledBrightness,
                 pastDim = pastDim,
                 cancelledStrike = cancelledStrike,
+                options = lessonOptions,
                 color = Color(defaultSubjectColor),
                 textColor = Color(lessonTextColor),
             )
@@ -245,13 +315,49 @@ fun TimetableSettingsScreen(
             onDismiss = { pickTextColor = false },
         )
     }
+
+    if (pickStrikeColor) {
+        ColorPickerDialog(
+            title = stringResource(R.string.settings_strike_color),
+            currentColor = strikeColor,
+            allowUseDefault = true,
+            defaultColor = SubjectColorsPrefs.DEFAULT_STRIKE_COLOR,
+            previewCardColor = defaultSubjectColor,
+            previewTextColor = lessonTextColor,
+            previewCancelled = true,
+            onApply = { argb ->
+                onStrikeColor(argb)
+                pickStrikeColor = false
+            },
+            onDismiss = { pickStrikeColor = false },
+        )
+    }
+
+    if (pickExamColor) {
+        ColorPickerDialog(
+            title = stringResource(R.string.settings_exam_color),
+            currentColor = examColor,
+            allowUseDefault = true,
+            defaultColor = MaterialTheme.colorScheme.error.toArgb(),
+            previewCardColor = defaultSubjectColor,
+            previewTextColor = lessonTextColor,
+            previewExam = true,
+            onApply = { argb ->
+                onExamColor(argb)
+                pickExamColor = false
+            },
+            onDismiss = { pickExamColor = false },
+        )
+    }
 }
 
 @Composable
 private fun LessonPreview(
-    cancelledDim: Float,
+    cancelledDesaturation: Float,
+    cancelledBrightness: Float,
     pastDim: Float,
     cancelledStrike: Boolean,
+    options: LessonCardOptions,
     color: Color,
     textColor: Color,
     modifier: Modifier = Modifier,
@@ -265,9 +371,11 @@ private fun LessonPreview(
             cancelled = false,
             pastDim = pastDim,
             strike = true,
+            options = options,
             color = color,
             textColor = textColor,
-            cancelledDim = cancelledDim,
+            cancelledDesaturation = cancelledDesaturation,
+            cancelledBrightness = cancelledBrightness,
             modifier = Modifier.weight(1f),
         )
 
@@ -276,9 +384,11 @@ private fun LessonPreview(
             cancelled = true,
             pastDim = null,
             strike = cancelledStrike,
+            options = options,
             color = color,
             textColor = textColor,
-            cancelledDim = cancelledDim,
+            cancelledDesaturation = cancelledDesaturation,
+            cancelledBrightness = cancelledBrightness,
             modifier = Modifier.weight(1f),
         )
     }
@@ -290,9 +400,11 @@ private fun PreviewLesson(
     cancelled: Boolean,
     pastDim: Float?,
     strike: Boolean,
+    options: LessonCardOptions,
     color: Color,
     textColor: Color,
-    cancelledDim: Float,
+    cancelledDesaturation: Float,
+    cancelledBrightness: Float,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -306,7 +418,9 @@ private fun PreviewLesson(
                 color = color,
                 textColor = textColor,
                 strike = strike,
-                cancelledDim = cancelledDim,
+                cancelledDesaturation = cancelledDesaturation,
+                cancelledBrightness = cancelledBrightness,
+                options = options,
             )
 
             if (pastDim != null) {

@@ -1,9 +1,14 @@
 package sh.lsx.untisx.ui.timetable
 
+import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
 
-internal fun previewLesson(subject: String = "MA", cancelled: Boolean = false): LessonDisplay =
+internal fun previewLesson(
+    subject: String = "MA",
+    cancelled: Boolean = false,
+    exam: Boolean = false,
+): LessonDisplay =
     LessonDisplay(
         entry = TimetableEntry(
             id = 0,
@@ -18,4 +23,5 @@ internal fun previewLesson(subject: String = "MA", cancelled: Boolean = false): 
         subject = subject,
         rooms = "E01",
         teachers = "MÜ",
+        exam = if (exam) ExamInfo(examType = "KA") else null,
     )

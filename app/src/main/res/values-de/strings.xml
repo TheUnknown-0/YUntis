@@ -84,19 +84,32 @@
     <string name="settings_show_last_refreshed">Zuletzt aktualisiert anzeigen</string>
     <string name="settings_language">Sprache</string>
     <string name="settings_language_system">System</string>
-    <string name="settings_timetable_colors">Stundenplan-Farben</string>
+    <string name="settings_default_colors">Standardfarben</string>
+    <string name="settings_subjects">Fächerfarben</string>
+    <string name="settings_extras">Ausfälle &amp; Klausuren</string>
     <string name="settings_timetable_desc">Stundenfarben und -darstellung</string>
     <string name="settings_default_subject_color">Standardfarbe für Fächer</string>
-    <string name="settings_card_text_color">Textfarbe der Karten</string>
+    <string name="settings_card_text_color">Standard Textfarbe der Karten</string>
     <string name="settings_no_subjects">Noch keine Fächer gefunden. Öffne deinen Stundenplan, um die Farben deiner Fächer anzupassen.</string>
     <string name="settings_scan_subjects">Fächer scannen</string>
     <string name="settings_rescan_subjects">Fächer erneut scannen</string>
     <string name="settings_custom">eigene Farbe</string>
     <string name="settings_strike_cancelled">Ausfälle durchstreichen</string>
     <string name="settings_strike_cancelled_desc">Entfallene Stunden werden rot durchgestrichen</string>
+    <string name="settings_cards">Karten</string>
+    <string name="settings_show_teacher">Lehrer anzeigen</string>
+    <string name="settings_show_room">Raum anzeigen</string>
+    <string name="settings_show_changes">Änderungen markieren</string>
+    <string name="settings_show_changes_desc">Vertretungen als „alt → neu“ anzeigen</string>
+    <string name="settings_hide_cancelled">Ausfälle ausblenden</string>
+    <string name="settings_show_exam_badge">Klausur-Badge anzeigen</string>
+    <string name="settings_strike_color">Strichfarbe</string>
+    <string name="settings_exam_color">Klausur-Highlight-Farbe</string>
     <string name="settings_display">Darstellung</string>
-    <string name="settings_cancelled_dim">Ausfälle ausgrauen</string>
-    <string name="settings_cancelled_dim_desc">Wie stark ausgefallene Stunden ausgegraut werden</string>
+    <string name="settings_cancelled_desaturation">Ausfälle ausgrauen</string>
+    <string name="settings_cancelled_desaturation_desc">Wie stark die Farbe ausgefallener Stunden entfernt wird</string>
+    <string name="settings_cancelled_darken">Ausfälle abdunkeln</string>
+    <string name="settings_cancelled_darken_desc">Wie stark ausgefallene Stunden abgedunkelt werden</string>
     <string name="settings_past_dim">Vergangene Stunden abdunkeln</string>
     <string name="settings_past_dim_desc">Stärke der Abdunklung für bereits vergangene Stunden</string>
     <string name="settings_preview_past">Vergangen</string>
@@ -297,7 +310,7 @@
     <string name="color_picker_low_contrast">Geringer Kontrast zur Textfarbe der Karten</string>
     <string name="color_picker_target_card">Karte</string>
     <string name="color_picker_target_text">Text</string>
-    <string name="color_picker_use_default_text">Standard verwenden</string>
+    <string name="color_picker_use_default_text">Standardfarbe verwenden</string>
 
     <!-- Notifications -->
     <string name="notif_channel_changes">Stundenplanänderungen</string>

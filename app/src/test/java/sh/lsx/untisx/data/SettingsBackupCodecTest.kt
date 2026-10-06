@@ -23,6 +23,10 @@ class SettingsBackupCodecTest {
             timetable = TimetableSettingsBackup(
                 defaultSubjectColor = "#AABBCC",
                 subjectTextColors = mapOf("MA" to "#112233"),
+                strikeColor = "#E53935",
+                examColor = "#B3261E",
+                showTeacher = false,
+                hideCancelled = true,
             ),
         )
 
@@ -55,14 +59,19 @@ class SettingsBackupCodecTest {
     @Test
     fun `display dims round trip`() {
         val backup = SettingsBackup(
-            timetable = TimetableSettingsBackup(cancelledDim = 0.4f, pastDim = 0.2f),
+            timetable = TimetableSettingsBackup(
+                cancelledDesaturation = 0.4f,
+                cancelledBrightness = 0.6f,
+                pastDim = 0.2f,
+            ),
         )
 
         val decoded = SettingsBackupCodec.decode(SettingsBackupCodec.encode(backup))
 
         assertTrue(decoded is DecodeResult.Valid)
         val timetable = (decoded as DecodeResult.Valid).backup.timetable
-        assertEquals(0.4f, timetable?.cancelledDim)
+        assertEquals(0.4f, timetable?.cancelledDesaturation)
+        assertEquals(0.6f, timetable?.cancelledBrightness)
         assertEquals(0.2f, timetable?.pastDim)
     }
 
@@ -74,7 +83,8 @@ class SettingsBackupCodecTest {
 
         assertTrue(decoded is DecodeResult.Valid)
         val timetable = (decoded as DecodeResult.Valid).backup.timetable
-        assertNull(timetable?.cancelledDim)
+        assertNull(timetable?.cancelledDesaturation)
+        assertNull(timetable?.cancelledBrightness)
         assertNull(timetable?.pastDim)
     }
 

@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sh.lsx.untisx.R
 import sh.lsx.untisx.ui.theme.SUBJECT_PALETTE
+import sh.lsx.untisx.ui.timetable.LessonCardOptions
 import sh.lsx.untisx.ui.util.Haptics
 
 @Composable
@@ -39,6 +40,8 @@ fun ColorPickerDialog(
     previewSubject: String? = null,
     previewCardColor: Int? = null,
     previewTextColor: Int? = null,
+    previewCancelled: Boolean = false,
+    previewExam: Boolean = false,
 ) {
     val initial = currentColor ?: defaultColor ?: SUBJECT_PALETTE.first().toArgb()
     val editor = remember(title) { ColorEditorState(initial) }
@@ -49,6 +52,12 @@ fun ColorPickerDialog(
     val cardText = Color(previewTextColor ?: effective)
     val lowContrast = !useDefault && contrastRatio(cardColor, cardText) < 3f
 
+    val previewOptions = when {
+        previewCancelled -> LessonCardOptions(strikeColor = Color(effective))
+        previewExam -> LessonCardOptions(examColor = Color(effective))
+        else -> LessonCardOptions()
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -58,6 +67,9 @@ fun ColorPickerDialog(
                     cardColor = cardColor,
                     textColor = cardText,
                     subject = previewSubject ?: "MA",
+                    cancelled = previewCancelled,
+                    exam = previewExam,
+                    options = previewOptions,
                 )
 
                 Spacer(Modifier.height(6.dp))

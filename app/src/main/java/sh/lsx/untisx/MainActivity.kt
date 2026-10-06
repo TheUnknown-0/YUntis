@@ -128,6 +128,7 @@ import sh.lsx.untisx.ui.screens.settings.SettingsOverviewScreen
 import sh.lsx.untisx.ui.screens.settings.TimetableSettingsScreen
 import sh.lsx.untisx.ui.timetable.ErrorBanner
 import sh.lsx.untisx.ui.timetable.InfoBanner
+import sh.lsx.untisx.ui.timetable.LessonCardOptions
 import sh.lsx.untisx.ui.timetable.TimetableScreen
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.theme.UntisXTheme
@@ -235,9 +236,17 @@ private fun AppRoot(
     var knownSubjects by remember { mutableStateOf(SubjectColorsPrefs.getKnown(context)) }
     var defaultSubjectColor by remember { mutableStateOf(SubjectColorsPrefs.getDefaultColor(context)) }
     var lessonTextColor by remember { mutableStateOf(SubjectColorsPrefs.getTextColor(context)) }
+    var strikeColor by remember { mutableStateOf(SubjectColorsPrefs.getStrikeColor(context)) }
+    var examColor by remember { mutableStateOf(SubjectColorsPrefs.getExamColor(context)) }
     var cancelledStrike by remember { mutableStateOf(SubjectColorsPrefs.isCancelledStrike(context)) }
-    var cancelledDim by remember { mutableStateOf(AppearancePrefs.getCancelledDim(context)) }
+    var cancelledDesaturation by remember { mutableStateOf(AppearancePrefs.getCancelledDesaturation(context)) }
+    var cancelledBrightness by remember { mutableStateOf(AppearancePrefs.getCancelledBrightness(context)) }
     var pastDim by remember { mutableStateOf(AppearancePrefs.getPastDim(context)) }
+    var showTeacher by remember { mutableStateOf(AppearancePrefs.showTeacher(context)) }
+    var showRoom by remember { mutableStateOf(AppearancePrefs.showRoom(context)) }
+    var showChanges by remember { mutableStateOf(AppearancePrefs.showChanges(context)) }
+    var hideCancelled by remember { mutableStateOf(AppearancePrefs.hideCancelled(context)) }
+    var showExamBadge by remember { mutableStateOf(AppearancePrefs.showExamBadge(context)) }
 
     val accounts by AccountStore.accounts.collectAsStateWithLifecycle()
     val activeId by AccountStore.activeId.collectAsStateWithLifecycle()
@@ -280,12 +289,20 @@ private fun AppRoot(
                 knownSubjects = SubjectColorsPrefs.getKnown(context)
                 defaultSubjectColor = SubjectColorsPrefs.getDefaultColor(context)
                 lessonTextColor = SubjectColorsPrefs.getTextColor(context)
+                strikeColor = SubjectColorsPrefs.getStrikeColor(context)
+                examColor = SubjectColorsPrefs.getExamColor(context)
                 cancelledStrike = SubjectColorsPrefs.isCancelledStrike(context)
             }
 
             if (key in AppearancePrefs.KEYS) {
-                cancelledDim = AppearancePrefs.getCancelledDim(context)
+                cancelledDesaturation = AppearancePrefs.getCancelledDesaturation(context)
+                cancelledBrightness = AppearancePrefs.getCancelledBrightness(context)
                 pastDim = AppearancePrefs.getPastDim(context)
+                showTeacher = AppearancePrefs.showTeacher(context)
+                showRoom = AppearancePrefs.showRoom(context)
+                showChanges = AppearancePrefs.showChanges(context)
+                hideCancelled = AppearancePrefs.hideCancelled(context)
+                showExamBadge = AppearancePrefs.showExamBadge(context)
             }
         }
 
@@ -366,12 +383,34 @@ private fun AppRoot(
                         onDefaultSubjectColor = { SubjectColorsPrefs.setDefaultColor(context, it) },
                         lessonTextColor = lessonTextColor,
                         onLessonTextColor = { SubjectColorsPrefs.setTextColor(context, it) },
+                        strikeColor = strikeColor,
+                        onStrikeColor = { SubjectColorsPrefs.setStrikeColor(context, it) },
+                        examColor = examColor,
+                        onExamColor = { SubjectColorsPrefs.setExamColor(context, it) },
                         cancelledStrike = cancelledStrike,
                         onCancelledStrike = { SubjectColorsPrefs.setCancelledStrike(context, it) },
-                        cancelledDim = cancelledDim,
-                        onCancelledDim = { AppearancePrefs.setCancelledDim(context, it) },
+                        cancelledDesaturation = cancelledDesaturation,
+                        onCancelledDesaturation = { AppearancePrefs.setCancelledDesaturation(context, it) },
+                        cancelledBrightness = cancelledBrightness,
+                        onCancelledBrightness = { AppearancePrefs.setCancelledBrightness(context, it) },
                         pastDim = pastDim,
                         onPastDim = { AppearancePrefs.setPastDim(context, it) },
+                        lessonOptions = LessonCardOptions(
+                            showTeacher = showTeacher,
+                            showRoom = showRoom,
+                            showChanges = showChanges,
+                            showExamBadge = showExamBadge,
+                            strikeColor = Color(strikeColor ?: SubjectColorsPrefs.DEFAULT_STRIKE_COLOR),
+                            examColor = examColor?.let { Color(it) },
+                        ),
+                        onLessonOptionsChange = { updated ->
+                            AppearancePrefs.setShowTeacher(context, updated.showTeacher)
+                            AppearancePrefs.setShowRoom(context, updated.showRoom)
+                            AppearancePrefs.setShowChanges(context, updated.showChanges)
+                            AppearancePrefs.setShowExamBadge(context, updated.showExamBadge)
+                        },
+                        hideCancelled = hideCancelled,
+                        onHideCancelledChange = { AppearancePrefs.setHideCancelled(context, it) },
                         focusDate = focusDate,
                         focusScreen = focusScreen,
                         focusNonce = focusNonce,
@@ -540,12 +579,22 @@ private fun MainApp(
     onDefaultSubjectColor: (Int) -> Unit,
     lessonTextColor: Int,
     onLessonTextColor: (Int) -> Unit,
+    strikeColor: Int?,
+    onStrikeColor: (Int?) -> Unit,
+    examColor: Int?,
+    onExamColor: (Int?) -> Unit,
     cancelledStrike: Boolean,
     onCancelledStrike: (Boolean) -> Unit,
-    cancelledDim: Float,
-    onCancelledDim: (Float) -> Unit,
+    cancelledDesaturation: Float,
+    onCancelledDesaturation: (Float) -> Unit,
+    cancelledBrightness: Float,
+    onCancelledBrightness: (Float) -> Unit,
     pastDim: Float,
     onPastDim: (Float) -> Unit,
+    lessonOptions: LessonCardOptions,
+    onLessonOptionsChange: (LessonCardOptions) -> Unit,
+    hideCancelled: Boolean,
+    onHideCancelledChange: (Boolean) -> Unit,
     focusDate: Int,
     focusScreen: String?,
     focusNonce: Int,
@@ -979,10 +1028,20 @@ private fun MainApp(
                                             onLessonTextColor = onLessonTextColor,
                                             cancelledStrike = cancelledStrike,
                                             onCancelledStrike = onCancelledStrike,
-                                            cancelledDim = cancelledDim,
-                                            onCancelledDim = onCancelledDim,
+                                            cancelledDesaturation = cancelledDesaturation,
+                                            onCancelledDesaturation = onCancelledDesaturation,
+                                            cancelledBrightness = cancelledBrightness,
+                                            onCancelledBrightness = onCancelledBrightness,
                                             pastDim = pastDim,
                                             onPastDim = onPastDim,
+                                            lessonOptions = lessonOptions,
+                                            onLessonOptionsChange = onLessonOptionsChange,
+                                            strikeColor = strikeColor,
+                                            onStrikeColor = onStrikeColor,
+                                            examColor = examColor,
+                                            onExamColor = onExamColor,
+                                            hideCancelled = hideCancelled,
+                                            onHideCancelledChange = onHideCancelledChange,
                                             modifier = settingsModifier,
                                         )
                                     }
@@ -1028,8 +1087,11 @@ private fun MainApp(
                             textColor = Color(lessonTextColor),
                             subjectTextColors = subjectTextColors.mapValues { Color(it.value) },
                             cancelledStrike = cancelledStrike,
-                            cancelledDim = cancelledDim,
+                            cancelledDesaturation = cancelledDesaturation,
+                            cancelledBrightness = cancelledBrightness,
                             pastDim = pastDim,
+                            lessonOptions = lessonOptions,
+                            hideCancelled = hideCancelled,
                             showLastRefreshed = showLastRefreshed,
                             focusDate = focusDate,
                             focusNonce = focusNonce,
@@ -1110,8 +1172,11 @@ private fun MainApp(
                             textColor = Color(lessonTextColor),
                             subjectTextColors = subjectTextColors.mapValues { Color(it.value) },
                             cancelledStrike = cancelledStrike,
-                            cancelledDim = cancelledDim,
+                            cancelledDesaturation = cancelledDesaturation,
+                            cancelledBrightness = cancelledBrightness,
                             pastDim = pastDim,
+                            lessonOptions = lessonOptions,
+                            hideCancelled = hideCancelled,
                             showLastRefreshed = showLastRefreshed,
                             focusDate = focusDate,
                             focusNonce = focusNonce,
@@ -1134,8 +1199,11 @@ private fun MainApp(
                             textColor = Color(lessonTextColor),
                             subjectTextColors = subjectTextColors.mapValues { Color(it.value) },
                             cancelledStrike = cancelledStrike,
-                            cancelledDim = cancelledDim,
+                            cancelledDesaturation = cancelledDesaturation,
+                            cancelledBrightness = cancelledBrightness,
                             pastDim = pastDim,
+                            lessonOptions = lessonOptions,
+                            hideCancelled = hideCancelled,
                             showLastRefreshed = showLastRefreshed,
                             focusDate = focusDate,
                             focusNonce = focusNonce,

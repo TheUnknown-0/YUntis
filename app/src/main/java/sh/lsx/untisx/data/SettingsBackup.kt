@@ -57,8 +57,16 @@ data class TimetableSettingsBackup(
     val defaultSubjectColor: String? = null,
     val lessonTextColor: String? = null,
     val cancelledStrike: Boolean? = null,
-    val cancelledDim: Float? = null,
+    val strikeColor: String? = null,
+    val examColor: String? = null,
+    val cancelledDesaturation: Float? = null,
+    val cancelledBrightness: Float? = null,
     val pastDim: Float? = null,
+    val showTeacher: Boolean? = null,
+    val showRoom: Boolean? = null,
+    val showChanges: Boolean? = null,
+    val hideCancelled: Boolean? = null,
+    val showExamBadge: Boolean? = null,
 )
 
 @Serializable
@@ -171,8 +179,16 @@ object SettingsBackupManager {
                 defaultSubjectColor = colorToHex(SubjectColorsPrefs.getDefaultColor(context)),
                 lessonTextColor = colorToHex(SubjectColorsPrefs.getTextColor(context)),
                 cancelledStrike = SubjectColorsPrefs.isCancelledStrike(context),
-                cancelledDim = AppearancePrefs.getCancelledDim(context),
+                strikeColor = SubjectColorsPrefs.getStrikeColor(context)?.let(::colorToHex),
+                examColor = SubjectColorsPrefs.getExamColor(context)?.let(::colorToHex),
+                cancelledDesaturation = AppearancePrefs.getCancelledDesaturation(context),
+                cancelledBrightness = AppearancePrefs.getCancelledBrightness(context),
                 pastDim = AppearancePrefs.getPastDim(context),
+                showTeacher = AppearancePrefs.showTeacher(context),
+                showRoom = AppearancePrefs.showRoom(context),
+                showChanges = AppearancePrefs.showChanges(context),
+                hideCancelled = AppearancePrefs.hideCancelled(context),
+                showExamBadge = AppearancePrefs.showExamBadge(context),
             ),
         )
     }
@@ -264,8 +280,16 @@ object SettingsBackupManager {
                 ?.let(::hexToColor)
                 ?.let { SubjectColorsPrefs.setTextColor(context, it) }
             timetable.cancelledStrike?.let { SubjectColorsPrefs.setCancelledStrike(context, it) }
-            timetable.cancelledDim?.let { AppearancePrefs.setCancelledDim(context, it) }
+            timetable.strikeColor?.let(::hexToColor)?.let { SubjectColorsPrefs.setStrikeColor(context, it) }
+            timetable.examColor?.let(::hexToColor)?.let { SubjectColorsPrefs.setExamColor(context, it) }
+            timetable.cancelledDesaturation?.let { AppearancePrefs.setCancelledDesaturation(context, it) }
+            timetable.cancelledBrightness?.let { AppearancePrefs.setCancelledBrightness(context, it) }
             timetable.pastDim?.let { AppearancePrefs.setPastDim(context, it) }
+            timetable.showTeacher?.let { AppearancePrefs.setShowTeacher(context, it) }
+            timetable.showRoom?.let { AppearancePrefs.setShowRoom(context, it) }
+            timetable.showChanges?.let { AppearancePrefs.setShowChanges(context, it) }
+            timetable.hideCancelled?.let { AppearancePrefs.setHideCancelled(context, it) }
+            timetable.showExamBadge?.let { AppearancePrefs.setShowExamBadge(context, it) }
         }
     }
 
