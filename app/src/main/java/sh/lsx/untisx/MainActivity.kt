@@ -102,6 +102,7 @@ import sh.lsx.untisx.data.prefs.AnimationPrefs
 import sh.lsx.untisx.data.prefs.AppearancePrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
 import sh.lsx.untisx.data.prefs.TimetablePrefs
+import sh.lsx.untisx.data.SubjectAlias
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.ThemePrefs
 import sh.lsx.untisx.data.notifications.NotificationScheduler
@@ -233,6 +234,7 @@ private fun AppRoot(
     var animationsEnabled by remember { mutableStateOf(AnimationPrefs.isEnabled(context)) }
     var subjectColors by remember { mutableStateOf(SubjectColorsPrefs.getColors(context)) }
     var subjectTextColors by remember { mutableStateOf(SubjectColorsPrefs.getSubjectTextColors(context)) }
+    var subjectAliases by remember { mutableStateOf(SubjectColorsPrefs.getAliases(context)) }
     var knownSubjects by remember { mutableStateOf(SubjectColorsPrefs.getKnown(context)) }
     var defaultSubjectColor by remember { mutableStateOf(SubjectColorsPrefs.getDefaultColor(context)) }
     var lessonTextColor by remember { mutableStateOf(SubjectColorsPrefs.getTextColor(context)) }
@@ -286,6 +288,7 @@ private fun AppRoot(
             if (key in SubjectColorsPrefs.KEYS) {
                 subjectColors = SubjectColorsPrefs.getColors(context)
                 subjectTextColors = SubjectColorsPrefs.getSubjectTextColors(context)
+                subjectAliases = SubjectColorsPrefs.getAliases(context)
                 knownSubjects = SubjectColorsPrefs.getKnown(context)
                 defaultSubjectColor = SubjectColorsPrefs.getDefaultColor(context)
                 lessonTextColor = SubjectColorsPrefs.getTextColor(context)
@@ -379,6 +382,8 @@ private fun AppRoot(
                         onSubjectColor = { name, argb -> SubjectColorsPrefs.setColor(context, name, argb) },
                         subjectTextColors = subjectTextColors,
                         onSubjectTextColor = { name, argb -> SubjectColorsPrefs.setSubjectTextColor(context, name, argb) },
+                        subjectAliases = subjectAliases,
+                        onSubjectAlias = { name, short, long -> SubjectColorsPrefs.setAlias(context, name, short, long) },
                         defaultSubjectColor = defaultSubjectColor,
                         onDefaultSubjectColor = { SubjectColorsPrefs.setDefaultColor(context, it) },
                         lessonTextColor = lessonTextColor,
@@ -575,6 +580,8 @@ private fun MainApp(
     onSubjectColor: (String, Int?) -> Unit,
     subjectTextColors: Map<String, Int>,
     onSubjectTextColor: (String, Int?) -> Unit,
+    subjectAliases: Map<String, SubjectAlias>,
+    onSubjectAlias: (String, String?, String?) -> Unit,
     defaultSubjectColor: Int,
     onDefaultSubjectColor: (Int) -> Unit,
     lessonTextColor: Int,
@@ -1022,6 +1029,8 @@ private fun MainApp(
                                             onSubjectColor = onSubjectColor,
                                             subjectTextColors = subjectTextColors,
                                             onSubjectTextColor = onSubjectTextColor,
+                                            subjectAliases = subjectAliases,
+                                            onSubjectAlias = onSubjectAlias,
                                             defaultSubjectColor = defaultSubjectColor,
                                             onDefaultSubjectColor = onDefaultSubjectColor,
                                             lessonTextColor = lessonTextColor,
@@ -1064,6 +1073,7 @@ private fun MainApp(
                             onEventClick = { openEvent(it, Screen.EVENTS) },
                             exams = timetableVm.exams,
                             subjectsById = timetableVm.subjectsById,
+                            subjectAliases = subjectAliases,
                             teachersById = timetableVm.teachersById,
                             modifier = Modifier
                                 .fillMaxSize()
@@ -1086,6 +1096,7 @@ private fun MainApp(
                             defaultColor = Color(defaultSubjectColor),
                             textColor = Color(lessonTextColor),
                             subjectTextColors = subjectTextColors.mapValues { Color(it.value) },
+                            subjectAliases = subjectAliases,
                             cancelledStrike = cancelledStrike,
                             cancelledDesaturation = cancelledDesaturation,
                             cancelledBrightness = cancelledBrightness,
@@ -1159,6 +1170,7 @@ private fun MainApp(
                                 textColor = Color(
                                     subjectName?.let { subjectTextColors[it] } ?: lessonTextColor,
                                 ),
+                                subjectAliases = subjectAliases,
                                 notes = timetableVm.lessonNotes,
                                 exam = timetableVm.examFor(lesson),
                                 lessonOptions = lessonOptions,
@@ -1175,6 +1187,7 @@ private fun MainApp(
                             defaultColor = Color(defaultSubjectColor),
                             textColor = Color(lessonTextColor),
                             subjectTextColors = subjectTextColors.mapValues { Color(it.value) },
+                            subjectAliases = subjectAliases,
                             cancelledStrike = cancelledStrike,
                             cancelledDesaturation = cancelledDesaturation,
                             cancelledBrightness = cancelledBrightness,
@@ -1202,6 +1215,7 @@ private fun MainApp(
                             defaultColor = Color(defaultSubjectColor),
                             textColor = Color(lessonTextColor),
                             subjectTextColors = subjectTextColors.mapValues { Color(it.value) },
+                            subjectAliases = subjectAliases,
                             cancelledStrike = cancelledStrike,
                             cancelledDesaturation = cancelledDesaturation,
                             cancelledBrightness = cancelledBrightness,

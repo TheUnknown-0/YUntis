@@ -92,6 +92,10 @@
     <string name="settings_card_text_color">Standard Textfarbe der Karten</string>
     <string name="settings_no_subjects">Noch keine Fächer gefunden. Öffne deinen Stundenplan, um die Farben deiner Fächer anzupassen.</string>
     <string name="settings_scan_subjects">Fächer scannen</string>
+    <string name="settings_subject_rename">Fach umbenennen</string>
+    <string name="settings_subject_short_name">Kurzname</string>
+    <string name="settings_subject_full_name">Voller Name</string>
+    <string name="settings_subject_name_hint">Eins leer lassen, dann wird der andere Name verwendet</string>
     <string name="settings_rescan_subjects">Fächer erneut scannen</string>
     <string name="settings_custom">eigene Farbe</string>
     <string name="settings_strike_cancelled">Ausfälle durchstreichen</string>

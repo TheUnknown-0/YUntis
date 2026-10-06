@@ -270,7 +270,7 @@ internal fun LessonCard(
             }
 
             Text(
-                text = lesson.subject,
+                text = lesson.label,
                 fontSize = if (compact) 9.sp else 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = titleColor,

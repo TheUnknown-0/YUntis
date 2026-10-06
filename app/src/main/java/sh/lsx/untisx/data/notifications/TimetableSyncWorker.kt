@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.TimetableCache
 import kotlinx.coroutines.CancellationException
 import sh.lsx.untisx.data.api.UntisClient
@@ -136,6 +137,7 @@ class TimetableSyncWorker(
                     subjects = subjects,
                     teachers = teachers,
                     rooms = rooms,
+                    subjectAliases = SubjectColorsPrefs.getAliases(context),
                     filter = filter,
                 )
             }

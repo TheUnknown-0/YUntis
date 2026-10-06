@@ -44,6 +44,8 @@ import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.model.toUntisLocalTime
+import sh.lsx.untisx.data.SubjectAlias
+import sh.lsx.untisx.data.subjectLongLabel
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.timetable.LessonCardColors
 import sh.lsx.untisx.ui.timetable.LessonCardOptions
@@ -71,6 +73,7 @@ fun LessonDetailsScreen(
     cancelledStrike: Boolean = true,
     cancelledDesaturation: Float = 1f,
     cancelledBrightness: Float = 1f,
+    subjectAliases: Map<String, SubjectAlias> = emptyMap(),
 ) {
     val timeFormat = rememberTimeFormat()
 
@@ -126,7 +129,8 @@ fun LessonDetailsScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
             ) {
                 Text(
-                    text = subjectName.ifBlank { entry.lstext?.takeIf { it.isNotBlank() } ?: "?" },
+                    text = subjectLongLabel(subjectAliases, subjectName)
+                        .ifBlank { entry.lstext?.takeIf { it.isNotBlank() } ?: "?" },
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = cardColors.title,

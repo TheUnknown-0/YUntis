@@ -15,6 +15,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,7 +35,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sh.lsx.untisx.R
+import sh.lsx.untisx.data.SubjectAlias
 import sh.lsx.untisx.data.SubjectColorsPrefs
+import sh.lsx.untisx.data.subjectLongLabel
 import sh.lsx.untisx.data.prefs.AppearancePrefs
 import sh.lsx.untisx.ui.components.ColorPickerDialog
 import sh.lsx.untisx.ui.components.SettingsColorRow
@@ -40,6 +45,7 @@ import sh.lsx.untisx.ui.components.SettingsSectionCard
 import sh.lsx.untisx.ui.components.SettingsSliderRow
 import sh.lsx.untisx.ui.components.SettingsSwitchRow
 import sh.lsx.untisx.ui.components.SubjectColorDialog
+import sh.lsx.untisx.ui.components.SubjectNameDialog
 import sh.lsx.untisx.ui.timetable.LessonCard
 import sh.lsx.untisx.ui.timetable.LessonCardOptions
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
@@ -56,6 +62,8 @@ fun TimetableSettingsScreen(
     onSubjectColor: (String, Int?) -> Unit,
     subjectTextColors: Map<String, Int>,
     onSubjectTextColor: (String, Int?) -> Unit,
+    subjectAliases: Map<String, SubjectAlias>,
+    onSubjectAlias: (String, String?, String?) -> Unit,
     defaultSubjectColor: Int,
     onDefaultSubjectColor: (Int) -> Unit,
     lessonTextColor: Int,
@@ -80,6 +88,7 @@ fun TimetableSettingsScreen(
 ) {
 
     var colorDialogFor by remember { mutableStateOf<String?>(null) }
+    var renameDialogFor by remember { mutableStateOf<String?>(null) }
     var pickDefaultColor by remember { mutableStateOf(false) }
     var pickTextColor by remember { mutableStateOf(false) }
     var pickStrikeColor by remember { mutableStateOf(false) }
@@ -123,6 +132,7 @@ fun TimetableSettingsScreen(
                 knownSubjects.forEach { name ->
                     val custom = subjectColors.containsKey(name)
                     val color = subjectColors[name]?.let { Color(it) } ?: Color(defaultSubjectColor)
+                    val label = subjectLongLabel(subjectAliases, name)
 
                     Row(
                         modifier = Modifier
@@ -152,13 +162,24 @@ fun TimetableSettingsScreen(
 
                         Spacer(Modifier.size(10.dp))
 
-                        Text(
-                            text = name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+
+                            if (label != name) {
+                                Text(
+                                    text = name,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
 
                         if (custom) {
                             Text(
@@ -167,6 +188,18 @@ fun TimetableSettingsScreen(
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
+
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = stringResource(R.string.settings_subject_rename),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .tapHaptic { renameDialogFor = name }
+                                .padding(4.dp),
+                        )
                     }
 
                     Spacer(Modifier.size(4.dp))
@@ -285,6 +318,18 @@ fun TimetableSettingsScreen(
                 colorDialogFor = null
             },
             onDismiss = { colorDialogFor = null },
+        )
+    }
+
+    renameDialogFor?.let { subjectName ->
+        SubjectNameDialog(
+            subject = subjectName,
+            alias = subjectAliases[subjectName],
+            onApply = { short, long ->
+                onSubjectAlias(subjectName, short, long)
+                renameDialogFor = null
+            },
+            onDismiss = { renameDialogFor = null },
         )
     }
 

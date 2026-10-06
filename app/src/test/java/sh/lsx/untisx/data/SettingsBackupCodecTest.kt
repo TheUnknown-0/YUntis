@@ -23,6 +23,7 @@ class SettingsBackupCodecTest {
             timetable = TimetableSettingsBackup(
                 defaultSubjectColor = "#AABBCC",
                 subjectTextColors = mapOf("MA" to "#112233"),
+                subjectAliases = mapOf("MA_G2" to SubjectAlias(short = "MA", long = "Mathe")),
                 strikeColor = "#E53935",
                 examColor = "#B3261E",
                 showTeacher = false,
@@ -86,6 +87,22 @@ class SettingsBackupCodecTest {
         assertNull(timetable?.cancelledDesaturation)
         assertNull(timetable?.cancelledBrightness)
         assertNull(timetable?.pastDim)
+    }
+
+    @Test
+    fun `subject aliases round trip`() {
+        val alias = SubjectAlias(short = "MA", long = "Mathe")
+        val backup = SettingsBackup(
+            timetable = TimetableSettingsBackup(subjectAliases = mapOf("MA_G2" to alias)),
+        )
+
+        val decoded = SettingsBackupCodec.decode(SettingsBackupCodec.encode(backup))
+
+        assertTrue(decoded is DecodeResult.Valid)
+        assertEquals(
+            mapOf("MA_G2" to alias),
+            (decoded as DecodeResult.Valid).backup.timetable?.subjectAliases,
+        )
     }
 
     @Test

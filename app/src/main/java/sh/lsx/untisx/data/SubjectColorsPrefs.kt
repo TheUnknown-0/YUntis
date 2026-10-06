@@ -9,6 +9,7 @@ object SubjectColorsPrefs {
 
     const val KEY_COLORS = "subject_colors"
     const val KEY_TEXT_COLORS = "subject_text_colors"
+    const val KEY_ALIASES = "subject_aliases"
     const val KEY_KNOWN = "known_subjects"
     const val KEY_CANCELLED_STRIKE = "cancelled_strike"
     const val KEY_STRIKE_COLOR = "strike_color"
@@ -19,6 +20,7 @@ object SubjectColorsPrefs {
     val KEYS = listOf(
         KEY_COLORS,
         KEY_TEXT_COLORS,
+        KEY_ALIASES,
         KEY_KNOWN,
         KEY_CANCELLED_STRIKE,
         KEY_STRIKE_COLOR,
@@ -27,7 +29,7 @@ object SubjectColorsPrefs {
         KEY_TEXT_COLOR,
     )
 
-    const val DEFAULT_SUBJECT_COLOR = 0xFF78A8CF.toInt()
+    val DEFAULT_SUBJECT_COLOR = 0xFF78A8CF.toInt()
     const val DEFAULT_TEXT_COLOR = 0xFF111111.toInt()
     const val DEFAULT_STRIKE_COLOR = 0xFFE53935.toInt()
 
@@ -69,6 +71,30 @@ object SubjectColorsPrefs {
 
         prefs(context).edit {
             putString(KEY_TEXT_COLORS, json.encodeToString(current))
+        }
+    }
+
+    fun getAliases(context: Context): Map<String, SubjectAlias> {
+        val raw = prefs(context).getString(KEY_ALIASES, null) ?: return emptyMap()
+
+        return runCatching {
+            json.decodeFromString<Map<String, SubjectAlias>>(raw)
+        }.getOrDefault(emptyMap())
+    }
+
+    fun setAlias(context: Context, name: String, short: String?, long: String?) {
+        val current = getAliases(context).toMutableMap()
+        val trimmedShort = short?.trim()?.takeIf { it.isNotEmpty() }
+        val trimmedLong = long?.trim()?.takeIf { it.isNotEmpty() }
+
+        if (trimmedShort == null && trimmedLong == null) {
+            current.remove(name)
+        } else {
+            current[name] = SubjectAlias(short = trimmedShort, long = trimmedLong)
+        }
+
+        prefs(context).edit {
+            putString(KEY_ALIASES, json.encodeToString(current))
         }
     }
 
@@ -135,6 +161,7 @@ object SubjectColorsPrefs {
         prefs(context).edit {
             remove(KEY_COLORS)
             remove(KEY_TEXT_COLORS)
+            remove(KEY_ALIASES)
             remove(KEY_KNOWN)
             remove(KEY_STRIKE_COLOR)
             remove(KEY_EXAM_COLOR)

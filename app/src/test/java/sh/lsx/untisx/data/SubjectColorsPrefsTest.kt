@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -31,6 +32,38 @@ class SubjectColorsPrefsTest {
 
         assertNull(afterReset["MA"])
         assertEquals(0xFF445566.toInt(), afterReset["EN"])
+    }
+
+    @Test
+    fun `subject aliases round trip, trim and reset`() {
+        SubjectColorsPrefs.setAlias(context, "MA_G2", "  MA ", "  Mathe ")
+        SubjectColorsPrefs.setAlias(context, "EN", null, "English")
+
+        val aliases = SubjectColorsPrefs.getAliases(context)
+
+        assertEquals(SubjectAlias(short = "MA", long = "Mathe"), aliases["MA_G2"])
+        assertEquals(SubjectAlias(long = "English"), aliases["EN"])
+
+        SubjectColorsPrefs.setAlias(context, "MA_G2", " ", null)
+        SubjectColorsPrefs.setAlias(context, "EN", null, "   ")
+
+        assertTrue(SubjectColorsPrefs.getAliases(context).isEmpty())
+    }
+
+    @Test
+    fun `short and long labels fall back to each other and the original`() {
+        val aliases = mapOf(
+            "MA_G2" to SubjectAlias(short = "MA"),
+            "EN" to SubjectAlias(long = "English"),
+            "MU" to SubjectAlias(short = "   "),
+        )
+
+        assertEquals("MA", subjectShortLabel(aliases, "MA_G2"))
+        assertEquals("MA", subjectLongLabel(aliases, "MA_G2"))
+        assertEquals("English", subjectShortLabel(aliases, "EN"))
+        assertEquals("English", subjectLongLabel(aliases, "EN"))
+        assertEquals("MU", subjectShortLabel(aliases, "MU"))
+        assertEquals("MU", subjectLongLabel(aliases, "MU"))
     }
 
     @Test

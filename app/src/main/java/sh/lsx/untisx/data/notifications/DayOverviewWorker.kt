@@ -6,7 +6,9 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import sh.lsx.untisx.R
+import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.TimetableCache
+import sh.lsx.untisx.data.subjectLongLabel
 import kotlinx.coroutines.CancellationException
 import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.MasterDataItem
@@ -146,10 +148,11 @@ class DayOverviewWorker(
         val sorted = lessons.sortedWith(compareBy({ it.startTime }, { it.endTime }))
         val detailed = NotificationPrefs.overviewDetailed(context)
         val showChanges = NotificationPrefs.overviewShowChanges(context)
+        val subjectAliases = SubjectColorsPrefs.getAliases(context)
 
         return sorted.joinToString("\n") { entry ->
             val time = entry.startTime.toUntisLocalTime().format(AppDateFormats.time(context))
-            val subject = names(entry.subject, subjects).ifBlank { "?" }
+            val subject = subjectLongLabel(subjectAliases, names(entry.subject, subjects).ifBlank { "?" })
 
             val details = ArrayList<String>(3)
 

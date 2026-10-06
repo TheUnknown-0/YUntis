@@ -45,6 +45,8 @@ import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
+import sh.lsx.untisx.data.SubjectAlias
+import sh.lsx.untisx.data.subjectLongLabel
 import sh.lsx.untisx.ui.util.animatedItem
 import sh.lsx.untisx.ui.util.entranceEffect
 import sh.lsx.untisx.ui.util.rememberDateFormat
@@ -71,6 +73,7 @@ fun EventsScreen(
     onEventClick: (TimetableEntry) -> Unit = {},
     exams: List<ExamInfo> = emptyList(),
     subjectsById: Map<Int, MasterDataItem> = emptyMap(),
+    subjectAliases: Map<String, SubjectAlias> = emptyMap(),
     teachersById: Map<Int, MasterDataItem> = emptyMap(),
 ) {
     val today = rememberToday()
@@ -192,6 +195,7 @@ fun EventsScreen(
                                 ExamCard(
                                     exam = exam,
                                     subjectsById = subjectsById,
+                                    subjectAliases = subjectAliases,
                                     teachersById = teachersById,
                                     roomsById = roomsById,
                                     modifier = animatedItem()
@@ -379,13 +383,14 @@ private fun EventCard(
 private fun ExamCard(
     exam: ExamInfo,
     subjectsById: Map<Int, MasterDataItem>,
+    subjectAliases: Map<String, SubjectAlias> = emptyMap(),
     teachersById: Map<Int, MasterDataItem>,
     roomsById: Map<Int, MasterDataItem>,
     modifier: Modifier = Modifier,
 ) {
     val type = exam.examType.takeIf { it.isNotBlank() } ?: stringResource(R.string.lesson_exam)
     val timeFormat = rememberTimeFormat()
-    val subject = subjectsById[exam.subjectId]?.name?.takeIf { it.isNotBlank() }
+    val subject = subjectsById[exam.subjectId]?.name?.takeIf { it.isNotBlank() }?.let { subjectLongLabel(subjectAliases, it) }
     val rooms = exam.roomIds.mapNotNull { roomsById[it]?.name?.takeIf { name -> name.isNotBlank() } }.distinct()
     val teachers = exam.teacherIds.mapNotNull { teachersById[it]?.name?.takeIf { name -> name.isNotBlank() } }.distinct()
     val timed = exam.startTime != 0 || exam.endTime != 0

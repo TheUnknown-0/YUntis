@@ -3,6 +3,7 @@ package sh.lsx.untisx.data.notifications
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import sh.lsx.untisx.data.SubjectAlias
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
@@ -235,12 +236,28 @@ class ScheduleChangeDetectorTest {
         assertEquals("Neubau", changes.single().newValue)
     }
 
+    @Test
+    fun subjectAliasesAreApplied() {
+        val previous = listOf(
+            entry(teacher = listOf(teacher(TEACHER_1)), room = listOf(room(ROOM_1))),
+        )
+        val fresh = listOf(
+            entry(teacher = listOf(teacher(TEACHER_1)), room = listOf(room(ROOM_2))),
+        )
+
+        val changes = detect(previous, fresh, subjectAliases = mapOf("Mathe" to SubjectAlias(short = "MA")))
+
+        assertEquals(1, changes.size)
+        assertEquals("MA", changes.single().subject)
+    }
+
     private fun detect(
         previous: List<TimetableEntry>,
         fresh: List<TimetableEntry>,
         subjects: Map<Int, MasterDataItem> = emptyMap(),
         teachers: Map<Int, MasterDataItem> = emptyMap(),
         rooms: Map<Int, MasterDataItem> = emptyMap(),
+        subjectAliases: Map<String, SubjectAlias> = emptyMap(),
         filter: ChangeFilter = ChangeFilter(),
     ): List<ScheduleChange> = ScheduleChangeDetector.detect(
         previous = previous,
@@ -248,6 +265,7 @@ class ScheduleChangeDetectorTest {
         subjects = subjects,
         teachers = teachers,
         rooms = rooms,
+        subjectAliases = subjectAliases,
         filter = filter,
     )
 

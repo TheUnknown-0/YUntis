@@ -3,6 +3,8 @@ package sh.lsx.untisx.data.notifications
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
+import sh.lsx.untisx.data.SubjectAlias
+import sh.lsx.untisx.data.subjectLongLabel
 
 enum class ChangeType {
     CANCELLED,
@@ -32,6 +34,7 @@ object ScheduleChangeDetector {
         subjects: Map<Int, MasterDataItem> = emptyMap(),
         teachers: Map<Int, MasterDataItem> = emptyMap(),
         rooms: Map<Int, MasterDataItem> = emptyMap(),
+        subjectAliases: Map<String, SubjectAlias> = emptyMap(),
         filter: ChangeFilter = ChangeFilter(),
     ): List<ScheduleChange> {
         val remaining = previous.groupBy { slotKey(it) }
@@ -50,7 +53,7 @@ object ScheduleChangeDetector {
             if (old == null) continue
             if (old.code == "cancelled" && entry.code != "cancelled") continue
 
-            val subject = names(entry.subject, subjects).ifBlank { "?" }
+            val subject = subjectLongLabel(subjectAliases, names(entry.subject, subjects).ifBlank { "?" })
 
             if (entry.code == "cancelled" && old.code != "cancelled") {
                 if (filter.cancelled) changes += ScheduleChange(ChangeType.CANCELLED, entry, subject)

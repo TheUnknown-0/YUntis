@@ -18,6 +18,7 @@ internal val HEADER_HEIGHT = 56.dp
 internal data class LessonDisplay(
     val entry: TimetableEntry,
     val subject: String,
+    val label: String = subject,
     val rooms: String,
     val teachers: String,
     val origRooms: String? = null,

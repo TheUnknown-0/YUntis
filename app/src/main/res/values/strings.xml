@@ -92,6 +92,10 @@
     <string name="settings_card_text_color">Default Card text color</string>
     <string name="settings_no_subjects">No subjects scanned yet. Scan your timetable to customize subject colors.</string>
     <string name="settings_scan_subjects">Scan subjects</string>
+    <string name="settings_subject_rename">Rename subject</string>
+    <string name="settings_subject_short_name">Short name</string>
+    <string name="settings_subject_full_name">Full name</string>
+    <string name="settings_subject_name_hint">Leave one empty to use the other</string>
     <string name="settings_rescan_subjects">Rescan subjects</string>
     <string name="settings_custom">custom</string>
     <string name="settings_strike_cancelled">Strike through cancelled</string>

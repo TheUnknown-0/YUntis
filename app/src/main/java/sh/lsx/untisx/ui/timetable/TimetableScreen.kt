@@ -60,6 +60,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import sh.lsx.untisx.data.ExamsMatcher
+import sh.lsx.untisx.data.SubjectAlias
 import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
@@ -68,6 +69,7 @@ import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.model.toUntisWeekStart
+import sh.lsx.untisx.data.subjectShortLabel
 import sh.lsx.untisx.R
 import sh.lsx.untisx.ui.util.AppMotion
 import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
@@ -112,6 +114,7 @@ fun TimetableScreen(
     defaultColor: Color = Color(0xFF81D4FA),
     textColor: Color = Color(0xFF212121),
     subjectTextColors: Map<String, Color> = emptyMap(),
+    subjectAliases: Map<String, SubjectAlias> = emptyMap(),
     cancelledStrike: Boolean = true,
     cancelledDesaturation: Float = 1f,
     cancelledBrightness: Float = 1f,
@@ -235,6 +238,7 @@ fun TimetableScreen(
                         subjectsById = vm.subjectsById,
                         teachersById = vm.teachersById,
                         roomsById = vm.roomsById,
+                        subjectAliases = subjectAliases,
                         holidays = vm.holidays,
                         weekStart = weekStart,
                         dayStart = grid.dayStart,
@@ -275,6 +279,7 @@ private fun WeekPage(
     subjectsById: Map<Int, MasterDataItem>,
     teachersById: Map<Int, MasterDataItem>,
     roomsById: Map<Int, MasterDataItem>,
+    subjectAliases: Map<String, SubjectAlias>,
     holidays: List<Holiday>,
     weekStart: LocalDate,
     dayStart: Int,
@@ -307,11 +312,14 @@ private fun WeekPage(
         } else {
             val safeEntries = entries.orEmpty()
 
-            val displays = remember(safeEntries, subjectsById, teachersById, roomsById, exams) {
+            val displays = remember(safeEntries, subjectsById, teachersById, roomsById, exams, subjectAliases) {
                 safeEntries.map { entry ->
+                    val subject = resolveSubject(entry, subjectsById)
+
                     LessonDisplay(
                         entry = entry,
-                        subject = resolveSubject(entry, subjectsById),
+                        subject = subject,
+                        label = subjectShortLabel(subjectAliases, subject),
                         rooms = resolveNames(entry.room, roomsById),
                         teachers = resolveNames(entry.teacher, teachersById),
                         origRooms = resolveOriginals(entry.room, roomsById),

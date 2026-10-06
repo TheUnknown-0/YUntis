@@ -6,7 +6,9 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.CancellationException
+import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.TimetableCache
+import sh.lsx.untisx.data.subjectLongLabel
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.api.UntisException
 import sh.lsx.untisx.data.model.toUntisDate
@@ -61,11 +63,15 @@ class ExamReminderWorker(
             val subjects = cache?.subjects?.associateBy { it.id }.orEmpty()
             val teachers = cache?.teachers?.associateBy { it.id }.orEmpty()
             val rooms = cache?.rooms?.associateBy { it.id }.orEmpty()
+            val subjectAliases = SubjectColorsPrefs.getAliases(context)
 
             val reminders = fresh.map { exam ->
                 ExamReminder(
                     exam = exam,
-                    subject = subjects[exam.subjectId]?.name?.takeIf { it.isNotBlank() }.orEmpty(),
+                    subject = subjectLongLabel(
+                        subjectAliases,
+                        subjects[exam.subjectId]?.name?.takeIf { it.isNotBlank() }.orEmpty(),
+                    ),
                     rooms = exam.roomIds
                         .mapNotNull { id -> rooms[id]?.name?.takeIf { it.isNotBlank() } }
                         .distinct()

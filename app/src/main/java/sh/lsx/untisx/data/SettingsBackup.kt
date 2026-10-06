@@ -53,6 +53,7 @@ data class NotificationSettingsBackup(
 data class TimetableSettingsBackup(
     val subjectColors: Map<String, String>? = null,
     val subjectTextColors: Map<String, String>? = null,
+    val subjectAliases: Map<String, SubjectAlias>? = null,
     val knownSubjects: List<String>? = null,
     val defaultSubjectColor: String? = null,
     val lessonTextColor: String? = null,
@@ -175,6 +176,7 @@ object SettingsBackupManager {
             timetable = TimetableSettingsBackup(
                 subjectColors = SubjectColorsPrefs.getColors(context).mapValues { colorToHex(it.value) },
                 subjectTextColors = SubjectColorsPrefs.getSubjectTextColors(context).mapValues { colorToHex(it.value) },
+                subjectAliases = SubjectColorsPrefs.getAliases(context),
                 knownSubjects = SubjectColorsPrefs.getKnown(context),
                 defaultSubjectColor = colorToHex(SubjectColorsPrefs.getDefaultColor(context)),
                 lessonTextColor = colorToHex(SubjectColorsPrefs.getTextColor(context)),
@@ -260,6 +262,25 @@ object SettingsBackupManager {
 
                     if (subject != null) {
                         hexToColor(hex)?.let { SubjectColorsPrefs.setSubjectTextColor(context, subject, it) }
+                    }
+                }
+
+            timetable.subjectAliases
+                ?.entries
+                ?.take(MAX_SUBJECT_ENTRIES)
+                ?.forEach { (name, alias) ->
+                    val subject = name.trim()
+                        .takeIf { it.isNotBlank() && it.length <= MAX_SUBJECT_NAME_LENGTH }
+                        ?: return@forEach
+                    val short = alias.short
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() && it.length <= MAX_SUBJECT_NAME_LENGTH }
+                    val long = alias.long
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() && it.length <= MAX_SUBJECT_NAME_LENGTH }
+
+                    if (short != null || long != null) {
+                        SubjectColorsPrefs.setAlias(context, subject, short, long)
                     }
                 }
 
