@@ -1,6 +1,5 @@
 package sh.lsx.untisx.data.api
 
-import kotlinx.serialization.Serializable
 import sh.lsx.untisx.data.model.AuthResult
 import sh.lsx.untisx.data.model.DayMessage
 import sh.lsx.untisx.data.model.DirectMessage

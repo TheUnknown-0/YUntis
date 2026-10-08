@@ -16,59 +16,40 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import sh.lsx.untisx.data.prefs.AccountPrefs
-import sh.lsx.untisx.data.prefs.AccountStore
-import sh.lsx.untisx.data.prefs.AuthData
-import sh.lsx.untisx.data.SubjectColorsPrefs
+import kotlinx.coroutines.withContext
+import sh.lsx.untisx.R
 import sh.lsx.untisx.data.AppClock
 import sh.lsx.untisx.data.ExamsMatcher
 import sh.lsx.untisx.data.ExamsStore
-import sh.lsx.untisx.data.StatsData
-import sh.lsx.untisx.data.StatsStore
 import sh.lsx.untisx.data.SchoolYearStats
+import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.TimetableCache
 import sh.lsx.untisx.data.api.SessionManager
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.api.UntisException
-import sh.lsx.untisx.data.model.DayMessage
 import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.SchoolYear
-import sh.lsx.untisx.data.prefs.PasswordVault
-import sh.lsx.untisx.data.prefs.StatsPrefs
-import sh.lsx.untisx.data.model.TimetableEntry
-import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimegridDay
+import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.model.toUntisWeekStart
 import sh.lsx.untisx.data.model.toVisibleWeekStart
-import sh.lsx.untisx.R
+import sh.lsx.untisx.data.prefs.AccountPrefs
+import sh.lsx.untisx.data.prefs.AccountStore
+import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.data.prefs.PasswordVault
 import sh.lsx.untisx.ui.util.UiText
-import sh.lsx.untisx.ui.util.AppDateFormats
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 class TimetableViewModel(app: Application) : AndroidViewModel(app) {
-
-    sealed interface LoadError {
-        val text: UiText
-
-        data class Network(override val text: UiText) : LoadError
-        data class Auth(override val text: UiText) : LoadError
-        data class Server(override val text: UiText) : LoadError
-        data class Unknown(override val text: UiText) : LoadError
-    }
 
     sealed interface NotesState {
         data object Loading : NotesState
@@ -90,7 +71,6 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         private const val TAG = "TimetableViewModel"
         private const val SCAN_FROM_MONTHS = 1L
         private const val SCAN_TO_MONTHS = 11L
-        private const val EVENTS_AHEAD_MONTHS = 6L
         private const val EXAMS_BACK_MONTHS = 2L
         private const val EXAMS_AHEAD_MONTHS = 6L
         private const val EXAMS_TTL_MS = 12 * 60 * 60 * 1000L
@@ -124,32 +104,26 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var restrictedDays by mutableStateOf<Set<Int>>(emptySet())
         private set
-    var events by mutableStateOf<List<TimetableEntry>>(emptyList())
-        private set
-    var eventsLoading by mutableStateOf(false)
-        private set
-    var eventsError by mutableStateOf<UiText?>(null)
-        private set
-    var eventsFetchedAt by mutableLongStateOf(0L)
-        private set
-    var dayMessages by mutableStateOf<List<DayMessage>>(emptyList())
-        private set
-    var messagesFetchedAt by mutableLongStateOf(0L)
-        private set
     var lessonNotes by mutableStateOf<NotesState?>(null)
-        private set
-    var stats by mutableStateOf<StatsData?>(null)
-        private set
-    var statsLoading by mutableStateOf(false)
-        private set
-    var statsProgress by mutableStateOf<Pair<Int, Int>?>(null)
-        private set
-    var statsError by mutableStateOf<UiText?>(null)
-        private set
-    var statsUpToDate by mutableStateOf(false)
         private set
     var exams by mutableStateOf<List<ExamInfo>>(emptyList())
         private set
+
+    var lastFetch by mutableLongStateOf(0L)
+        private set
+
+    val events get() = eventsLoader.events
+    val eventsLoading get() = eventsLoader.loading
+    val eventsError get() = eventsLoader.error
+    val eventsFetchedAt get() = eventsLoader.fetchedAt
+    val dayMessages get() = eventsLoader.dayMessages
+    val messagesFetchedAt get() = eventsLoader.messagesFetchedAt
+
+    val stats get() = statsLoader.data
+    val statsLoading get() = statsLoader.loading
+    val statsProgress get() = statsLoader.progress
+    val statsError get() = statsLoader.error
+    val statsUpToDate get() = statsLoader.upToDate
 
     private var statsYear: SchoolYear? = null
     private var examsFetchedAt = 0L
@@ -157,7 +131,6 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     private var auth: AuthData? = null
     private var staticDataLoaded = false
     private var subjectsScanned = false
-    private var eventsRequested = false
     private val weekCache = HashMap<Int, List<TimetableEntry>>()
     private val failedWeeks = HashSet<Int>()
     private val flightLock = Mutex()
@@ -165,11 +138,36 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     private val notesCache = HashMap<Int, NotesState.Loaded>()
     private var notesRequestId = 0
 
-    var lastFetch by mutableLongStateOf(0L)
-        private set
-
     private val backgroundJob = SupervisorJob(viewModelScope.coroutineContext[Job])
     private val backgroundScope = CoroutineScope(viewModelScope.coroutineContext + backgroundJob)
+
+    private val fetch: TimetableFetch = TimetableFetch(
+        context = getApplication<Application>(),
+        requireAuth = { requireAuth() },
+        withPassword = { withPassword() },
+        onFreshSession = { persistSession(it) },
+        resolveElementIds = { entries -> resolveElementIds(entries, subjectsById, teachersById, roomsById) },
+    )
+
+    private val staticData: TimetableStaticData = TimetableStaticData(
+        withPassword = { withPassword() },
+    )
+
+    private val statsLoader: TimetableStatsLoader = TimetableStatsLoader(
+        context = getApplication<Application>(),
+        scope = backgroundScope,
+        requireAuth = { requireAuth() },
+        withPassword = { withPassword() },
+        fetchStatsWeek = { account, week -> fetch.fetchStatsWeek(account, week) },
+    )
+
+    private val eventsLoader: TimetableEventsLoader = TimetableEventsLoader(
+        scope = backgroundScope,
+        requireAuth = { requireAuth() },
+        fetchEvents = { account, from, to -> fetch.fetchEvents(account, from, to) },
+        fetchMessages = { account, fallback -> fetch.fetchMessages(account, fallback) },
+        onPersist = { persistCache() },
+    )
 
     fun cancelBackgroundWork() {
         backgroundJob.cancelChildren()
@@ -184,9 +182,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { TimetableCache.load(getApplication(), AccountPrefs.accountId(it)) }
             }
 
-            stats = account?.let {
-                withContext(Dispatchers.IO) { StatsStore.load(getApplication(), AccountPrefs.accountId(it)) }
-            }
+            account?.let { statsLoader.load(AccountPrefs.accountId(it)) }
 
             val cachedExams = account?.let {
                 withContext(Dispatchers.IO) { ExamsStore.load(getApplication(), AccountPrefs.accountId(it)) }
@@ -236,56 +232,9 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun ensureEvents(force: Boolean = false) {
-        val messagesStale = messagesFetchedAt <= 0L ||
-            Instant.ofEpochMilli(messagesFetchedAt).atZone(ZoneId.systemDefault()).toLocalDate() != AppClock.today()
+    fun ensureEvents(force: Boolean = false) = eventsLoader.ensure(force)
 
-        if (!force && (eventsRequested || eventsFetchedAt > 0L) && !messagesStale) {
-            eventsError = null
-            return
-        }
-
-        eventsRequested = true
-        refreshEvents()
-    }
-
-    fun refreshEvents() {
-        if (eventsLoading) return
-
-        eventsLoading = true
-        eventsError = null
-
-        backgroundScope.launch {
-            try {
-                val currentAuth = requireAuth()
-                val from = AppClock.today()
-                val to = from.plusMonths(EVENTS_AHEAD_MONTHS)
-
-                val fetched = fetchEvents(currentAuth, from, to)
-                Log.d(TAG, "events fetch -> ${fetched.size} periods, ${fetched.count { it.isEvent }} events")
-
-                events = mergeConsecutiveEvents(
-                    fetched
-                        .filter { it.isEvent }
-                        .sortedWith(compareBy({ it.date }, { it.startTime })),
-                )
-
-                eventsFetchedAt = System.currentTimeMillis()
-
-                dayMessages = fetchMessages(currentAuth)
-                messagesFetchedAt = System.currentTimeMillis()
-
-                persistCache()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.d(TAG, "events fetch failed: ${e.javaClass.simpleName}")
-                eventsError = friendly(e)
-            } finally {
-                eventsLoading = false
-            }
-        }
-    }
+    fun refreshEvents() = eventsLoader.refresh()
 
     fun loadLessonNotes(entry: TimetableEntry) {
         val id = entry.id
@@ -341,43 +290,15 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun mergeConsecutiveEvents(entries: List<TimetableEntry>): List<TimetableEntry> {
-        val merged = ArrayList<TimetableEntry>(entries.size)
+    fun currentYearStats(): SchoolYearStats? = statsLoader.currentYear()
 
-        for (entry in entries) {
-            val last = merged.lastOrNull()
+    fun currentYearLessonCount(): Int = statsLoader.currentYearLessonCount()
 
-            if (
-                last != null &&
-                last.date == entry.date &&
-                last.startTime == entry.startTime &&
-                last.endTime == entry.endTime &&
-                last.eventTitle == entry.eventTitle &&
-                last.room == entry.room
-            ) {
-                continue
-            }
-
-            merged.add(entry)
-        }
-
-        return merged
-    }
-
-    fun currentYearStats(): SchoolYearStats? = StatsStore.currentYear(stats, statsYear)
-
-    fun currentYearLessonCount(): Int {
-        val year = currentYearStats() ?: return 0
-        val includeEvents = StatsPrefs.includeEvents(getApplication())
-
-        return year.days.values.sumOf { day ->
-            if (includeEvents) day.lessons else day.lessons - day.eventLessons
-        }
-    }
-
-    fun statsSchoolYear(): SchoolYear? = statsYear
+    fun statsSchoolYear(): SchoolYear? = statsLoader.year
 
     fun examFor(entry: TimetableEntry): ExamInfo? = ExamsMatcher.best(entry, exams)
+
+    fun loadHistoricalStats() = statsLoader.loadHistorical()
 
     private suspend fun refreshExams(force: Boolean) {
         val currentAuth = auth ?: return
@@ -413,148 +334,6 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun loadHistoricalStats() {
-        if (statsLoading) return
-
-        statsLoading = true
-        statsError = null
-
-        backgroundScope.launch {
-            try {
-                val currentAuth = requireAuth()
-                val year = resolveStatsYear(currentAuth)
-                statsYear = year
-
-                val today = AppClock.today()
-                val start = year.startDate.toUntisLocalDate()
-                val end = if (year.endDate > 0) {
-                    runCatching { year.endDate.toUntisLocalDate() }.getOrDefault(start.plusYears(1).minusDays(1))
-                } else {
-                    start.plusYears(1).minusDays(1)
-                }
-                val lastDay = minOf(today, end)
-
-                if (lastDay >= start) {
-                    val counted = StatsStore.countedDays(stats, year)
-                    val accountId = AccountPrefs.accountId(currentAuth)
-
-                    val weeks = generateSequence(start.toUntisWeekStart()) { it.plusWeeks(1) }
-                        .takeWhile { it <= lastDay }
-                        .filter { weekStart ->
-                            (0..6).any { offset ->
-                                val date = weekStart.plusDays(offset.toLong())
-                                date >= start && date <= lastDay && date.toUntisDate() !in counted
-                            }
-                        }
-                        .toList()
-
-                    statsUpToDate = weeks.isEmpty()
-                    statsProgress = 0 to weeks.size
-
-                    for ((index, weekStart) in weeks.withIndex()) {
-                        val entries = fetchStatsWeek(currentAuth, weekStart)
-
-                        stats = withContext(Dispatchers.IO) {
-                            StatsStore.recordWeek(
-                                context = getApplication(),
-                                accountId = accountId,
-                                year = year,
-                                weekStart = weekStart,
-                                entries = entries,
-                                today = today,
-                            )
-                        }
-
-                        statsProgress = index + 1 to weeks.size
-                    }
-                }
-
-                stats = withContext(Dispatchers.IO) {
-                    StatsStore.load(getApplication(), AccountPrefs.accountId(currentAuth))
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.d(TAG, "stats backfill failed: ${e.javaClass.simpleName}")
-                statsError = friendly(e)
-            } finally {
-                statsLoading = false
-                statsProgress = null
-            }
-        }
-    }
-
-    private suspend fun resolveStatsYear(auth: AuthData): SchoolYear {
-        statsYear?.let { return it }
-
-        val today = AppClock.today()
-        val stored = stats?.years?.values
-            ?.filter { it.startDate > 0 && it.endDate > 0 }
-            ?.filter { today.toUntisDate() in it.startDate..it.endDate }
-            ?.maxByOrNull { it.startDate }
-
-        if (stored != null) {
-            return SchoolYear(
-                id = 0,
-                name = stored.name,
-                startDate = stored.startDate,
-                endDate = stored.endDate,
-            ).also { statsYear = it }
-        }
-
-        val password = runCatching { withPassword() }.getOrNull()
-
-        return (password?.let { UntisClient.fetchCurrentSchoolYear(auth, it) }
-            ?: StatsStore.fallbackYear(today))
-            .also { statsYear = it }
-    }
-
-    private suspend fun recordStatsWeek(
-        monday: LocalDate,
-        entries: List<TimetableEntry>,
-        refusedDates: List<Int>,
-    ) {
-        val currentAuth = auth ?: return
-        val year = resolveStatsYear(currentAuth)
-
-        stats = withContext(Dispatchers.IO) {
-            StatsStore.recordWeek(
-                context = getApplication(),
-                accountId = AccountPrefs.accountId(currentAuth),
-                year = year,
-                weekStart = monday,
-                entries = entries,
-                today = AppClock.today(),
-                skipDates = refusedDates.toSet(),
-            )
-        }
-    }
-
-    private suspend fun fetchStatsWeek(
-        auth: AuthData,
-        weekStart: LocalDate,
-    ): List<TimetableEntry> {
-        try {
-            return UntisClient.getTimetableIntern(auth, withPassword(), weekStart, weekStart.plusDays(6))
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.d(TAG, "stats week via mobile API failed: ${e.javaClass.simpleName}")
-        }
-
-        val (entries, fresh) = SessionManager.withValidSession(getApplication(), auth) { a ->
-            UntisClient.getTimetable(
-                auth = a,
-                startDate = weekStart.toUntisDate(),
-                endDate = weekStart.plusDays(6).toUntisDate(),
-            )
-        }
-
-        if (fresh != null) persistSession(fresh)
-
-        return entries
-    }
-
     fun retry() {
         error = null
         info = null
@@ -575,15 +354,6 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         subjectsScanned = false
         scanSubjectsIfPossible()
     }
-
-    private fun subjectNamesOf(entries: Collection<TimetableEntry>): Set<String> =
-        entries
-            .flatMap { it.subject }
-            .mapNotNull { el ->
-                subjectsById[el.id]?.name?.takeIf { it.isNotBlank() }
-                    ?: el.name.takeIf { it.isNotBlank() }
-            }
-            .toSet()
 
     private fun addKnownSubjects(context: Context, names: Set<String>) {
         if (names.isEmpty()) return
@@ -623,10 +393,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         holidays = cached.holidays
         timegrid = cached.timegrid
         restrictedDays = cached.restrictedDays
-        events = cached.events
-        eventsFetchedAt = cached.eventsFetchedAt
-        dayMessages = cached.messages
-        messagesFetchedAt = cached.messagesFetchedAt
+        eventsLoader.applyCached(cached)
     }
 
     private fun ensureWeek(
@@ -649,7 +416,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             var success = false
 
             try {
-                val (entries, fresh, allRefused, refusedDays) = fetchWeek(claimed, monday)
+                val (entries, fresh, allRefused, refusedDays) = fetch.fetchWeek(claimed, monday, anchorMonday)
 
                 Log.d(
                     TAG,
@@ -661,7 +428,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 if (fresh != null) persistSession(fresh)
 
                 try {
-                    recordStatsWeek(monday, entries, refusedDays)
+                    auth?.let { statsLoader.recordWeek(monday, entries, refusedDays, it) }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -672,7 +439,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                     .let(::mergeConsecutiveLessons)
                     .sortedWith(compareBy({ it.date }, { it.startTime }))
 
-                addKnownSubjects(getApplication(), subjectNamesOf(weekCache[claimed] ?: emptyList()))
+                addKnownSubjects(getApplication(), subjectNamesOf(weekCache[claimed] ?: emptyList(), subjectsById))
                 mergeTimetableElements()
 
                 synchronized(failedWeeks) { failedWeeks.remove(claimed) }
@@ -718,9 +485,9 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 synchronized(failedWeeks) { failedWeeks.add(claimed) }
 
                 if (force && weekCache.isNotEmpty()) {
-                    info = refreshFailureMessage(e)
+                    info = refreshFailureMessage(getApplication(), lastFetch, e)
                 } else {
-                    error = classify(e)
+                    error = classifyError(e)
                 }
             } finally {
                 release(claimed)
@@ -750,239 +517,11 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             ?: throw UntisException.BadCredentials
     }
 
-    private suspend fun fetchWeek(claimed: Int, monday: LocalDate): WeekFetch {
-        val currentAuth = requireAuth()
-
-        if (!monday.isBefore(anchorMonday)) {
-            val rest = try {
-                UntisClient.fetchTimetableEntries(currentAuth, withPassword(), monday, monday.plusDays(6))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.w(TAG, "REST week $claimed failed: ${e.javaClass.simpleName}")
-                null
-            }
-
-            if (rest != null) {
-                Log.d(TAG, "week $claimed via REST -> ${rest.size} entries")
-                return WeekFetch(resolveElementIds(rest), currentAuth, allRefused = false)
-            }
-        }
-
-        val intern = try {
-            UntisClient.getTimetableIntern(currentAuth, withPassword(), monday, monday.plusDays(6))
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.w(TAG, "intern week $claimed failed: ${e.javaClass.simpleName}")
-            null
-        }
-
-        if (!intern.isNullOrEmpty()) {
-            Log.d(TAG, "week $claimed via intern -> ${intern.size} entries")
-            return WeekFetch(intern, currentAuth, allRefused = false)
-        }
-
-        return weekViaLegacy(currentAuth, monday)
-    }
-
-    private suspend fun weekViaLegacy(auth: AuthData, monday: LocalDate): WeekFetch {
-        return try {
-            val (entries, fresh) = SessionManager.withValidSession(getApplication(), auth) { a ->
-                UntisClient.getTimetable(
-                    auth = a,
-                    startDate = monday.toUntisDate(),
-                    endDate = monday.plusDays(6).toUntisDate(),
-                )
-            }
-
-            Log.d(TAG, "week ${monday.toUntisDate()} via legacy -> ${entries.size} entries")
-
-            WeekFetch(entries, fresh, allRefused = false)
-        } catch (e: UntisException.Api) {
-            if (e.code != UntisClient.RPC_NO_TIMETABLE && e.code != UntisClient.RPC_NO_RIGHTS) throw e
-
-            val intern = runCatching {
-                UntisClient.getTimetableIntern(auth, withPassword(), monday, monday.plusDays(6))
-            }.onFailure { Log.d(TAG, "mobile API failed") }.getOrNull()
-
-            if (!intern.isNullOrEmpty()) {
-                WeekFetch(intern, auth, allRefused = false)
-            } else {
-                fetchWeekByDay(auth, monday)
-            }
-        }
-    }
-
-    private fun refreshFailureMessage(e: Exception): UiText {
-        if (lastFetch > 0) {
-            val timestamp = UiText.Raw(
-                AppDateFormats.formatter(getApplication(), "EEEdMMMjm")
-                    .format(Instant.ofEpochMilli(lastFetch).atZone(ZoneId.systemDefault())),
-            )
-
-            return UiText.Res(
-                R.string.error_refresh_cached_at,
-                listOf(timestamp, friendly(e)),
-            )
-        }
-
-        return UiText.Res(R.string.error_refresh_cached, listOf(friendly(e)))
-    }
-
-    private data class WeekFetch(
-        val entries: List<TimetableEntry>,
-        val fresh: AuthData?,
-        val allRefused: Boolean,
-        val refusedDays: List<Int> = emptyList(),
-    )
-
-    private suspend fun fetchWeekByDay(
-        auth: AuthData,
-        monday: LocalDate,
-    ): WeekFetch {
-        val all = ArrayList<TimetableEntry>()
-        val refused = ArrayList<Int>()
-        var latest = auth
-        var succeeded = 0
-
-        for (i in 0 until 7) {
-            val day = monday.plusDays(i.toLong())
-
-            try {
-                val (entries, fresh) = SessionManager.withValidSession(getApplication(), latest) { a ->
-                    UntisClient.getTimetable(
-                        auth = a,
-                        startDate = day.toUntisDate(),
-                        endDate = day.toUntisDate(),
-                    )
-                }
-
-                if (fresh != null) latest = fresh
-
-                all += entries
-                succeeded++
-            } catch (e: UntisException.Api) {
-                if (e.code == UntisClient.RPC_NO_TIMETABLE || e.code == UntisClient.RPC_NO_RIGHTS) {
-                    refused += day.toUntisDate()
-                    continue
-                }
-
-                throw e
-            }
-        }
-
-        return WeekFetch(all, latest, allRefused = succeeded == 0, refusedDays = refused)
-    }
-
-    private suspend fun fetchMessages(auth: AuthData): List<DayMessage> {
-        val password = try {
-            withPassword()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.d(TAG, "messages fetch failed: ${e.javaClass.simpleName}")
-            return dayMessages
-        }
-
-        val today = LocalDate.now()
-        val found = LinkedHashMap<Int, DayMessage>()
-        var anySuccess = false
-
-        for (daysBack in 0..2) {
-            val date = today.minusDays(daysBack.toLong())
-
-            try {
-                val messages = UntisClient.fetchMessagesOfDay(auth, password, date)
-                anySuccess = true
-
-                messages.forEach { message ->
-                    val key = if (message.id != 0) message.id else message.body.hashCode()
-                    found.putIfAbsent(key, message)
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.d(TAG, "messages fetch failed: ${e.javaClass.simpleName}")
-            }
-        }
-
-        return if (anySuccess) found.values.toList() else dayMessages
-    }
-
-    private suspend fun fetchEvents(
-        auth: AuthData,
-        from: LocalDate,
-        to: LocalDate,
-    ): List<TimetableEntry> {
-        val internal = try {
-            UntisClient.getTimetableIntern(auth, withPassword(), from, to)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.d(TAG, "events via mobile API failed: ${e.javaClass.simpleName}")
-            null
-        }
-
-        if (!internal.isNullOrEmpty()) return internal
-
-        try {
-            val (entries, fresh) = SessionManager.withValidSession(getApplication(), auth) { a ->
-                UntisClient.getTimetable(
-                    auth = a,
-                    startDate = from.toUntisDate(),
-                    endDate = to.toUntisDate(),
-                )
-            }
-
-            if (fresh != null) persistSession(fresh)
-
-            return entries
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.d(TAG, "events via public API failed: ${e.javaClass.simpleName}")
-        }
-
-        return fetchEventsByMonth(auth, from, to)
-    }
-
-    private suspend fun fetchEventsByMonth(
-        auth: AuthData,
-        from: LocalDate,
-        to: LocalDate,
-    ): List<TimetableEntry> {
-        val all = ArrayList<TimetableEntry>()
-        var latest = auth
-        var cursor = from
-
-        while (!cursor.isAfter(to)) {
-            val chunkEnd = minOf(cursor.plusMonths(1).minusDays(1), to)
-
-            val (entries, fresh) = SessionManager.withValidSession(getApplication(), latest) { a ->
-                UntisClient.getTimetable(
-                    auth = a,
-                    startDate = cursor.toUntisDate(),
-                    endDate = chunkEnd.toUntisDate(),
-                )
-            }
-
-            if (fresh != null) latest = fresh
-
-            all += entries
-            cursor = chunkEnd.plusDays(1)
-        }
-
-        return all
-    }
-
     private fun loadStaticData() {
         val currentAuth = auth ?: return
 
         backgroundScope.launch {
-            val master = optional("masterData") {
-                UntisClient.fetchMasterData(currentAuth, withPassword())
-            }
+            val master = staticData.loadMasterData(currentAuth)
 
             if (master != null) {
                 if (master.subjects.isNotEmpty()) subjectsById = master.subjects.associateBy { it.id }
@@ -991,10 +530,22 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 if (master.holidays.isNotEmpty()) holidays = master.holidays
                 if (master.timegrid.isNotEmpty()) timegrid = master.timegrid
             } else {
-                loadStaticDataLegacy(currentAuth)
+                val legacy = staticData.loadLegacy(currentAuth)
+
+                legacy.subjects?.let { subjectsById = it.associateBy { item -> item.id } }
+                legacy.teachers?.let { list ->
+                    if (list.isNotEmpty()) teachersById = list.associateBy { item -> item.id }
+                }
+                legacy.rooms?.let { roomsById = it.associateBy { item -> item.id } }
+                legacy.holidays?.let { holidays = it }
+                legacy.timegrid?.let { if (it.isNotEmpty()) timegrid = it }
+
+                if (legacy.timegridFailed && timegrid.isEmpty()) {
+                    timegridError = UiText.Res(R.string.error_timegrid_missing)
+                }
             }
 
-            weekCache.replaceAll { _, entries -> resolveElementIds(entries) }
+            weekCache.replaceAll { _, entries -> resolveElementIds(entries, subjectsById, teachersById, roomsById) }
             publishWeeks()
 
             mergeTimetableElements()
@@ -1003,106 +554,18 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
             weekCache[anchorMonday.toUntisDate()]?.takeIf { it.isNotEmpty() }?.let { entries ->
                 runCatching {
-                    recordStatsWeek(anchorMonday, entries, emptyList())
+                    auth?.let { statsLoader.recordWeek(anchorMonday, entries, emptyList(), it) }
                 }
             }
-        }
-    }
-
-    private suspend fun loadStaticDataLegacy(currentAuth: AuthData) {
-        coroutineScope {
-            val subjects = async { optional("getSubjects") { UntisClient.getSubjects(currentAuth) } }
-            val teachers = async { loadTeachers(currentAuth) }
-            val rooms = async { optional("getRooms") { UntisClient.getRooms(currentAuth) } }
-            val holidays = async { optional("getHolidays") { UntisClient.getHolidays(currentAuth) } }
-            val timegrid = async { optional("getTimegrid") { resolveTimegrid(currentAuth) } }
-
-            subjects.await()?.let { subjectsById = it.associateBy { item -> item.id } }
-            teachers.await()?.let { list ->
-                if (list.isNotEmpty()) teachersById = list.associateBy { item -> item.id }
-            }
-            rooms.await()?.let { roomsById = it.associateBy { item -> item.id } }
-            holidays.await()?.let { this@TimetableViewModel.holidays = it }
-
-            val grid = timegrid.await()
-            if (!grid.isNullOrEmpty()) this@TimetableViewModel.timegrid = grid
-        }
-    }
-
-    private suspend fun <T> optional(label: String, block: suspend () -> T): T? =
-        try {
-            block()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.d(TAG, "static data: $label failed: ${e.javaClass.simpleName}")
-            null
-        }
-
-    private suspend fun loadTeachers(currentAuth: AuthData): List<MasterDataItem>? {
-        optional("getTeachers") { UntisClient.getTeachers(currentAuth) }
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { return it }
-
-        return optional("getTeachers (user data)") {
-            UntisClient.fetchTeachersViaUserData(currentAuth, withPassword())
         }
     }
 
     private fun mergeTimetableElements() {
-        subjectsById = mergeMissing(subjectsById) { it.subject }
-        teachersById = mergeMissing(teachersById) { it.teacher }
-        roomsById = mergeMissing(roomsById) { it.room }
-    }
+        val entries = weekCache.values.flatten()
 
-    private fun resolveElementIds(entries: List<TimetableEntry>): List<TimetableEntry> {
-        if (subjectsById.isEmpty() && teachersById.isEmpty() && roomsById.isEmpty()) return entries
-
-        fun resolve(
-            elements: List<TimetableElement>,
-            data: Map<Int, MasterDataItem>,
-        ): List<TimetableElement> = elements.map { element ->
-            if (element.id > 0 || element.name.isBlank()) {
-                element
-            } else {
-                val match = data.values.firstOrNull { item ->
-                    item.name.equals(element.name, ignoreCase = true) ||
-                        (element.longName != null && item.longName.equals(element.longName, ignoreCase = true))
-                }
-
-                if (match != null) element.copy(id = match.id) else element
-            }
-        }
-
-        return entries.map { entry ->
-            entry.copy(
-                subject = resolve(entry.subject, subjectsById),
-                teacher = resolve(entry.teacher, teachersById),
-                room = resolve(entry.room, roomsById),
-            )
-        }
-    }
-
-    private fun mergeMissing(
-        current: Map<Int, MasterDataItem>,
-        selector: (TimetableEntry) -> List<TimetableElement>,
-    ): Map<Int, MasterDataItem> {
-        val derived = weekCache.values
-            .asSequence()
-            .flatten()
-            .flatMap { entry -> selector(entry).asSequence() }
-            .filter { it.id > 0 && it.name.isNotBlank() }
-            .associate { it.id to MasterDataItem(id = it.id, name = it.name) }
-
-        if (derived.isEmpty()) return current
-
-        val merged = HashMap(current)
-
-        for ((id, item) in derived) {
-            if (merged[id]?.name.isNullOrBlank()) merged[id] = item
-        }
-
-        return merged
+        subjectsById = mergeMissing(subjectsById, entries) { it.subject }
+        teachersById = mergeMissing(teachersById, entries) { it.teacher }
+        roomsById = mergeMissing(roomsById, entries) { it.room }
     }
 
     private fun scanSubjectsIfPossible() {
@@ -1115,7 +578,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
         val context: Context = getApplication()
 
-        addKnownSubjects(context, subjectNamesOf(weekCache.values.flatten()))
+        addKnownSubjects(context, subjectNamesOf(weekCache.values.flatten(), subjectsById))
 
         backgroundScope.launch {
             val ranges = listOf(
@@ -1137,7 +600,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
                     if (fresh != null) persistSession(fresh)
 
-                    val names = subjectNamesOf(entries)
+                    val names = subjectNamesOf(entries, subjectsById)
 
                     addKnownSubjects(context, names)
                     Log.d(TAG, "subject scan ($fromMonths..$toMonths months) -> ${names.size} subjects")
@@ -1163,90 +626,21 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun resolveTimegrid(currentAuth: AuthData): List<TimegridDay> {
-        val password: suspend () -> String = { withPassword() }
-
-        val attempts: List<Pair<String, suspend () -> List<TimegridDay>>> = listOf(
-            "getUserData2017" to { UntisClient.fetchTimegridViaUserData(currentAuth, password()) },
-            "getTimegrid (internal rpc)" to { UntisClient.fetchTimegridFromInternalRpc(currentAuth) },
-            "getTimegrid (public rpc)" to { UntisClient.fetchTimegridRpc(currentAuth) },
-        )
-
-        for ((name, attempt) in attempts) {
-            val days = try {
-                attempt()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.d(TAG, "timegrid via $name failed")
-                null
-            } ?: continue
-
-            if (days.isEmpty()) {
-                Log.d(TAG, "timegrid via $name -> empty")
-                continue
-            }
-
-            Log.d(TAG, "timegrid via $name -> ${days.size} days")
-            return days
-        }
-
-        if (timegrid.isEmpty()) {
-            timegridError = UiText.Res(R.string.error_timegrid_missing)
-        }
-
-        return emptyList()
-    }
-
     fun retryTimegrid() {
         timegridError = null
 
         val currentAuth = auth ?: return
 
         backgroundScope.launch {
-            val days = resolveTimegrid(currentAuth)
+            val days = staticData.resolveTimegrid(currentAuth)
 
-            if (days.isNotEmpty()) {
+            if (days != null && days.isNotEmpty()) {
                 timegrid = days
                 persistCache()
+            } else if (timegrid.isEmpty()) {
+                timegridError = UiText.Res(R.string.error_timegrid_missing)
             }
         }
-    }
-
-    private fun mergeConsecutiveLessons(entries: List<TimetableEntry>): List<TimetableEntry> {
-        val sorted = entries.sortedWith(
-            compareBy({ it.date }, { it.startTime }, { it.endTime }),
-        )
-
-        val merged = ArrayList<TimetableEntry>(sorted.size)
-
-        for (entry in sorted) {
-            val last = merged.lastOrNull()
-
-            if (
-                last != null &&
-                last.date == entry.date &&
-                last.code == entry.code &&
-                last.subject == entry.subject &&
-                last.teacher == entry.teacher &&
-                last.klasse == entry.klasse &&
-                last.room == entry.room &&
-                last.endTime == entry.startTime
-            ) {
-                val notes = listOfNotNull(last.lstext, entry.lstext)
-                    .distinct()
-                    .joinToString(" | ")
-
-                merged[merged.size - 1] = last.copy(
-                    endTime = entry.endTime,
-                    lstext = notes.ifBlank { null },
-                )
-            } else {
-                merged.add(entry)
-            }
-        }
-
-        return merged
     }
 
     private suspend fun persistSession(updated: AuthData) {
@@ -1303,29 +697,5 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         lastFetch = data.lastFetch
-    }
-
-    private fun classify(e: Exception): LoadError = when (e) {
-        is UntisException.Network -> LoadError.Network(friendly(e))
-        is UntisException.Certificate -> LoadError.Network(friendly(e))
-        is UntisException.BadCredentials -> LoadError.Auth(friendly(e))
-        is UntisException.SessionExpired -> LoadError.Auth(friendly(e))
-        is UntisException.Api -> LoadError.Server(friendly(e))
-        else -> LoadError.Unknown(friendly(e))
-    }
-
-    private fun friendly(e: Exception): UiText = when (e) {
-        is UntisException.Network -> UiText.Res(R.string.error_network)
-        is UntisException.Certificate -> UiText.Res(R.string.error_certificate)
-        is UntisException.BadCredentials -> UiText.Res(R.string.error_bad_credentials)
-        is UntisException.SessionExpired -> UiText.Res(R.string.error_session_expired)
-        is UntisException.Api -> UiText.Res(
-            R.string.error_untis_generic,
-            listOf(UiText.Raw(e.code.toString()), UiText.Raw(e.message)),
-        )
-        else -> UiText.Res(
-            R.string.error_unexpected,
-            listOf(UiText.Raw(e.message ?: "")),
-        )
     }
 }
