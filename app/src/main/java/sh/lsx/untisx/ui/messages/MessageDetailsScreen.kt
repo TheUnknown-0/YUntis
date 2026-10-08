@@ -116,11 +116,12 @@ private fun MessageHeader(message: DirectMessage) {
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
 
-            message.sender?.displayName?.takeIf { it.isNotBlank() }?.let { sender ->
-                val className = message.sender.className.takeIf { it.isNotBlank() }
+            val sender = message.sender
+            sender?.displayName?.takeIf { it.isNotBlank() }?.let { senderName ->
+                val className = sender.className.takeIf { it.isNotBlank() }
 
                 Text(
-                    text = if (className != null) "$sender ($className)" else sender,
+                    text = if (className != null) "$senderName ($className)" else senderName,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
                 )

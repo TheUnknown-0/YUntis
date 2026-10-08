@@ -1110,7 +1110,7 @@ object UntisClient {
             .build()
 
     @Volatile
-    internal var allowHttpForTests = false
+    var allowHttpForTests = false
 
     private fun serverBase(server: String): HttpUrl {
         val trimmed = server.trim().trimEnd('/')

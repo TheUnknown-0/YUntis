@@ -14,7 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import sh.lsx.untisx.UntisXApp
+import sh.lsx.untisx.data.CorePrefs
 import sh.lsx.untisx.data.model.AuthResult
 
 @RunWith(RobolectricTestRunner::class)
@@ -39,7 +39,7 @@ class AccountStoreTest {
     }
 
     private fun prefs() =
-        context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
+        context.getSharedPreferences(CorePrefs.PREFS_NAME, Context.MODE_PRIVATE)
 
     private fun account(user: String, sessionId: String = "session-1") = AuthData(
         server = "https://school.example",

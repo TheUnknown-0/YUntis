@@ -6,7 +6,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import sh.lsx.untisx.data.notifications.Notifications
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.prefs.AuthData
@@ -18,6 +17,9 @@ object SessionManager {
     private const val TAG = "SessionManager"
 
     private val reauthLock = Mutex()
+
+    @Volatile
+    var loginRequiredNotifier: LoginRequiredNotifier? = null
 
     suspend fun <T> withValidSession(
         context: Context,
@@ -76,7 +78,7 @@ object SessionManager {
 
     private fun markInvalid(context: Context, accountId: String) {
         if (CredentialsPrefs.markInvalid(context, accountId)) {
-            Notifications.notifyLoginRequired(context)
+            loginRequiredNotifier?.onLoginRequired(context)
         }
     }
 }

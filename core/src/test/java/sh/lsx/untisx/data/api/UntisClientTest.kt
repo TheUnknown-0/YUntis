@@ -18,7 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import sh.lsx.untisx.UntisXApp
+import sh.lsx.untisx.data.CorePrefs
 import sh.lsx.untisx.data.model.AuthResult
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AccountStore
@@ -36,7 +36,7 @@ class UntisClientTest {
 
     @Before
     fun setUp() {
-        context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
+        context.getSharedPreferences(CorePrefs.PREFS_NAME, Context.MODE_PRIVATE)
             .edit().clear().commit()
 
         AccountStore.resetForTests()

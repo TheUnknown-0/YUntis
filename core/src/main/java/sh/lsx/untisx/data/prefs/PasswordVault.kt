@@ -2,7 +2,7 @@ package sh.lsx.untisx.data.prefs
 
 import android.content.Context
 import androidx.core.content.edit
-import sh.lsx.untisx.UntisXApp
+import sh.lsx.untisx.data.CorePrefs
 import sh.lsx.untisx.data.security.DecryptResult
 
 object PasswordVault {
@@ -12,7 +12,7 @@ object PasswordVault {
     private fun key(accountId: String) = PREFIX + accountId
 
     private fun prefs(context: Context) =
-        context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
+        context.getSharedPreferences(CorePrefs.PREFS_NAME, Context.MODE_PRIVATE)
 
     fun store(context: Context, accountId: String, password: String) {
         if (password.isBlank()) return

@@ -26,9 +26,9 @@ import java.time.LocalDate
 @Config(sdk = [36])
 class TimetableAnchorTest {
 
+    private val thursday = LocalDate.of(2026, 10, 1)
     private val friday = LocalDate.of(2026, 10, 2)
     private val saturday = LocalDate.of(2026, 10, 3)
-    private val thursday = LocalDate.of(2026, 10, 1)
 
     private lateinit var dispatcher: TestDispatcher
     private val viewModels = mutableListOf<TimetableViewModel>()

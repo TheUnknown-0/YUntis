@@ -2,7 +2,6 @@ package sh.lsx.untisx.data
 
 import android.content.Context
 import kotlinx.serialization.json.Json
-import sh.lsx.untisx.UntisXApp
 import androidx.core.content.edit
 
 object SubjectColorsPrefs {
@@ -36,7 +35,7 @@ object SubjectColorsPrefs {
     private val json = Json { ignoreUnknownKeys = true }
 
     private fun prefs(context: Context) =
-        context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
+        context.getSharedPreferences(CorePrefs.PREFS_NAME, Context.MODE_PRIVATE)
 
     fun getColors(context: Context): Map<String, Int> {
         val raw = prefs(context).getString(KEY_COLORS, null) ?: return emptyMap()

@@ -91,6 +91,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
@@ -108,6 +109,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.material)
     implementation(libs.androidx.work.runtime.ktx)
+    testImplementation(testFixtures(project(":core")))
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)

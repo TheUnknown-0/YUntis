@@ -2,6 +2,6 @@ package sh.lsx.untisx.data.net
 
 import okhttp3.OkHttpClient
 
-internal object Http {
+object Http {
     val base: OkHttpClient = OkHttpClient()
 }

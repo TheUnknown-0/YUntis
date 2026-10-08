@@ -2,7 +2,7 @@ package sh.lsx.untisx.data.prefs
 
 import android.content.Context
 import androidx.core.content.edit
-import sh.lsx.untisx.UntisXApp
+import sh.lsx.untisx.data.CorePrefs
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import sh.lsx.untisx.data.model.AuthResult
@@ -25,7 +25,7 @@ object AuthPrefs {
     internal val json = Json { ignoreUnknownKeys = true }
 
     private fun prefs(context: Context) =
-        context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
+        context.getSharedPreferences(CorePrefs.PREFS_NAME, Context.MODE_PRIVATE)
 
     fun clear(context: Context) {
         prefs(context).edit { remove(KEY_BLOB) }

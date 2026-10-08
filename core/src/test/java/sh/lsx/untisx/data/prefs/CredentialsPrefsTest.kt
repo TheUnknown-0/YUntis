@@ -9,7 +9,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import sh.lsx.untisx.UntisXApp
+import sh.lsx.untisx.data.CorePrefs
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -19,7 +19,7 @@ class CredentialsPrefsTest {
 
     @Before
     fun setUp() {
-        context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
+        context.getSharedPreferences(CorePrefs.PREFS_NAME, Context.MODE_PRIVATE)
             .edit().clear().commit()
     }
 

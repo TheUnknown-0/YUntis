@@ -8,7 +8,7 @@ import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 
-internal object AtomicJsonFile {
+object AtomicJsonFile {
 
     private const val TAG = "AtomicJsonFile"
 
@@ -50,7 +50,7 @@ internal object AtomicJsonFile {
     }
 }
 
-internal fun accountFile(context: android.content.Context, prefix: String, accountId: String): File {
+fun accountFile(context: android.content.Context, prefix: String, accountId: String): File {
     val digest = MessageDigest.getInstance("SHA-256")
         .digest(accountId.toByteArray(Charsets.UTF_8))
 

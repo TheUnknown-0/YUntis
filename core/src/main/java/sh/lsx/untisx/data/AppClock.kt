@@ -15,7 +15,7 @@ object AppClock {
 
     fun now(): ZonedDateTime = nowProvider()
 
-    internal fun set(
+    fun set(
         today: (() -> LocalDate)? = null,
         now: (() -> ZonedDateTime)? = null,
     ) {
@@ -23,7 +23,7 @@ object AppClock {
         if (now != null) nowProvider = now
     }
 
-    internal fun reset() {
+    fun reset() {
         todayProvider = { LocalDate.now() }
         nowProvider = { ZonedDateTime.now() }
     }

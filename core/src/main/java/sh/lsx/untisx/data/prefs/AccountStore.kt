@@ -2,6 +2,7 @@ package sh.lsx.untisx.data.prefs
 
 import android.content.Context
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,7 +12,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
-import sh.lsx.untisx.UntisXApp
+import sh.lsx.untisx.data.CorePrefs
 import sh.lsx.untisx.data.ExamsStore
 import sh.lsx.untisx.data.MessagesStore
 import sh.lsx.untisx.data.StatsStore
@@ -35,8 +36,9 @@ object AccountStore {
     private val json = AuthPrefs.json
     private val serializer = ListSerializer(AuthData.serializer())
 
+    @VisibleForTesting
     @Volatile
-    internal var cryptor: Cryptor = Crypto
+    var cryptor: Cryptor = Crypto
 
     private val mutex = Mutex()
 
@@ -63,7 +65,7 @@ object AccountStore {
     val snapshot: List<AuthData> get() = _accounts.value
 
     private fun prefs(context: Context) =
-        context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
+        context.getSharedPreferences(CorePrefs.PREFS_NAME, Context.MODE_PRIVATE)
 
     suspend fun refresh(context: Context) {
         mutex.withLock {
@@ -309,7 +311,8 @@ object AccountStore {
         }
     }
 
-    internal fun resetForTests() {
+    @VisibleForTesting
+    fun resetForTests() {
         cryptor = Crypto
         _accounts.value = emptyList()
         _activeId.value = null
