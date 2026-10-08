@@ -115,6 +115,8 @@ internal object UntisRpc {
             throw e
         } catch (e: UntisException.BadCredentials) {
             throw e
+        } catch (e: UntisException.RateLimited) {
+            throw e
         } catch (e: UntisException) {
             log("'$method' rejected the cached secret -> requesting a new one")
 
@@ -158,10 +160,16 @@ internal object UntisRpc {
                         .get()
                         .build(),
                 ).execute().use { result ->
+                    if (result.code == 429) {
+                        throw UntisException.RateLimited(result.header("Retry-After")?.toLongOrNull())
+                    }
+
                     val body = if (result.isSuccessful) result.body?.string() else null
 
                     body to result.code
                 }
+            } catch (e: UntisException.RateLimited) {
+                throw e
             } catch (e: Exception) {
                 warn("bearer GET failed: ${e.javaClass.simpleName}")
                 return null
@@ -207,6 +215,10 @@ internal object UntisRpc {
                     .post(json.encodeToString(payload).toRequestBody("application/json".toMediaType()))
                     .build(),
             ).execute().use { response ->
+                if (response.code == 429) {
+                    throw UntisException.RateLimited(response.header("Retry-After")?.toLongOrNull())
+                }
+
                 if (!response.isSuccessful) {
                     warn("mobile jwt http ${response.code}")
                     return null
@@ -223,6 +235,8 @@ internal object UntisRpc {
 
                 jwt
             }
+        } catch (e: UntisException.RateLimited) {
+            throw e
         } catch (e: Exception) {
             warn("mobile jwt failed: ${e.javaClass.simpleName}")
             null
@@ -291,6 +305,11 @@ internal object UntisRpc {
 
         return try {
             http.newCall(request).execute().use { response ->
+                if (response.code == 429) {
+                    log("rpc '$method' rate limited")
+                    throw UntisException.RateLimited(response.header("Retry-After")?.toLongOrNull())
+                }
+
                 val rpc = response.body?.string()?.let { runCatching { json.decodeFromString<JsonRpcResponse>(it) }.getOrNull() }
 
                 rpc?.error?.let { err ->

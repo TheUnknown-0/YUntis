@@ -35,6 +35,8 @@ internal class TimetableFetch(
                 UntisClient.fetchTimetableEntries(currentAuth, withPassword(), monday, monday.plusDays(6))
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: UntisException.RateLimited) {
+                throw e
             } catch (e: Exception) {
                 Log.w(TAG, "REST week $claimed failed: ${e.javaClass.simpleName}")
                 null
@@ -49,6 +51,8 @@ internal class TimetableFetch(
         val intern = try {
             UntisClient.getTimetableIntern(currentAuth, withPassword(), monday, monday.plusDays(6))
         } catch (e: CancellationException) {
+            throw e
+        } catch (e: UntisException.RateLimited) {
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "intern week $claimed failed: ${e.javaClass.simpleName}")
@@ -138,6 +142,8 @@ internal class TimetableFetch(
             UntisClient.getTimetableIntern(auth, withPassword(), from, to)
         } catch (e: CancellationException) {
             throw e
+        } catch (e: UntisException.RateLimited) {
+            throw e
         } catch (e: Exception) {
             Log.d(TAG, "events via mobile API failed: ${e.javaClass.simpleName}")
             null
@@ -158,6 +164,8 @@ internal class TimetableFetch(
 
             return entries
         } catch (e: CancellationException) {
+            throw e
+        } catch (e: UntisException.RateLimited) {
             throw e
         } catch (e: Exception) {
             Log.d(TAG, "events via public API failed: ${e.javaClass.simpleName}")
@@ -203,6 +211,8 @@ internal class TimetableFetch(
             return UntisClient.getTimetableIntern(auth, withPassword(), weekStart, weekStart.plusDays(6))
         } catch (e: CancellationException) {
             throw e
+        } catch (e: UntisException.RateLimited) {
+            throw e
         } catch (e: Exception) {
             Log.d(TAG, "stats week via mobile API failed: ${e.javaClass.simpleName}")
         }
@@ -246,6 +256,8 @@ internal class TimetableFetch(
                     found.putIfAbsent(key, message)
                 }
             } catch (e: CancellationException) {
+                throw e
+            } catch (e: UntisException.RateLimited) {
                 throw e
             } catch (e: Exception) {
                 Log.d(TAG, "messages fetch failed: ${e.javaClass.simpleName}")

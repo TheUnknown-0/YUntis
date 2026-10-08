@@ -31,6 +31,7 @@ internal fun friendlyError(e: Exception): UiText = when (e) {
     is UntisException.Certificate -> UiText.Res(R.string.error_certificate)
     is UntisException.BadCredentials -> UiText.Res(R.string.error_bad_credentials)
     is UntisException.SessionExpired -> UiText.Res(R.string.error_session_expired)
+    is UntisException.RateLimited -> UiText.Res(R.string.error_rate_limited)
     is UntisException.Api -> UiText.Res(
         R.string.error_untis_generic,
         listOf(UiText.Raw(e.code.toString()), UiText.Raw(e.message)),

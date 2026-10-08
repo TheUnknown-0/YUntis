@@ -252,6 +252,7 @@
     <string name="error_bad_credentials">Wrong username or password.</string>
     <string name="error_too_many_results">Too many schools match your search.</string>
     <string name="error_session_expired">Session expired.</string>
+    <string name="error_rate_limited">The Untis server is rate limiting requests. Please try again later.</string>
     <string name="error_untis_generic">Untis error %1$s: %2$s</string>
     <string name="error_unexpected">Unexpected error: %1$s</string>
     <string name="error_refresh_cached">Couldn\'t refresh - showing saved timetable. %1$s</string>
@@ -293,7 +294,7 @@
     <string name="about_lib_material3_desc">Theming with dynamic colors</string>
     <string name="about_license_title">License</string>
     <string name="about_license_text">UntisX is free and open-source software licensed under the GNU GPL-3.0.</string>
-    <string name="about_unofficial_text">UntisX is an unofficial client and is not affiliated with Untis.</string>
+    <string name="about_unofficial_text">UntisX is an unofficial client and is not affiliated with Untis. It uses partially undocumented interfaces, which can change or stop working at any time.</string>
     <string name="about_view_license">View license</string>
     <string name="about_credits_title">Credits</string>
     <string name="about_credits_text">UntisX is heavily inspired by BetterUntis, the open-source Untis client for Android.</string>

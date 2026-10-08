@@ -45,6 +45,12 @@ If you enable notifications, UntisX periodically checks your timetable on your s
 
 ---
 
+## Unofficial client
+
+UntisX is not affiliated with or endorsed by Untis. It talks to your school's Untis server through partially undocumented interfaces (the same ones other community clients use). These can change or be restricted at any time - if that happens, parts of the app may stop working until they are adapted. The app only reads data and never changes anything on the server.
+
+---
+
 ## Building
 
 ```bash

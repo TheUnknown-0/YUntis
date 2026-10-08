@@ -78,6 +78,9 @@ class TimetableSyncWorker(
         } catch (e: UntisException.Api) {
             Log.d(TAG, "sync stopped: api error ${e.code}")
             Result.success()
+        } catch (e: UntisException.RateLimited) {
+            Log.d(TAG, "sync deferred: rate limited")
+            if (runAttemptCount < 3) Result.retry() else Result.success()
         } catch (e: UntisException.Network) {
             Log.d(TAG, "sync failed: network")
             if (runAttemptCount < 3) Result.retry() else Result.success()

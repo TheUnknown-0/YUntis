@@ -252,6 +252,7 @@
     <string name="error_bad_credentials">Benutzername oder Passwort ist falsch.</string>
     <string name="error_too_many_results">Deine Suche passt zu zu vielen Schulen.</string>
     <string name="error_session_expired">Deine Sitzung ist abgelaufen.</string>
+    <string name="error_rate_limited">Der Untis-Server begrenzt aktuell deine Anfragen. Bitte versuche es später erneut.</string>
     <string name="error_untis_generic">Untis-Fehler %1$s: %2$s</string>
     <string name="error_unexpected">Unerwarteter Fehler: %1$s</string>
     <string name="error_refresh_cached">Aktualisieren fehlgeschlagen - gespeicherter Plan wird angezeigt. %1$s</string>
@@ -293,7 +294,7 @@
     <string name="about_lib_material3_desc">Design mit dynamischen Farben</string>
     <string name="about_license_title">Lizenz</string>
     <string name="about_license_text">UntisX ist Open-Source Software unter der GNU GPL-3.0.</string>
-    <string name="about_unofficial_text">UntisX ist ein inoffizieller Client und steht in keinerlei Verbindung zu Untis.</string>
+    <string name="about_unofficial_text">UntisX ist ein inoffizieller Client und steht in keinerlei Verbindung zu Untis. Er nutzt teilweise undokumentierte Schnittstellen, die sich jederzeit ändern oder ausfallen können.</string>
     <string name="about_view_license">Lizenz ansehen</string>
     <string name="about_credits_title">Credits</string>
     <string name="about_credits_text">UntisX ist stark von BetterUntis inspiriert - dem Open-Source-Untis-Client für Android.</string>
