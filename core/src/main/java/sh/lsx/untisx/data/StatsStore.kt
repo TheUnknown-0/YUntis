@@ -95,7 +95,7 @@ object StatsStore {
             ?: emptySet()
 
     fun load(context: Context, accountId: String): StatsData {
-        val text = AtomicJsonFile.read(file(context, accountId)) ?: return StatsData()
+        val text = AtomicJsonFile.readEncrypted(file(context, accountId)) ?: return StatsData()
 
         return runCatching {
             val data = json.decodeFromString<StatsData>(text)
@@ -244,7 +244,7 @@ object StatsStore {
     private fun save(context: Context, accountId: String, data: StatsData) {
         val encoded = json.encodeToString(data.copy(version = VERSION))
 
-        if (!AtomicJsonFile.write(file(context, accountId), encoded)) {
+        if (!AtomicJsonFile.writeEncrypted(file(context, accountId), encoded)) {
             Log.d(TAG, "stats save failed")
         }
     }

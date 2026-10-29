@@ -13,7 +13,7 @@ import sh.lsx.untisx.data.AtomicJsonFile
 
 object NewsBaseline {
 
-    private const val STALE_AFTER_MS = 24 * 60 * 60 * 1000L
+    private const val STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000L
     private const val FILE_PREFIX = "notif_news_"
     private const val VERSION = 1
     private const val TAG = "NewsBaseline"
@@ -38,7 +38,7 @@ object NewsBaseline {
         accountFile(context, FILE_PREFIX, accountId)
 
     fun load(context: Context, accountId: String): Data? {
-        val text = AtomicJsonFile.read(file(context, accountId)) ?: return null
+        val text = AtomicJsonFile.readEncrypted(file(context, accountId)) ?: return null
 
         return runCatching {
             val data = json.decodeFromString<Data>(text)
@@ -49,7 +49,7 @@ object NewsBaseline {
     fun save(context: Context, accountId: String, data: Data) {
         val encoded = json.encodeToString(data.copy(version = VERSION))
 
-        if (!AtomicJsonFile.write(file(context, accountId), encoded)) {
+        if (!AtomicJsonFile.writeEncrypted(file(context, accountId), encoded)) {
             Log.d(TAG, "baseline save failed")
         }
     }

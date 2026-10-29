@@ -27,6 +27,7 @@ object TimetableCache {
     @Serializable
     data class Data(
         val weeks: Map<String, List<TimetableEntry>> = emptyMap(),
+        val weekFetchedAt: Map<String, Long> = emptyMap(),
         val subjects: List<MasterDataItem> = emptyList(),
         val teachers: List<MasterDataItem> = emptyList(),
         val rooms: List<MasterDataItem> = emptyList(),
@@ -49,7 +50,7 @@ object TimetableCache {
     fun load(context: Context, accountId: String): Data? {
         migrateLegacy(context, accountId)
 
-        val text = AtomicJsonFile.read(file(context, accountId)) ?: return null
+        val text = AtomicJsonFile.readEncrypted(file(context, accountId)) ?: return null
 
         return runCatching {
             val data = json.decodeFromString<Data>(text)
@@ -61,7 +62,7 @@ object TimetableCache {
     fun save(context: Context, accountId: String, data: Data) {
         val encoded = json.encodeToString(data.copy(version = VERSION))
 
-        if (!AtomicJsonFile.write(file(context, accountId), encoded)) {
+        if (!AtomicJsonFile.writeEncrypted(file(context, accountId), encoded)) {
             Log.d(TAG, "cache save failed")
         }
     }

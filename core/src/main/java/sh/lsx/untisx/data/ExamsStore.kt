@@ -29,7 +29,7 @@ object ExamsStore {
         accountFile(context, FILE_PREFIX, accountId)
 
     fun load(context: Context, accountId: String): Data? {
-        val text = AtomicJsonFile.read(file(context, accountId)) ?: return null
+        val text = AtomicJsonFile.readEncrypted(file(context, accountId)) ?: return null
 
         return runCatching {
             val data = json.decodeFromString<Data>(text)
@@ -40,7 +40,7 @@ object ExamsStore {
     fun save(context: Context, accountId: String, data: Data) {
         val encoded = json.encodeToString(data.copy(version = VERSION))
 
-        if (!AtomicJsonFile.write(file(context, accountId), encoded)) {
+        if (!AtomicJsonFile.writeEncrypted(file(context, accountId), encoded)) {
             Log.d(TAG, "exams save failed")
         }
     }

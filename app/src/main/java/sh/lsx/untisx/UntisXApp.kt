@@ -1,11 +1,16 @@
 package sh.lsx.untisx
 
 import android.app.Application
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import sh.lsx.untisx.data.AtomicJsonFile
 import sh.lsx.untisx.data.CorePrefs
 import sh.lsx.untisx.data.api.LoginRequiredNotifier
 import sh.lsx.untisx.data.api.SessionManager
 import sh.lsx.untisx.data.net.Http
+import sh.lsx.untisx.data.net.SchoolRequestGuard
 import sh.lsx.untisx.data.notifications.Notifications
 
 class UntisXApp : Application() {
@@ -14,8 +19,10 @@ class UntisXApp : Application() {
         super.onCreate()
 
         AtomicJsonFile.cleanupTempFiles(filesDir)
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { AtomicJsonFile.migrateCaches(filesDir) }
 
         Http.userAgent = buildUserAgent()
+        SchoolRequestGuard.initialize(this)
 
         SessionManager.loginRequiredNotifier = LoginRequiredNotifier {
             Notifications.notifyLoginRequired(it)

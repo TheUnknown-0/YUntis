@@ -7,6 +7,11 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.Before
+import org.junit.After
+import sh.lsx.untisx.data.prefs.AccountStore
+import sh.lsx.untisx.data.prefs.FakeCryptor
+import sh.lsx.untisx.data.security.Crypto
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -21,6 +26,8 @@ class BaselineTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val accountId = "https://school.example/school/max"
+    @Before fun setupCryptor() { AccountStore.cryptor = FakeCryptor() }
+    @After fun resetCryptor() { AccountStore.cryptor = Crypto }
 
     @Test
     fun `change baseline round trips and clears`() {
@@ -61,12 +68,13 @@ class BaselineTest {
     }
 
     @Test
-    fun `news baseline is stale after 24 hours`() {
+    fun `daily event checks have a baseline valid for seven days`() {
         val now = 1_000_000_000_000L
 
         assertFalse(NewsBaseline.isStale(0L, now))
         assertFalse(NewsBaseline.isStale(now - 60_000L, now))
-        assertTrue(NewsBaseline.isStale(now - 24 * 60 * 60 * 1000L - 1, now))
+        assertFalse(NewsBaseline.isStale(now - 24 * 60 * 60 * 1000L - 1, now))
+        assertTrue(NewsBaseline.isStale(now - 7 * 24 * 60 * 60 * 1000L - 1, now))
     }
 
     @Test

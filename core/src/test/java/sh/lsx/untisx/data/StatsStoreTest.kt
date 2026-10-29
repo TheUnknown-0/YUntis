@@ -7,6 +7,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.After
+import sh.lsx.untisx.data.prefs.AccountStore
+import sh.lsx.untisx.data.prefs.FakeCryptor
+import sh.lsx.untisx.data.security.Crypto
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -35,9 +39,12 @@ class StatsStoreTest {
 
     @Before
     fun setUp() {
+        AccountStore.cryptor = FakeCryptor()
         StatsStore.clear(context, accountId)
         nextId = 1
     }
+
+    @After fun resetCryptor() { AccountStore.cryptor = Crypto }
 
     @Test
     fun `event overlapping lessons are tracked separately`() = runBlocking {

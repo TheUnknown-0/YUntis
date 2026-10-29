@@ -30,7 +30,7 @@ object ChangeBaseline {
         accountFile(context, FILE_PREFIX, accountId)
 
     fun load(context: Context, accountId: String): Data? {
-        val text = AtomicJsonFile.read(file(context, accountId)) ?: return null
+        val text = AtomicJsonFile.readEncrypted(file(context, accountId)) ?: return null
 
         return runCatching {
             val data = json.decodeFromString<Data>(text)
@@ -41,7 +41,7 @@ object ChangeBaseline {
     fun save(context: Context, accountId: String, weeks: Map<String, List<TimetableEntry>>) {
         val encoded = json.encodeToString(Data(weeks = weeks, version = VERSION))
 
-        if (!AtomicJsonFile.write(file(context, accountId), encoded)) {
+        if (!AtomicJsonFile.writeEncrypted(file(context, accountId), encoded)) {
             Log.d(TAG, "baseline save failed")
         }
     }
