@@ -12,6 +12,7 @@ import sh.lsx.untisx.data.model.SchoolYear
 import sh.lsx.untisx.data.model.TimegridDay
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.data.prefs.AccountPrefs
 import java.time.LocalDate
 
 object UntisClient {
@@ -41,7 +42,9 @@ object UntisClient {
         auth: AuthData,
         startDate: Int,
         endDate: Int,
-    ): List<TimetableEntry> = UntisTimetableApi.getTimetable(auth, startDate, endDate)
+    ): List<TimetableEntry> = InFlightRequests.read(listOf("legacy", AccountPrefs.accountId(auth), auth.session.sessionId, startDate, endDate)) {
+        UntisTimetableApi.getTimetable(auth, startDate, endDate)
+    }
 
     suspend fun getSubjects(auth: AuthData): List<MasterDataItem> = UntisMasterDataApi.getSubjects(auth)
 
@@ -73,14 +76,18 @@ object UntisClient {
         password: String,
         from: LocalDate,
         to: LocalDate,
-    ): List<TimetableEntry> = UntisTimetableApi.getTimetableIntern(auth, password, from, to)
+    ): List<TimetableEntry> = InFlightRequests.read(listOf("internal", AccountPrefs.accountId(auth), from, to)) {
+        UntisTimetableApi.getTimetableIntern(auth, password, from, to)
+    }
 
     suspend fun fetchTimetableEntries(
         auth: AuthData,
         password: String,
         from: LocalDate,
         to: LocalDate,
-    ): List<TimetableEntry>? = UntisTimetableApi.fetchTimetableEntries(auth, password, from, to)
+    ): List<TimetableEntry>? = InFlightRequests.read(listOf("rest", AccountPrefs.accountId(auth), from, to)) {
+        UntisTimetableApi.fetchTimetableEntries(auth, password, from, to)
+    }
 
     suspend fun fetchTimegridFromInternalRpc(auth: AuthData): List<TimegridDay> =
         UntisTimetableApi.fetchTimegridFromInternalRpc(auth)
@@ -92,13 +99,15 @@ object UntisClient {
         password: String,
         from: LocalDate,
         to: LocalDate,
-    ): List<ExamInfo> = UntisExamsApi.fetchExams(auth, password, from, to)
+    ): List<ExamInfo> = InFlightRequests.read(listOf("exams", AccountPrefs.accountId(auth), from, to)) {
+        UntisExamsApi.fetchExams(auth, password, from, to)
+    }
 
     suspend fun fetchCurrentSchoolYear(auth: AuthData, password: String): SchoolYear? =
         UntisExamsApi.fetchCurrentSchoolYear(auth, password)
 
     suspend fun fetchMessages(auth: AuthData, password: String): MessagesData? =
-        UntisMessagesApi.fetchMessages(auth, password)
+        InFlightRequests.read(listOf("messages", AccountPrefs.accountId(auth))) { UntisMessagesApi.fetchMessages(auth, password) }
 
     suspend fun fetchMessage(auth: AuthData, password: String, id: Long): DirectMessage? =
         UntisMessagesApi.fetchMessage(auth, password, id)

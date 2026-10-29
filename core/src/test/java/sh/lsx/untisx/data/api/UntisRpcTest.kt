@@ -50,7 +50,7 @@ class UntisRpcTest {
     }
 
     @Test
-    fun `429 without retry-after maps to rate limited without seconds`() {
+    fun `429 without retry-after uses a conservative cooldown`() {
         server.enqueue(MockResponse().setResponseCode(429))
 
         val error = assertThrows(UntisException.RateLimited::class.java) {
@@ -59,6 +59,6 @@ class UntisRpcTest {
             }
         }
 
-        assertNull(error.retryAfterSeconds)
+        assertEquals(300L, error.retryAfterSeconds)
     }
 }

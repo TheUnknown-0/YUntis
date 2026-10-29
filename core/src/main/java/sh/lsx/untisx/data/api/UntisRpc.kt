@@ -21,6 +21,8 @@ import sh.lsx.untisx.data.model.AuthResult
 import sh.lsx.untisx.data.model.JsonRpcRequest
 import sh.lsx.untisx.data.model.JsonRpcResponse
 import sh.lsx.untisx.data.net.Http
+import sh.lsx.untisx.data.net.SchoolRequestGuard
+import sh.lsx.untisx.data.net.SameOriginRedirects
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.security.generateTotp
@@ -43,6 +45,9 @@ internal object UntisRpc {
     }
 
     private val http = Http.base.newBuilder()
+        .followSslRedirects(false)
+        .addInterceptor(SchoolRequestGuard)
+        .addNetworkInterceptor(SameOriginRedirects)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(30, TimeUnit.SECONDS)
@@ -51,6 +56,9 @@ internal object UntisRpc {
 
     private val sharedSecrets = ConcurrentHashMap<String, CachedSecret>()
     private val jwts = ConcurrentHashMap<String, CachedJwt>()
+    private val mobileUnavailableUntil = ConcurrentHashMap<String, Long>()
+    private val secretLocks = ConcurrentHashMap<String, Any>()
+    private val jwtLocks = ConcurrentHashMap<String, Any>()
 
     private data class CachedSecret(val secret: String, val at: Long)
     private data class CachedJwt(val jwt: String, val at: Long)
@@ -69,6 +77,7 @@ internal object UntisRpc {
     internal fun clearSessionCache(accountId: String) {
         sharedSecrets.remove(accountId)
         jwts.remove(accountId)
+        mobileUnavailableUntil.remove(accountId)
     }
 
     internal fun rpcCall(
@@ -105,12 +114,13 @@ internal object UntisRpc {
             return executeRpc(url, method, params(credentials))
         }
 
-        val cached = sharedSecrets[key]?.takeIf { System.currentTimeMillis() - it.at < SECRET_TTL_MS }
-
-        if (cached == null) return call(fetchSharedSecret(auth, password, url, key))
+        val secret = synchronized(secretLocks.getOrPut(key) { Any() }) {
+            sharedSecrets[key]?.takeIf { System.currentTimeMillis() - it.at < SECRET_TTL_MS }?.secret
+                ?: fetchSharedSecret(auth, password, url, key)
+        }
 
         return try {
-            call(cached.secret)
+            call(secret)
         } catch (e: UntisException.Network) {
             throw e
         } catch (e: UntisException.BadCredentials) {
@@ -118,10 +128,18 @@ internal object UntisRpc {
         } catch (e: UntisException.RateLimited) {
             throw e
         } catch (e: UntisException) {
+            if (e !is UntisException.SessionExpired && e !is UntisException.Api) throw e
+            if (e is UntisException.Api && e.code in setOf(UntisClient.RPC_NO_RIGHTS, UntisClient.RPC_NO_TIMETABLE, UntisClient.RPC_INVALID)) throw e
             log("'$method' rejected the cached secret -> requesting a new one")
 
-            sharedSecrets.remove(key)
-            call(fetchSharedSecret(auth, password, url, key))
+            val renewed = synchronized(secretLocks.getOrPut(key) { Any() }) {
+                sharedSecrets[key]?.secret?.takeIf { it != secret }
+                    ?: run {
+                        if (System.currentTimeMillis() - (sharedSecrets[key]?.at ?: 0L) < 60_000) throw e
+                        fetchSharedSecret(auth, password, url, key)
+                    }
+            }
+            call(renewed)
         }
     }
 
@@ -165,11 +183,16 @@ internal object UntisRpc {
                     }
 
                     val body = if (result.isSuccessful) result.body?.string() else null
+                    if (result.code >= 500) throw UntisException.Network
 
                     body to result.code
                 }
-            } catch (e: UntisException.RateLimited) {
+            } catch (e: UntisException) {
                 throw e
+            } catch (e: SSLException) {
+                throw UntisException.Certificate
+            } catch (e: IOException) {
+                throw UntisException.Network
             } catch (e: Exception) {
                 warn("bearer GET failed: ${e.javaClass.simpleName}")
                 return null
@@ -191,9 +214,15 @@ internal object UntisRpc {
         return null
     }
 
-    private fun mobileJwt(auth: AuthData, password: String): String? {
+    private fun mobileJwt(auth: AuthData, password: String): String? =
+        synchronized(jwtLocks.getOrPut(AccountPrefs.accountId(auth)) { Any() }) {
+            loadMobileJwt(auth, password)
+        }
+
+    private fun loadMobileJwt(auth: AuthData, password: String): String? {
         val key = AccountPrefs.accountId(auth)
         val now = System.currentTimeMillis()
+        if ((mobileUnavailableUntil[key] ?: 0L) > now) return null
 
         jwts[key]?.let { if (now - it.at < JWT_TTL_MS) return it.jwt }
 
@@ -220,6 +249,8 @@ internal object UntisRpc {
                 }
 
                 if (!response.isSuccessful) {
+                    if (response.code >= 500) throw UntisException.Network
+                    if (response.code == 404 || response.code == 405) mobileUnavailableUntil[key] = now + 15 * 60_000L
                     warn("mobile jwt http ${response.code}")
                     return null
                 }
@@ -235,8 +266,12 @@ internal object UntisRpc {
 
                 jwt
             }
-        } catch (e: UntisException.RateLimited) {
+        } catch (e: UntisException) {
             throw e
+        } catch (e: SSLException) {
+            throw UntisException.Certificate
+        } catch (e: IOException) {
+            throw UntisException.Network
         } catch (e: Exception) {
             warn("mobile jwt failed: ${e.javaClass.simpleName}")
             null
@@ -311,6 +346,9 @@ internal object UntisRpc {
                 }
 
                 val rpc = response.body?.string()?.let { runCatching { json.decodeFromString<JsonRpcResponse>(it) }.getOrNull() }
+                if (response.code == 404 || response.code == 405) {
+                    throw UntisException.Api(UntisClient.RPC_INVALID, "RPC endpoint unavailable")
+                }
 
                 rpc?.error?.let { err ->
                     log("rpc '$method' error ${err.code}")

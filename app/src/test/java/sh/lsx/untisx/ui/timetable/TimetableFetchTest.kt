@@ -74,9 +74,9 @@ class TimetableFetchTest {
     }
 
     @Test
-    fun `rest failure falls back to intern and legacy`() {
-        server.enqueue(MockResponse().setResponseCode(500))
-        server.enqueue(MockResponse().setResponseCode(500))
+    fun `unsupported endpoints fall back to legacy`() {
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(MockResponse().setResponseCode(404))
         server.enqueue(
             MockResponse()
                 .setResponseCode(200)
@@ -88,5 +88,14 @@ class TimetableFetchTest {
         assertEquals(3, server.requestCount)
         assertTrue(result.entries.isEmpty())
         assertNull(result.fresh)
+    }
+
+    @Test
+    fun `server failure does not cause a fallback burst`() {
+        server.enqueue(MockResponse().setResponseCode(500))
+        assertThrows(UntisException.Network::class.java) {
+            runBlocking { fetch.fetchWeek(1, monday, anchorMonday = monday) }
+        }
+        assertEquals(1, server.requestCount)
     }
 }

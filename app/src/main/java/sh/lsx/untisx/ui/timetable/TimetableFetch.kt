@@ -26,16 +26,25 @@ internal class TimetableFetch(
     private val onFreshSession: suspend (AuthData) -> Unit,
     private val resolveElementIds: (List<TimetableEntry>) -> List<TimetableEntry>,
 ) {
+    private val routePrefs = context.getSharedPreferences("timetable_api_routes", Context.MODE_PRIVATE)
+    private fun routeKey(auth: AuthData) = "${auth.server}/${auth.loginName}/${auth.user}"
 
     suspend fun fetchWeek(claimed: Int, monday: LocalDate, anchorMonday: LocalDate): WeekFetch {
         val currentAuth = requireAuth()
 
-        if (!monday.isBefore(anchorMonday)) {
+        val preferred = routePrefs.getString(routeKey(currentAuth), null)
+        if (!monday.isBefore(anchorMonday) && preferred != "internal" && preferred != "legacy") {
             val rest = try {
                 UntisClient.fetchTimetableEntries(currentAuth, withPassword(), monday, monday.plusDays(6))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: UntisException.RateLimited) {
+                throw e
+            } catch (e: UntisException.Network) {
+                throw e
+            } catch (e: UntisException.Certificate) {
+                throw e
+            } catch (e: UntisException.BadCredentials) {
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "REST week $claimed failed: ${e.javaClass.simpleName}")
@@ -43,23 +52,31 @@ internal class TimetableFetch(
             }
 
             if (rest != null) {
+                routePrefs.edit().putString(routeKey(currentAuth), "rest").apply()
                 Log.d(TAG, "week $claimed via REST -> ${rest.size} entries")
                 return WeekFetch(resolveElementIds(rest), currentAuth, allRefused = false)
             }
         }
 
-        val intern = try {
+        val intern = if (preferred == "legacy") null else try {
             UntisClient.getTimetableIntern(currentAuth, withPassword(), monday, monday.plusDays(6))
         } catch (e: CancellationException) {
             throw e
         } catch (e: UntisException.RateLimited) {
+            throw e
+        } catch (e: UntisException.Network) {
+            throw e
+        } catch (e: UntisException.Certificate) {
+            throw e
+        } catch (e: UntisException.BadCredentials) {
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "intern week $claimed failed: ${e.javaClass.simpleName}")
             null
         }
 
-        if (!intern.isNullOrEmpty()) {
+        if (intern != null) {
+            routePrefs.edit().putString(routeKey(currentAuth), "internal").apply()
             Log.d(TAG, "week $claimed via intern -> ${intern.size} entries")
             return WeekFetch(intern, currentAuth, allRefused = false)
         }
@@ -80,18 +97,11 @@ internal class TimetableFetch(
             Log.d(TAG, "week ${monday.toUntisDate()} via legacy -> ${entries.size} entries")
 
             WeekFetch(entries, fresh, allRefused = false)
+                .also { routePrefs.edit().putString(routeKey(auth), "legacy").apply() }
         } catch (e: UntisException.Api) {
             if (e.code != UntisClient.RPC_NO_TIMETABLE && e.code != UntisClient.RPC_NO_RIGHTS) throw e
 
-            val intern = runCatching {
-                UntisClient.getTimetableIntern(auth, withPassword(), monday, monday.plusDays(6))
-            }.onFailure { Log.d(TAG, "mobile API failed") }.getOrNull()
-
-            if (!intern.isNullOrEmpty()) {
-                WeekFetch(intern, auth, allRefused = false)
-            } else {
-                fetchWeekByDay(auth, monday)
-            }
+            fetchWeekByDay(auth, monday)
         }
     }
 
@@ -149,7 +159,7 @@ internal class TimetableFetch(
             null
         }
 
-        if (!internal.isNullOrEmpty()) return internal
+        if (internal != null) return internal
 
         try {
             val (entries, fresh) = SessionManager.withValidSession(context, auth) { a ->

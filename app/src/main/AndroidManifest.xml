@@ -11,6 +11,7 @@
     <application
         android:name=".UntisXApp"
         android:allowBackup="false"
+        android:usesCleartextTraffic="false"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -80,5 +81,4 @@
             </intent-filter>
         </receiver>
     </application>
-
 </manifest>

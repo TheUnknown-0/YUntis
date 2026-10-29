@@ -152,7 +152,7 @@ internal object UntisTimetableApi {
     }
 
     private fun parseTimetableEntriesV1(result: JsonElement): List<TimetableEntry> {
-        val days = (result.jsonObject["days"] as? JsonArray).orEmpty()
+        val days = requireNotNull(result.jsonObject["days"] as? JsonArray) { "Missing timetable days" }
         val entries = ArrayList<TimetableEntry>()
 
         for (day in days) {
@@ -260,7 +260,7 @@ internal object UntisTimetableApi {
     private fun parseInternTimetable(result: JsonElement): List<TimetableEntry> {
         val periods = runCatching {
             result.jsonObject["timetable"]?.jsonObject?.get("periods")?.jsonArray
-        }.getOrNull() ?: return emptyList()
+        }.getOrNull() ?: throw UntisException.Api(UntisClient.RPC_INVALID, "Missing timetable periods")
 
         return periods.mapNotNull { period ->
             runCatching { parseInternPeriod(period.jsonObject) }.getOrNull()
