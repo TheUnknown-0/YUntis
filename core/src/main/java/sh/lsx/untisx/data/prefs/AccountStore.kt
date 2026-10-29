@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import androidx.core.content.edit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +18,8 @@ import sh.lsx.untisx.data.ExamsStore
 import sh.lsx.untisx.data.MessagesStore
 import sh.lsx.untisx.data.StatsStore
 import sh.lsx.untisx.data.TimetableCache
+import sh.lsx.untisx.data.notebook.NotebookAccountLifecycle
+import sh.lsx.untisx.data.notebook.NotebookAccountLocks
 import sh.lsx.untisx.data.security.Crypto
 import sh.lsx.untisx.data.security.Cryptor
 import sh.lsx.untisx.data.security.DecryptResult
@@ -28,6 +31,24 @@ sealed interface AccountLoadError {
 }
 
 class AccountUnavailableException : Exception("Accounts are temporarily unavailable.")
+
+class NotebookCleanupException(
+    accountId: String,
+    message: String = "Notebook cleanup failed for account $accountId; the account was not removed.",
+) : Exception(message)
+
+enum class AccountRemovalFailure {
+    ACCOUNTS_UNAVAILABLE,
+    DELETION_MARKER_FAILED,
+    ACCOUNT_PERSISTENCE_FAILED,
+}
+
+sealed interface AccountRemovalResult {
+    data object Removed : AccountRemovalResult
+    data class RemovedCleanupPending(val accountId: String) : AccountRemovalResult
+    data class Retained(val accountId: String, val failure: AccountRemovalFailure) : AccountRemovalResult
+    data class Indeterminate(val accountId: String) : AccountRemovalResult
+}
 
 object AccountStore {
 
@@ -94,7 +115,32 @@ object AccountStore {
     }
 
     private suspend fun loadLocked(context: Context) {
-        when (val result = withContext(Dispatchers.IO) { readAccounts(context) }) {
+        val readResult = withContext(Dispatchers.IO) {
+            val result = readAccounts(context)
+
+            runCatching {
+                when (result) {
+                    is ReadResult.Ok -> NotebookAccountLifecycle.reconcile(
+                        context,
+                        result.accounts.mapTo(mutableSetOf<String>()) { AccountPrefs.accountId(it) },
+                        accountsReadable = true,
+                    )
+
+                    ReadResult.Missing -> NotebookAccountLifecycle.reconcile(
+                        context,
+                        emptySet<String>(),
+                        accountsReadable = false,
+                    )
+
+                    ReadResult.Transient,
+                    ReadResult.KeyLost -> Unit
+                }
+            }
+
+            result
+        }
+
+        when (val result = readResult) {
             is ReadResult.Ok -> {
                 _accounts.value = result.accounts
                 _activeId.value = readActiveId(context)
@@ -152,7 +198,8 @@ object AccountStore {
                     prefs.edit { remove(AuthPrefs.KEY_BLOB) }
                     ReadResult.Missing
                 } else {
-                    writeAccounts(context, listOf(legacy))
+                    if (!writeAccounts(context, listOf(legacy))) return ReadResult.Transient
+
                     setActiveId(context, AccountPrefs.accountId(legacy))
                     prefs.edit { remove(AuthPrefs.KEY_BLOB) }
                     ReadResult.Ok(listOf(legacy))
@@ -174,34 +221,92 @@ object AccountStore {
         prefs(context).getString(AccountPrefs.KEY_ACTIVE, null)
 
     private fun setActiveId(context: Context, id: String) {
-        prefs(context).edit { putString(AccountPrefs.KEY_ACTIVE, id) }
+        runCatching { prefs(context).edit().putString(AccountPrefs.KEY_ACTIVE, id).commit() }
     }
 
-    private fun writeAccounts(context: Context, accounts: List<AuthData>) {
-        val encoded = cryptor.encrypt(json.encodeToString(serializer, accounts))
+    private fun clearActiveId(context: Context) {
+        runCatching { prefs(context).edit().remove(AccountPrefs.KEY_ACTIVE).commit() }
+    }
 
-        prefs(context).edit { putString(AccountPrefs.KEY_ACCOUNTS, encoded) }
+    private fun encodeAccounts(accounts: List<AuthData>): String? = try {
+        cryptor.encrypt(json.encodeToString(serializer, accounts)).takeIf { it.isNotBlank() }
+    } catch (e: Exception) {
+        Log.w(TAG, "account encryption unavailable: ${e.javaClass.simpleName}")
+        null
+    }
+
+    private fun commitAccounts(context: Context, encoded: String): Boolean = try {
+        prefs(context).edit().putString(AccountPrefs.KEY_ACCOUNTS, encoded).commit()
+    } catch (e: Exception) {
+        Log.w(TAG, "account commit failed: ${e.javaClass.simpleName}")
+        false
+    }
+
+    private fun writeAccounts(context: Context, accounts: List<AuthData>): Boolean {
+        val encoded = encodeAccounts(accounts) ?: return false
+        return commitAccounts(context, encoded)
+    }
+
+    private enum class PersistOutcome { COMMITTED, RETAINED, INDETERMINATE }
+
+    private fun verifyRemovalOutcome(
+        context: Context,
+        accountId: String,
+        expectedEncoded: String,
+    ): PersistOutcome {
+        val stored = prefs(context).getString(AccountPrefs.KEY_ACCOUNTS, null)
+            ?: return PersistOutcome.INDETERMINATE
+
+        if (stored == expectedEncoded) return PersistOutcome.COMMITTED
+
+        return when (val decrypted = cryptor.decrypt(stored)) {
+            is DecryptResult.Value -> {
+                val accounts = runCatching {
+                    json.decodeFromString(serializer, decrypted.plaintext)
+                }.getOrNull() ?: return PersistOutcome.INDETERMINATE
+
+                if (accounts.any { AccountPrefs.accountId(it) == accountId }) {
+                    PersistOutcome.RETAINED
+                } else {
+                    PersistOutcome.COMMITTED
+                }
+            }
+
+            DecryptResult.Missing,
+            DecryptResult.KeyLost,
+            DecryptResult.Transient -> PersistOutcome.INDETERMINATE
+        }
     }
 
     suspend fun addAccount(context: Context, data: AuthData, password: String) {
-        mutex.withLock {
-            ensureEditableLocked(context)
+        val id = AccountPrefs.accountId(data)
 
-            val id = AccountPrefs.accountId(data)
+        NotebookAccountLocks.lock(id).withLock {
+            mutex.withLock {
+                ensureEditableLocked(context)
 
-            withContext(Dispatchers.IO) {
-                PasswordVault.store(context, id, password)
+                val existing = _accounts.value.any { AccountPrefs.accountId(it) == id }
 
-                val updated = _accounts.value.filterNot { AccountPrefs.accountId(it) == id } + data
+                withContext(Dispatchers.IO) {
+                    if (!existing && !NotebookAccountLifecycle.finalizeForReadd(context, id)) {
+                        throw AccountUnavailableException()
+                    }
 
-                writeAccounts(context, updated)
-                setActiveId(context, id)
-                CredentialsPrefs.clear(context, id)
+                    PasswordVault.store(context, id, password)
 
-                _accounts.value = updated
-                _activeId.value = id
-                _error.value = null
-                _loaded.value = true
+                    val updated = _accounts.value.filterNot { AccountPrefs.accountId(it) == id } + data
+
+                    if (!writeAccounts(context, updated)) throw AccountUnavailableException()
+
+                    NotebookAccountLifecycle.activate(context, id)
+                    setActiveId(context, id)
+                    CredentialsPrefs.clear(context, id)
+
+                    _accounts.value = updated
+                    _activeId.value = id
+                    _error.value = null
+                    _loaded.value = true
+                }
             }
         }
     }
@@ -222,7 +327,7 @@ object AccountStore {
             withContext(Dispatchers.IO) {
                 val list = _accounts.value.map { if (AccountPrefs.accountId(it) == id) updated else it }
 
-                writeAccounts(context, list)
+                if (!writeAccounts(context, list)) return@withContext
 
                 val active = _activeId.value
                 if (active == null) {
@@ -236,33 +341,165 @@ object AccountStore {
     }
 
     suspend fun removeAccount(context: Context, id: String) {
-        mutex.withLock {
-            val accounts = _accounts.value.filterNot { AccountPrefs.accountId(it) == id }
+        when (val result = removeAccountTransactional(context, id)) {
+            AccountRemovalResult.Removed,
+            is AccountRemovalResult.RemovedCleanupPending -> Unit
 
-            withContext(Dispatchers.IO) {
-                writeAccounts(context, accounts)
-                PasswordVault.clear(context, id)
-                TimetableCache.clear(context, id)
-                StatsStore.clear(context, id)
-                ExamsStore.clear(context, id)
-                MessagesStore.clear(context, id)
-                CredentialsPrefs.clear(context, id)
-            }
+            is AccountRemovalResult.Retained -> throw NotebookCleanupException(id)
 
-            _accounts.value = accounts
+            is AccountRemovalResult.Indeterminate -> throw NotebookCleanupException(
+                id,
+                "Account removal state could not be confirmed for account $id; " +
+                    "notebook data was preserved and cleanup will be finalized on restart.",
+            )
+        }
+    }
 
-            if (_activeId.value == id || _activeId.value == null) {
-                val next = accounts.firstOrNull()?.let { AccountPrefs.accountId(it) }
+    suspend fun removeAccountTransactional(context: Context, id: String): AccountRemovalResult {
+        return NotebookAccountLocks.lock(id).withLock {
+            mutex.withLock inner@ {
+                if (!_loaded.value || _error.value != null) loadLocked(context)
 
-                if (next == null) {
-                    prefs(context).edit { remove(AccountPrefs.KEY_ACTIVE) }
-                } else {
-                    setActiveId(context, next)
+                if (_error.value != null) {
+                    return@inner AccountRemovalResult.Retained(
+                        id,
+                        AccountRemovalFailure.ACCOUNTS_UNAVAILABLE,
+                    )
                 }
 
-                _activeId.value = next
+                val accounts = _accounts.value
+                val accountWasPresent = accounts.any { AccountPrefs.accountId(it) == id }
+                val remaining = accounts.filterNot { AccountPrefs.accountId(it) == id }
+
+                val previousBlocked = withContext(Dispatchers.IO) {
+                    NotebookAccountLifecycle.isBlocked(context, id)
+                }
+                val previousPhase = withContext(Dispatchers.IO) {
+                    NotebookAccountLifecycle.phase(context, id)
+                }
+                val markerPrepared = withContext(Dispatchers.IO) {
+                    NotebookAccountLifecycle.prepare(context, id)
+                }
+
+                if (!markerPrepared) {
+                    val restored = withContext(Dispatchers.IO) {
+                        NotebookAccountLifecycle.restoreAfterAbortedRemoval(
+                            context,
+                            id,
+                            previousBlocked,
+                            previousPhase,
+                        )
+                    }
+
+                    return@inner if (restored && accountWasPresent) {
+                        AccountRemovalResult.Retained(id, AccountRemovalFailure.DELETION_MARKER_FAILED)
+                    } else {
+                        AccountRemovalResult.Indeterminate(id)
+                    }
+                }
+
+                val outcome = if (!accountWasPresent) {
+                    PersistOutcome.COMMITTED
+                } else {
+                    val encoded = withContext(Dispatchers.IO) { encodeAccounts(remaining) }
+
+                    if (encoded == null) {
+                        val restored = withContext(Dispatchers.IO) {
+                            NotebookAccountLifecycle.restoreAfterAbortedRemoval(
+                                context,
+                                id,
+                                previousBlocked,
+                                previousPhase,
+                            )
+                        }
+
+                        return@inner if (restored) {
+                            AccountRemovalResult.Retained(id, AccountRemovalFailure.ACCOUNT_PERSISTENCE_FAILED)
+                        } else {
+                            AccountRemovalResult.Indeterminate(id)
+                        }
+                    }
+
+                    val committed = withContext(Dispatchers.IO) { commitAccounts(context, encoded) }
+
+                    if (committed) {
+                        PersistOutcome.COMMITTED
+                    } else {
+                        withContext(Dispatchers.IO) { verifyRemovalOutcome(context, id, encoded) }
+                    }
+                }
+
+                when (outcome) {
+                    PersistOutcome.RETAINED -> {
+                        val restored = withContext(Dispatchers.IO) {
+                            NotebookAccountLifecycle.restoreAfterAbortedRemoval(
+                                context,
+                                id,
+                                previousBlocked,
+                                previousPhase,
+                            )
+                        }
+
+                        return@inner if (restored) {
+                            AccountRemovalResult.Retained(id, AccountRemovalFailure.ACCOUNT_PERSISTENCE_FAILED)
+                        } else {
+                            AccountRemovalResult.Indeterminate(id)
+                        }
+                    }
+
+                    PersistOutcome.INDETERMINATE -> return@inner AccountRemovalResult.Indeterminate(id)
+                    PersistOutcome.COMMITTED -> Unit
+                }
+
+                _accounts.value = remaining
+                updateActiveAfterRemovalLocked(context, id, remaining)
+
+                val cleanupComplete = withContext(Dispatchers.IO) {
+                    val notebookComplete = try {
+                        NotebookAccountLifecycle.finalizeCommittedDeletion(context, id)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        false
+                    }
+
+                    try {
+                        PasswordVault.clear(context, id)
+                        TimetableCache.clear(context, id)
+                        StatsStore.clear(context, id)
+                        ExamsStore.clear(context, id)
+                        MessagesStore.clear(context, id)
+                        CredentialsPrefs.clear(context, id)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) { }
+
+                    notebookComplete
+                }
+
+                if (cleanupComplete) {
+                    AccountRemovalResult.Removed
+                } else {
+                    AccountRemovalResult.RemovedCleanupPending(id)
+                }
             }
         }
+    }
+
+    private suspend fun updateActiveAfterRemovalLocked(
+        context: Context,
+        removedId: String,
+        accounts: List<AuthData>,
+    ) {
+        if (_activeId.value != removedId && _activeId.value != null) return
+
+        val next = accounts.firstOrNull()?.let { AccountPrefs.accountId(it) }
+
+        withContext(Dispatchers.IO) {
+            if (next == null) clearActiveId(context) else setActiveId(context, next)
+        }
+
+        _activeId.value = next
     }
 
     suspend fun discardUnreadable(context: Context) {

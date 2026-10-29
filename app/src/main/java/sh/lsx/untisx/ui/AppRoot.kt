@@ -68,6 +68,8 @@ internal fun AppRoot(
     focusDate: Int,
     focusScreen: String?,
     focusNonce: Int,
+    focusNotebookItemId: String?,
+    focusNotebookAccountId: String?,
     onFocusConsumed: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -264,6 +266,8 @@ internal fun AppRoot(
                         focusDate = focusDate,
                         focusScreen = focusScreen,
                         focusNonce = focusNonce,
+                        focusNotebookItemId = focusNotebookItemId,
+                        focusNotebookAccountId = focusNotebookAccountId,
                         onFocusConsumed = onFocusConsumed,
                     )
                 }

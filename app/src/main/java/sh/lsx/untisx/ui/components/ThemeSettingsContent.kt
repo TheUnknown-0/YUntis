@@ -57,14 +57,33 @@ fun ThemeModeSettingsContent(
     onChange: (AppTheme) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    SettingsModeSelector(
+        options = ThemeMode.entries,
+        selected = theme.mode,
+        onSelect = { onChange(theme.copy(mode = it)) },
+        label = { it.label() },
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun <T> SettingsModeSelector(
+    options: List<T>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    label: @Composable (T) -> String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
     SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
-        ThemeMode.entries.forEachIndexed { index, mode ->
+        options.forEachIndexed { index, mode ->
             SegmentedButton(
-                selected = theme.mode == mode,
-                onClick = Haptics.haptic { onChange(theme.copy(mode = mode)) },
-                shape = SegmentedButtonDefaults.itemShape(index, ThemeMode.entries.size),
+                selected = selected == mode,
+                onClick = Haptics.haptic { onSelect(mode) },
+                enabled = enabled,
+                shape = SegmentedButtonDefaults.itemShape(index, options.size),
             ) {
-                Text(mode.label())
+                Text(label(mode))
             }
         }
     }

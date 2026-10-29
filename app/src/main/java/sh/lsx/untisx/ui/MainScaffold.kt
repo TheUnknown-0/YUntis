@@ -7,14 +7,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -31,8 +40,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -41,8 +53,12 @@ import sh.lsx.untisx.R
 import sh.lsx.untisx.data.AppTheme
 import sh.lsx.untisx.data.SubjectAlias
 import sh.lsx.untisx.data.model.TimetableEntry
+import sh.lsx.untisx.data.notebook.LessonRef
+import sh.lsx.untisx.data.notebook.NotebookKind
+import sh.lsx.untisx.data.notebook.NotebookNotificationContract
 import sh.lsx.untisx.data.notifications.Notifications
 import sh.lsx.untisx.data.prefs.AccountPrefs
+import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.ui.components.AppDrawer
 import sh.lsx.untisx.ui.components.AppTopBar
@@ -50,6 +66,13 @@ import sh.lsx.untisx.ui.messages.MessagesViewModel
 import sh.lsx.untisx.ui.nav.AnimatedScreenHost
 import sh.lsx.untisx.ui.nav.Screen
 import sh.lsx.untisx.ui.nav.ScreenHost
+import sh.lsx.untisx.ui.notebook.NotebookEditorSession
+import sh.lsx.untisx.ui.notebook.NotebookEditorSessionSaver
+import sh.lsx.untisx.ui.notebook.NotebookEditorState
+import sh.lsx.untisx.ui.notebook.NotebookFocusNotice
+import sh.lsx.untisx.ui.notebook.NotebookLessonTarget
+import sh.lsx.untisx.ui.notebook.NotebookListState
+import sh.lsx.untisx.ui.notebook.NotebookViewModel
 import sh.lsx.untisx.ui.screens.settings.SettingsCategory
 import sh.lsx.untisx.ui.timetable.ErrorBanner
 import sh.lsx.untisx.ui.timetable.InfoBanner
@@ -115,6 +138,8 @@ internal fun MainApp(
     focusDate: Int,
     focusScreen: String?,
     focusNonce: Int,
+    focusNotebookItemId: String?,
+    focusNotebookAccountId: String?,
     onFocusConsumed: () -> Unit,
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -126,7 +151,20 @@ internal fun MainApp(
     val messagesVm: MessagesViewModel = viewModel(
         key = "messages:${AccountPrefs.accountId(auth)}",
     )
+    val notebookVm: NotebookViewModel = viewModel(
+        key = "notebook:${AccountPrefs.accountId(auth)}",
+    )
     val updateVm: UpdateViewModel = viewModel()
+
+    val notebookListState by notebookVm.listState.collectAsStateWithLifecycle()
+    val notebookEditorState by notebookVm.editorState.collectAsStateWithLifecycle()
+    val notebookEditorNonce by notebookVm.openEditorNonce.collectAsStateWithLifecycle()
+    var notebookFocusNotice by remember { mutableStateOf<NotebookFocusNotice?>(null) }
+    val notebookItems = (notebookListState as? NotebookListState.Ready)?.items.orEmpty()
+    val notebookOpenTasks = remember(notebookItems) {
+        notebookItems.count { it.isTask && !it.isCompleted }
+    }
+    val context = LocalContext.current
 
     DisposableEffect(timetableVm) {
         onDispose { timetableVm.cancelBackgroundWork() }
@@ -143,23 +181,153 @@ internal fun MainApp(
     var settingsCategory by rememberSaveable { mutableStateOf<SettingsCategory?>(null) }
     var examFocusDate by rememberSaveable { mutableStateOf(0) }
     var examFocusNonce by rememberSaveable { mutableStateOf(0) }
+    var notebookSession by rememberSaveable(stateSaver = NotebookEditorSessionSaver) {
+        mutableStateOf(NotebookEditorSession())
+    }
+    var notebookSessionAccount by rememberSaveable {
+        mutableStateOf(AccountPrefs.accountId(auth))
+    }
+    val notebookSelectionTarget = notebookSession.pickerTarget
+    val notebookSelectionActive = notebookSelectionTarget != null
+    var previousNotebookVm by remember { mutableStateOf(notebookVm) }
+    LaunchedEffect(notebookVm) {
+        if (previousNotebookVm !== notebookVm) {
+            previousNotebookVm.closeEditor()
+            previousNotebookVm = notebookVm
+        }
+    }
+    var pendingNotebookLeave by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    fun requestNotebookLeave(action: () -> Unit) {
+        val editor = notebookVm.editorState.value as? NotebookEditorState.Ready
+
+        if (editor?.saving == true) return
+
+        val leave = {
+            notebookSession = notebookSession.pickerClosed()
+            notebookVm.closeEditor()
+            action()
+        }
+
+        if (editor?.isDirty == true) pendingNotebookLeave = leave else leave()
+    }
+
+    if (pendingNotebookLeave != null) {
+        AlertDialog(
+            onDismissRequest = { pendingNotebookLeave = null; onFocusConsumed() },
+            title = { Text(stringResource(R.string.notebook_exit_title)) },
+            text = { Text(stringResource(R.string.notebook_exit_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val leave = pendingNotebookLeave
+                    pendingNotebookLeave = null
+                    leave?.invoke()
+                }) { Text(stringResource(R.string.notebook_discard)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingNotebookLeave = null; onFocusConsumed() }) {
+                    Text(stringResource(R.string.notebook_continue_editing))
+                }
+            },
+        )
+    }
 
     LaunchedEffect(focusNonce) {
-        when (focusScreen) {
+        val focus = focusScreen
+
+        when (focus) {
             Notifications.FOCUS_MESSAGES -> {
+                requestNotebookLeave {
                 messagesVm.refresh()
                 currentScreen = Screen.MESSAGES
                 onFocusConsumed()
+                }
             }
 
             Notifications.FOCUS_EVENTS -> {
+                requestNotebookLeave {
                 timetableVm.ensureEvents()
                 currentScreen = Screen.EVENTS
                 onFocusConsumed()
+                }
             }
 
             Notifications.FOCUS_ACCOUNT -> {
+                requestNotebookLeave {
                 currentScreen = Screen.PROFILE
+                onFocusConsumed()
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(notebookEditorNonce) {
+        if (notebookEditorNonce > 0 && notebookEditorState != null && notebookSession.pickerTarget == null) {
+            if (currentScreen == Screen.NOTEBOOK) {
+                notebookSession = notebookSession.openedFrom(Screen.NOTEBOOK)
+            }
+
+            currentScreen = Screen.NOTEBOOK_EDITOR
+        }
+    }
+
+    LaunchedEffect(AccountPrefs.accountId(auth)) {
+        val account = AccountPrefs.accountId(auth)
+
+        if (account != notebookSessionAccount) {
+            notebookSessionAccount = account
+            notebookSession = NotebookEditorSession()
+            pendingNotebookLeave = null
+
+            if (currentScreen == Screen.NOTEBOOK_EDITOR || notebookSelectionActive) {
+                notebookVm.closeEditor()
+                currentScreen = Screen.NOTEBOOK
+            }
+        }
+    }
+
+    LaunchedEffect(notebookSession.pickerTarget, notebookEditorState) {
+        if (notebookSession.pickerTarget != null && notebookEditorState == null) {
+            val returnScreen = notebookSession.returnScreen
+
+            notebookSession = notebookSession.pickerClosed()
+            currentScreen = returnScreen
+        }
+    }
+
+    LaunchedEffect(
+        focusNonce,
+        focusNotebookItemId,
+        focusNotebookAccountId,
+        AccountPrefs.accountId(auth),
+    ) {
+        if (focusScreen != NotebookNotificationContract.FOCUS_NOTEBOOK) return@LaunchedEffect
+
+        requestNotebookLeave {
+            val targetAccount = focusNotebookAccountId
+            val currentAccount = AccountPrefs.accountId(auth)
+
+            if (!targetAccount.isNullOrBlank() && targetAccount != currentAccount) {
+                val known = AccountStore.snapshot.any { AccountPrefs.accountId(it) == targetAccount }
+
+                if (known) {
+                    scope.launch { AccountStore.setActive(context, targetAccount) }
+                } else {
+                    notebookFocusNotice = NotebookFocusNotice.ACCOUNT_MISSING
+                    notebookSession = notebookSession.openedFrom(Screen.NOTEBOOK)
+                    currentScreen = Screen.NOTEBOOK
+                    onFocusConsumed()
+                }
+            } else {
+                notebookSession = notebookSession.openedFrom(Screen.NOTEBOOK)
+                currentScreen = Screen.NOTEBOOK
+
+                if (!focusNotebookItemId.isNullOrBlank()) {
+                    notebookVm.openItem(focusNotebookItemId)
+                } else {
+                    notebookVm.refresh()
+                }
+
                 onFocusConsumed()
             }
         }
@@ -172,10 +340,43 @@ internal fun MainApp(
         currentScreen = Screen.EVENT_DETAILS
     }
 
+    fun openNotebookNew(kind: NotebookKind, origin: LessonRef?, from: Screen) {
+        notebookSession = notebookSession.openedFrom(from)
+        notebookVm.openNew(kind, origin)
+    }
+
+    fun openNotebookItem(itemId: String, from: Screen) {
+        notebookSession = notebookSession.openedFrom(from)
+        notebookVm.openItem(itemId)
+    }
+
+    fun startNotebookLessonPicker(target: NotebookLessonTarget) {
+        if (notebookVm.editorState.value is NotebookEditorState.Ready) {
+            notebookSession = notebookSession.picker(target)
+            currentScreen = Screen.TIMETABLE
+        }
+    }
+
+    fun cancelNotebookLessonPicker() {
+        notebookSession = notebookSession.pickerClosed()
+        currentScreen = Screen.NOTEBOOK_EDITOR
+    }
+
+    fun completeNotebookLessonPicker(entry: TimetableEntry) {
+        val target = notebookSession.pickerTarget ?: return
+
+        notebookVm.applyTimetableLesson(target, entry)
+        notebookSession = notebookSession.pickerClosed()
+        currentScreen = Screen.NOTEBOOK_EDITOR
+    }
+
     fun goBack() {
         when {
             drawerState.isOpen -> scope.launch { drawerState.close() }
+            notebookSelectionActive -> cancelNotebookLessonPicker()
             currentScreen == Screen.SETTINGS && settingsCategory != null -> settingsCategory = null
+            currentScreen == Screen.NOTEBOOK_EDITOR -> notebookVm.requestEditorExit()
+            currentScreen == Screen.NOTEBOOK -> currentScreen = Screen.TIMETABLE
             currentScreen == Screen.EVENT_DETAILS -> currentScreen = previousScreen
             currentScreen == Screen.MESSAGE_DETAILS -> currentScreen = Screen.MESSAGES
             else -> currentScreen = Screen.TIMETABLE
@@ -185,13 +386,27 @@ internal fun MainApp(
     val backProgress = remember { Animatable(0f) }
 
     BackHandler(
-        enabled = drawerState.isOpen || (currentScreen != Screen.TIMETABLE && !animationsEnabled),
+        enabled = drawerState.isOpen ||
+            (notebookSelectionActive && !animationsEnabled) ||
+            (
+                currentScreen != Screen.TIMETABLE &&
+                    currentScreen != Screen.NOTEBOOK_EDITOR &&
+                    !animationsEnabled
+                ),
     ) {
         goBack()
     }
 
     PredictiveBackHandler(
-        enabled = currentScreen != Screen.TIMETABLE && !drawerState.isOpen && animationsEnabled,
+        enabled = (
+            notebookSelectionActive ||
+                (
+                    currentScreen != Screen.TIMETABLE &&
+                        currentScreen != Screen.NOTEBOOK_EDITOR
+                    )
+                ) &&
+            !drawerState.isOpen &&
+            animationsEnabled,
     ) { progress ->
         try {
             progress.collect { event -> backProgress.snapTo(event.progress) }
@@ -210,40 +425,56 @@ internal fun MainApp(
         }
     }.value
 
+    fun selectDrawerTarget(target: Screen) {
+        when (target) {
+            Screen.MESSAGES -> {
+                messagesVm.refresh()
+                currentScreen = Screen.MESSAGES
+            }
+
+            Screen.EVENTS -> {
+                timetableVm.ensureEvents()
+                currentScreen = Screen.EVENTS
+            }
+
+            Screen.NOTEBOOK -> {
+                notebookVm.refresh()
+                currentScreen = Screen.NOTEBOOK
+            }
+
+            Screen.SETTINGS -> {
+                settingsCategory = null
+                currentScreen = Screen.SETTINGS
+            }
+
+            else -> currentScreen = target
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = currentScreen != Screen.NOTEBOOK_EDITOR,
         drawerContent = {
             AppDrawer(
                 drawerState = drawerState,
                 open = drawerOpen,
                 messagesBadge = messagesVm.messageCount.takeIf { it > 0 }?.toString(),
                 eventsBadge = timetableVm.dayMessages.size.takeIf { it > 0 }?.toString(),
+                notebookBadge = notebookOpenTasks.takeIf { it > 0 }?.toString(),
                 teachersBadge = allTeachers.size.toString(),
                 statsBadge = timetableVm.currentYearLessonCount().takeIf { it > 0 }?.toString(),
                 onSelect = { target ->
-                    when (target) {
-                        Screen.MESSAGES -> {
-                            messagesVm.refresh()
-                            currentScreen = Screen.MESSAGES
-                        }
-
-                        Screen.EVENTS -> {
-                            timetableVm.ensureEvents()
-                            currentScreen = Screen.EVENTS
-                        }
-
-                        Screen.SETTINGS -> {
-                            settingsCategory = null
-                            currentScreen = Screen.SETTINGS
-                        }
-
-                        else -> currentScreen = target
-                    }
+                    requestNotebookLeave { selectDrawerTarget(target) }
                 },
             )
         },
     ) {
         val isTimetable = currentScreen == Screen.TIMETABLE
+        val selectionPrompt = when (notebookSelectionTarget) {
+            NotebookLessonTarget.ORIGIN -> stringResource(R.string.notebook_select_source_lesson)
+            NotebookLessonTarget.DUE -> stringResource(R.string.notebook_select_due_lesson)
+            null -> null
+        }
         val settingsTitle = settingsCategory?.let { stringResource(it.titleRes) }
             ?: stringResource(R.string.settings)
 
@@ -254,6 +485,15 @@ internal fun MainApp(
             Screen.EVENTS -> stringResource(R.string.events)
             Screen.MESSAGES -> stringResource(R.string.messages)
             Screen.MESSAGE_DETAILS -> stringResource(R.string.messages)
+            Screen.NOTEBOOK -> stringResource(R.string.notebook_title)
+            Screen.NOTEBOOK_EDITOR -> when (
+                (notebookEditorState as? NotebookEditorState.Ready)?.draft?.kind
+            ) {
+                NotebookKind.TASK -> stringResource(R.string.notebook_kind_task)
+                NotebookKind.NOTE -> stringResource(R.string.notebook_kind_note)
+                null -> stringResource(R.string.notebook_title)
+            }
+
             Screen.TEACHERS -> stringResource(R.string.teachers)
             Screen.ROOMS -> stringResource(R.string.rooms)
             Screen.STATS -> stringResource(R.string.stats)
@@ -276,18 +516,25 @@ internal fun MainApp(
                         }
                     },
                 topBar = {
-                    AppTopBar(
-                        title = title,
-                        isTimetable = isTimetable,
-                        onMenuToggle = {
-                            scope.launch {
-                                if (drawerState.isClosed) drawerState.open()
-                                else drawerState.close()
-                            }
-                        },
-                        onBack = { goBack() },
-                        onProfile = { currentScreen = Screen.PROFILE },
-                    )
+                    if (notebookSelectionActive) {
+                        NotebookSelectionTopBar(
+                            prompt = selectionPrompt.orEmpty(),
+                            onCancel = { cancelNotebookLessonPicker() },
+                        )
+                    } else {
+                        AppTopBar(
+                            title = title,
+                            isTimetable = isTimetable,
+                            onMenuToggle = {
+                                scope.launch {
+                                    if (drawerState.isClosed) drawerState.open()
+                                    else drawerState.close()
+                                }
+                            },
+                            onBack = { goBack() },
+                            onProfile = { currentScreen = Screen.PROFILE },
+                        )
+                    }
                 },
             ) { padding ->
                 AnimatedScreenHost(
@@ -299,6 +546,28 @@ internal fun MainApp(
                         auth = auth,
                         timetableVm = timetableVm,
                         messagesVm = messagesVm,
+                        notebookVm = notebookVm,
+                        notebookItems = notebookItems,
+                        notebookFocusNotice = notebookFocusNotice,
+                        onNotebookFocusNoticeShown = { notebookFocusNotice = null },
+                        onNotebookJumpToDate = { date ->
+                            examFocusDate = date
+                            examFocusNonce++
+                            currentScreen = Screen.TIMETABLE
+                        },
+                        notebookEditorReturn = notebookSession.returnScreen,
+                        onNotebookEditorClosed = {
+                            if (currentScreen == Screen.NOTEBOOK_EDITOR) {
+                                currentScreen = notebookSession.returnScreen
+                            }
+                        },
+                        notebookLessonTarget = notebookSelectionTarget,
+                        onNotebookOpenItem = { itemId, from -> openNotebookItem(itemId, from) },
+                        onNotebookCreate = { kind, origin, from ->
+                            openNotebookNew(kind, origin, from)
+                        },
+                        onNotebookPickLesson = { target -> startNotebookLessonPicker(target) },
+                        onNotebookLessonSelected = { entry -> completeNotebookLessonPicker(entry) },
                         teachers = allTeachers,
                         settingsCategory = settingsCategory,
                         onSettingsCategoryChange = { settingsCategory = it },
@@ -412,6 +681,40 @@ internal fun MainApp(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun NotebookSelectionTopBar(
+    prompt: String,
+    onCancel: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .statusBarsPadding()
+            .padding(horizontal = 6.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onCancel) {
+            Icon(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = stringResource(R.string.cancel),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+
+        Text(
+            text = prompt,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center,
+        )
+
+        TextButton(onClick = onCancel) {
+            Text(stringResource(R.string.cancel))
         }
     }
 }

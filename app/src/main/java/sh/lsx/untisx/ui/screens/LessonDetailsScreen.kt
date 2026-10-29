@@ -45,7 +45,9 @@ import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.SubjectAlias
+import sh.lsx.untisx.data.notebook.NotebookLessonLinks
 import sh.lsx.untisx.data.subjectLongLabel
+import sh.lsx.untisx.ui.notebook.NotebookLessonSection
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.timetable.LessonCardColors
 import sh.lsx.untisx.ui.timetable.LessonCardOptions
@@ -53,6 +55,7 @@ import sh.lsx.untisx.ui.timetable.StrikeOverlay
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.timetable.cancelledCardColors
 import sh.lsx.untisx.ui.timetable.lessonCardBackground
+import sh.lsx.untisx.ui.timetable.rememberToday
 import sh.lsx.untisx.ui.util.motionEffects
 import sh.lsx.untisx.ui.util.rememberTimeFormat
 import sh.lsx.untisx.ui.util.sharedElementBounds
@@ -74,6 +77,11 @@ fun LessonDetailsScreen(
     cancelledDesaturation: Float = 1f,
     cancelledBrightness: Float = 1f,
     subjectAliases: Map<String, SubjectAlias> = emptyMap(),
+    notebookLinks: NotebookLessonLinks? = null,
+    onNotebookItemClick: (String) -> Unit = {},
+    onCreateNote: () -> Unit = {},
+    onCreateTask: () -> Unit = {},
+    onJumpToDate: (Int) -> Unit = {},
 ) {
     val timeFormat = rememberTimeFormat()
 
@@ -89,6 +97,7 @@ fun LessonDetailsScreen(
     val examText = exam?.text?.takeIf { it.isNotBlank() } ?: entry.exam?.text
     val hasExam = examType != null || examName != null || examText != null
     val notesFade = motionEffects<Float>()
+    val today = rememberToday()
 
     val cancelled = entry.cancelled
     val cardColors = if (cancelled) {
@@ -344,6 +353,15 @@ fun LessonDetailsScreen(
                 else -> Unit
             }
         }
+
+        NotebookLessonSection(
+            links = notebookLinks,
+            today = today,
+            onItemClick = onNotebookItemClick,
+            onCreateNote = onCreateNote,
+            onCreateTask = onCreateTask,
+            onJumpToDate = onJumpToDate,
+        )
     }
 }
 

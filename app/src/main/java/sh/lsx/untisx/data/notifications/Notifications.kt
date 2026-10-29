@@ -74,6 +74,8 @@ object Notifications {
     fun ensureChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
 
+        NotebookReminderNotifier.ensureChannel(context)
+
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_CHANGES,

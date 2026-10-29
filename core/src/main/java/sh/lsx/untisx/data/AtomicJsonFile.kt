@@ -10,12 +10,64 @@ import java.util.concurrent.ConcurrentHashMap
 import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.security.DecryptResult
 
+enum class EncryptedReadFailure { IO, KEY_LOST, TRANSIENT, NOT_ENCRYPTED }
+
+sealed interface EncryptedReadResult {
+    data object Missing : EncryptedReadResult
+    data class Text(val value: String) : EncryptedReadResult
+    data class Failed(val reason: EncryptedReadFailure) : EncryptedReadResult
+}
+
+enum class EncryptedWriteFailure { IO, KEY_UNAVAILABLE }
+
+sealed interface EncryptedWriteResult {
+    data object Success : EncryptedWriteResult
+    data class Failed(val reason: EncryptedWriteFailure) : EncryptedWriteResult
+}
+
 object AtomicJsonFile {
 
     private const val TAG = "AtomicJsonFile"
 
     private val locks = ConcurrentHashMap<String, Any>()
     private const val ENCRYPTED_PREFIX = "UntisX-cache-v1:"
+
+    fun readEncryptedStrict(file: File): EncryptedReadResult = synchronized(lockFor(file)) {
+        val backup = File(file.path + ".bak")
+
+        if (!file.exists() && !backup.exists()) {
+            return@synchronized EncryptedReadResult.Missing
+        }
+
+        val stored = read(file)
+            ?: return@synchronized EncryptedReadResult.Failed(EncryptedReadFailure.IO)
+
+        if (!stored.startsWith(ENCRYPTED_PREFIX)) {
+            return@synchronized EncryptedReadResult.Failed(EncryptedReadFailure.NOT_ENCRYPTED)
+        }
+
+        when (val result = AccountStore.cryptor.decrypt(stored.removePrefix(ENCRYPTED_PREFIX))) {
+            is DecryptResult.Value -> EncryptedReadResult.Text(result.plaintext)
+            DecryptResult.KeyLost -> EncryptedReadResult.Failed(EncryptedReadFailure.KEY_LOST)
+            DecryptResult.Transient -> EncryptedReadResult.Failed(EncryptedReadFailure.TRANSIENT)
+            DecryptResult.Missing -> EncryptedReadResult.Failed(EncryptedReadFailure.IO)
+        }
+    }
+
+    fun writeEncryptedStrict(file: File, text: String): EncryptedWriteResult = synchronized(lockFor(file)) {
+        val encrypted = runCatching { AccountStore.cryptor.encrypt(text) }.getOrNull()
+            ?: return@synchronized EncryptedWriteResult.Failed(EncryptedWriteFailure.KEY_UNAVAILABLE)
+
+        if (encrypted.isBlank()) {
+            return@synchronized EncryptedWriteResult.Failed(EncryptedWriteFailure.KEY_UNAVAILABLE)
+        }
+
+        if (write(file, ENCRYPTED_PREFIX + encrypted)) {
+            EncryptedWriteResult.Success
+        } else {
+            EncryptedWriteResult.Failed(EncryptedWriteFailure.IO)
+        }
+    }
 
     fun readEncrypted(file: File): String? = synchronized(lockFor(file)) {
         val stored = read(file) ?: return null
@@ -81,9 +133,12 @@ object AtomicJsonFile {
     }
 }
 
-fun accountFile(context: android.content.Context, prefix: String, accountId: String): File {
+fun accountHash(accountId: String): String {
     val digest = MessageDigest.getInstance("SHA-256")
         .digest(accountId.toByteArray(Charsets.UTF_8))
 
-    return File(context.filesDir, prefix + digest.joinToString("") { "%02x".format(it) } + ".json")
+    return digest.joinToString("") { "%02x".format(it) }
 }
+
+fun accountFile(context: android.content.Context, prefix: String, accountId: String): File =
+    File(context.filesDir, prefix + accountHash(accountId) + ".json")

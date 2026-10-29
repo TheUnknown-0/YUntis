@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
@@ -51,6 +52,7 @@ internal fun AppDrawer(
     open: Boolean,
     messagesBadge: String?,
     eventsBadge: String?,
+    notebookBadge: String?,
     teachersBadge: String,
     statsBadge: String?,
     onSelect: (Screen) -> Unit,
@@ -123,11 +125,23 @@ internal fun AppDrawer(
         )
 
         SidebarItem(
+            icon = Icons.Outlined.Edit,
+            label = stringResource(R.string.notebook_title),
+            badge = notebookBadge,
+            visible = open,
+            index = 2,
+            onClick = {
+                close()
+                onSelect(Screen.NOTEBOOK)
+            },
+        )
+
+        SidebarItem(
             icon = Icons.Outlined.Person,
             label = stringResource(R.string.teachers),
             badge = teachersBadge,
             visible = open,
-            index = 2,
+            index = 3,
             onClick = {
                 close()
                 onSelect(Screen.TEACHERS)
@@ -139,7 +153,7 @@ internal fun AppDrawer(
             label = stringResource(R.string.rooms),
             badge = "...",
             visible = open,
-            index = 3,
+            index = 4,
             onClick = {
                 close()
                 onSelect(Screen.ROOMS)
@@ -151,7 +165,7 @@ internal fun AppDrawer(
             label = stringResource(R.string.stats),
             badge = statsBadge,
             visible = open,
-            index = 4,
+            index = 5,
             onClick = {
                 close()
                 onSelect(Screen.STATS)
@@ -165,7 +179,7 @@ internal fun AppDrawer(
             icon = Icons.Outlined.Settings,
             label = stringResource(R.string.settings),
             visible = open,
-            index = 5,
+            index = 6,
             onClick = {
                 close()
                 onSelect(Screen.SETTINGS)
@@ -176,7 +190,7 @@ internal fun AppDrawer(
             icon = Icons.Outlined.Info,
             label = stringResource(R.string.about),
             visible = open,
-            index = 6,
+            index = 7,
             onClick = {
                 close()
                 onSelect(Screen.ABOUT)

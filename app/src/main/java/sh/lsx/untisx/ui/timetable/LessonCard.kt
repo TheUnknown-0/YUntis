@@ -45,6 +45,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -61,6 +62,7 @@ import kotlin.math.atan2
 import kotlin.math.sqrt
 import sh.lsx.untisx.R
 import sh.lsx.untisx.data.SubjectColorsPrefs
+import sh.lsx.untisx.data.notebook.NotebookLessonSummary
 import sh.lsx.untisx.ui.util.AppMotion
 import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 import sh.lsx.untisx.ui.util.sharedElementBounds
@@ -180,6 +182,7 @@ internal fun LessonCard(
     cancelledDesaturation: Float = 1f,
     cancelledBrightness: Float = 1f,
     options: LessonCardOptions = LessonCardOptions(),
+    notebookBadge: NotebookLessonSummary? = null,
     sharedElement: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
@@ -235,6 +238,7 @@ internal fun LessonCard(
     val density = LocalDensity.current
     val measured = cell.width > 0 && cell.height > 0
     val compact = measured && with(density) { cell.width.toDp() } < 64.dp
+    val cardCornerRadius = 6.dp
 
     Box(
         modifier = modifier
@@ -247,7 +251,7 @@ internal fun LessonCard(
                 .padding(1.dp)
                 .lessonCardBackground(
                     container = container,
-                    cornerRadius = 6.dp,
+                    cornerRadius = cardCornerRadius,
                     examColor = if (lesson.exam != null) examColor else null,
                     strikeSlit = cancelled && strike && measured,
                 )
@@ -325,6 +329,38 @@ internal fun LessonCard(
                         maxLines = 1,
                     )
                 }
+            }
+        }
+
+        val badgeCount = notebookBadge?.badgeCount ?: 0
+
+        if (badgeCount > 0) {
+            val badgeDescription = stringResource(R.string.notebook_badge_description, badgeCount)
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(1.dp)
+                    .background(
+                        examColor,
+                        RoundedCornerShape(
+                            topStart = cardCornerRadius,
+                            topEnd = 0.dp,
+                            bottomEnd = cardCornerRadius,
+                            bottomStart = 0.dp,
+                        ),
+                    )
+                    .clearAndSetSemantics { contentDescription = badgeDescription }
+                    .padding(horizontal = if (compact) 3.dp else 4.dp),
+            ) {
+                Text(
+                    text = badgeCount.toString(),
+                    fontSize = if (compact) 7.sp else 8.sp,
+                    lineHeight = if (compact) 9.sp else 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = examTextColor,
+                    maxLines = 1,
+                )
             }
         }
 

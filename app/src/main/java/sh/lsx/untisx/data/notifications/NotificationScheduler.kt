@@ -32,6 +32,7 @@ object NotificationScheduler {
         ensureSyncWork(context)
         ensureOverviewAlarm(context)
         ensureExamReminderAlarm(context)
+        NotebookReminderScheduler.ensureAll(context)
     }
 
     fun onAccountRemoved(context: Context, accountId: String) {
@@ -39,6 +40,7 @@ object NotificationScheduler {
         SyncSchedule.clear(context, accountId)
         NewsBaseline.clear(context, accountId)
         NotificationPrefs.clearExamReminderSentKeys(context, accountId)
+        NotebookReminderScheduler.cancelAccount(context, accountId)
 
         if (AccountPrefs.getActive() == null) {
             cancelAll(context)
@@ -51,6 +53,7 @@ object NotificationScheduler {
         WorkManager.getInstance(context).cancelUniqueWork(SYNC_WORK_NAME)
         cancelOverviewAlarm(context)
         cancelExamReminderAlarm(context)
+        NotebookReminderScheduler.cancelAll(context)
         Notifications.cancelAll(context)
     }
 

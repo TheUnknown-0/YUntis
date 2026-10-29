@@ -75,6 +75,8 @@ import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.model.toUntisWeekStart
+import sh.lsx.untisx.data.notebook.LessonKey
+import sh.lsx.untisx.data.notebook.NotebookLessonSummary
 import sh.lsx.untisx.data.subjectShortLabel
 import sh.lsx.untisx.R
 import sh.lsx.untisx.ui.util.AppMotion
@@ -130,6 +132,9 @@ fun TimetableScreen(
     showLastRefreshed: Boolean = true,
     onLessonClick: (TimetableEntry) -> Unit = {},
     onEventClick: (TimetableEntry) -> Unit = {},
+    selectingLesson: Boolean = false,
+    onLessonSelected: (TimetableEntry) -> Unit = {},
+    notebookBadges: Map<LessonKey, NotebookLessonSummary> = emptyMap(),
     focusDate: Int = 0,
     focusNonce: Int = 0,
     onFocusConsumed: () -> Unit = {},
@@ -139,6 +144,12 @@ fun TimetableScreen(
     val info = vm.info
     val refreshing = vm.refreshing
     val animations = LocalAnimationsEnabled.current
+    val lessonClick: (TimetableEntry) -> Unit = if (selectingLesson) onLessonSelected else onLessonClick
+    val eventClick: (TimetableEntry) -> Unit = if (selectingLesson) {
+        { _: TimetableEntry -> }
+    } else {
+        onEventClick
+    }
 
     val colorFor = remember(subjectColors, defaultColor) {
         { name: String -> subjectColors[name] ?: defaultColor }
@@ -285,8 +296,9 @@ fun TimetableScreen(
                         pastDim = pastDim,
                         lessonOptions = lessonOptions,
                         hideCancelled = hideCancelled,
-                        onLessonClick = onLessonClick,
-                        onEventClick = onEventClick,
+                        notebookBadges = notebookBadges,
+                        onLessonClick = lessonClick,
+                        onEventClick = eventClick,
                         exams = vm.exams,
                     )
                 }
@@ -328,6 +340,7 @@ private fun WeekPage(
     pastDim: Float,
     lessonOptions: LessonCardOptions,
     hideCancelled: Boolean,
+    notebookBadges: Map<LessonKey, NotebookLessonSummary>,
     onLessonClick: (TimetableEntry) -> Unit,
     onEventClick: (TimetableEntry) -> Unit,
     exams: List<ExamInfo>,
@@ -416,6 +429,7 @@ private fun WeekPage(
                     pastDim = pastDim,
                     lessonOptions = lessonOptions,
                     hideCancelled = hideCancelled,
+                    notebookBadges = notebookBadges,
                     onLessonClick = onLessonClick,
                     onEventClick = onEventClick,
                 )
@@ -554,6 +568,7 @@ private fun WeekGrid(
     pastDim: Float,
     lessonOptions: LessonCardOptions,
     hideCancelled: Boolean,
+    notebookBadges: Map<LessonKey, NotebookLessonSummary>,
     onLessonClick: (TimetableEntry) -> Unit,
     onEventClick: (TimetableEntry) -> Unit,
 ) {
@@ -595,6 +610,7 @@ private fun WeekGrid(
                 pastDim = pastDim,
                 lessonOptions = lessonOptions,
                 hideCancelled = hideCancelled,
+                notebookBadges = notebookBadges,
                 onLessonClick = onLessonClick,
                 onEventClick = onEventClick,
                 modifier = Modifier.weight(1f).drawWithContent {
@@ -680,6 +696,7 @@ private fun DayColumn(
     pastDim: Float,
     lessonOptions: LessonCardOptions,
     hideCancelled: Boolean,
+    notebookBadges: Map<LessonKey, NotebookLessonSummary>,
     onLessonClick: (TimetableEntry) -> Unit,
     onEventClick: (TimetableEntry) -> Unit,
     modifier: Modifier = Modifier,
@@ -810,6 +827,9 @@ private fun DayColumn(
                         cancelledDesaturation = cancelledDesaturation,
                         cancelledBrightness = cancelledBrightness,
                         options = lessonOptions,
+                        notebookBadge = notebookBadges[
+                            LessonKey(entry.id, entry.date, entry.startTime)
+                        ],
                         modifier = Modifier
                             .width(cardWidth)
                             .offset(x = left, y = top)

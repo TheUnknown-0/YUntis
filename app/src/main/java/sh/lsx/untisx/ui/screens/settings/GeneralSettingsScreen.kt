@@ -46,6 +46,7 @@ fun GeneralSettingsScreen(
     showLastRefreshed: Boolean,
     onShowLastRefreshedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    dataTransferContent: @Composable () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -127,6 +128,8 @@ fun GeneralSettingsScreen(
                 onClick = { importLauncher.launch(arrayOf("application/json")) },
             )
         }
+
+        dataTransferContent()
     }
 
     pendingImport?.let { uri ->

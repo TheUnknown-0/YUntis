@@ -10,17 +10,33 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntOffset
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import sh.lsx.untisx.data.AppTheme
 import sh.lsx.untisx.data.SubjectAlias
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
+import sh.lsx.untisx.data.notebook.LessonRef
+import sh.lsx.untisx.data.notebook.NotebookItem
+import sh.lsx.untisx.data.notebook.NotebookKind
+import sh.lsx.untisx.data.notebook.NotebookSearch
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.ui.messages.MessageDetailsScreen
 import sh.lsx.untisx.ui.messages.MessagesScreen
 import sh.lsx.untisx.ui.messages.MessagesViewModel
+import sh.lsx.untisx.ui.notebook.NotebookEditorScreen
+import sh.lsx.untisx.ui.notebook.NotebookExportImportAction
+import sh.lsx.untisx.ui.notebook.NotebookFocusNotice
+import sh.lsx.untisx.ui.notebook.NotebookLessonTarget
+import sh.lsx.untisx.ui.notebook.NotebookListScreen
+import sh.lsx.untisx.ui.notebook.NotebookSubjectChoices
+import sh.lsx.untisx.ui.notebook.NotebookViewModel
+import sh.lsx.untisx.ui.notebook.notebookBadgeMap
+import sh.lsx.untisx.ui.notebook.notebookEntryRef
 import sh.lsx.untisx.ui.screens.AboutScreen
 import sh.lsx.untisx.ui.screens.EventDetailsScreen
 import sh.lsx.untisx.ui.screens.EventsScreen
@@ -48,6 +64,18 @@ internal fun ScreenHost(
     auth: AuthData,
     timetableVm: TimetableViewModel,
     messagesVm: MessagesViewModel,
+    notebookVm: NotebookViewModel,
+    notebookItems: List<NotebookItem>,
+    notebookFocusNotice: NotebookFocusNotice?,
+    onNotebookFocusNoticeShown: () -> Unit,
+    onNotebookJumpToDate: (Int) -> Unit,
+    notebookEditorReturn: Screen,
+    onNotebookEditorClosed: () -> Unit,
+    notebookLessonTarget: NotebookLessonTarget?,
+    onNotebookOpenItem: (String, Screen) -> Unit,
+    onNotebookCreate: (NotebookKind, LessonRef?, Screen) -> Unit,
+    onNotebookPickLesson: (NotebookLessonTarget) -> Unit,
+    onNotebookLessonSelected: (TimetableEntry) -> Unit,
     teachers: List<MasterDataItem>,
     settingsCategory: SettingsCategory?,
     onSettingsCategoryChange: (SettingsCategory?) -> Unit,
@@ -99,6 +127,15 @@ internal fun ScreenHost(
     val spatialSpec = motionSpatial<IntOffset>()
     val effectsSpec = motionEffects<Float>()
 
+    val notebookSubjectChoices by notebookVm.subjectChoices.collectAsStateWithLifecycle()
+    val notebookSubjects = (notebookSubjectChoices as? NotebookSubjectChoices.Ready)
+        ?.subjects
+        .orEmpty()
+
+    val notebookBadges = remember(notebookItems, timetableVm.weeks) {
+        notebookBadgeMap(timetableVm.weeks.values.flatten(), notebookItems)
+    }
+
     val timetableContent: @Composable () -> Unit = {
         TimetableScreen(
             vm = timetableVm,
@@ -114,11 +151,14 @@ internal fun ScreenHost(
             lessonOptions = lessonOptions,
             hideCancelled = hideCancelled,
             showLastRefreshed = showLastRefreshed,
+            notebookBadges = notebookBadges,
             focusDate = focusDate,
             focusNonce = focusNonce,
             onFocusConsumed = onFocusConsumed,
             onLessonClick = onLessonClick,
             onEventClick = { onOpenEvent(it, Screen.TIMETABLE) },
+            selectingLesson = notebookLessonTarget != null,
+            onLessonSelected = onNotebookLessonSelected,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -166,6 +206,14 @@ internal fun ScreenHost(
                             showLastRefreshed = showLastRefreshed,
                             onShowLastRefreshedChange = onShowLastRefreshedChange,
                             modifier = settingsModifier,
+                            dataTransferContent = {
+                                androidx.compose.runtime.key(notebookVm.accountId) {
+                                    NotebookExportImportAction(
+                                        vm = notebookVm,
+                                        accountLabel = auth.user.ifBlank { auth.loginName },
+                                    )
+                                }
+                            },
                         )
 
                         SettingsCategory.APPEARANCE -> AppearanceSettingsScreen(
@@ -215,6 +263,34 @@ internal fun ScreenHost(
                 }
             }
         }
+
+        Screen.NOTEBOOK -> NotebookListScreen(
+            vm = notebookVm,
+            subjects = notebookSubjects,
+            subjectAliases = subjectAliases,
+            accountLabel = auth.user.ifBlank { auth.loginName },
+            focusNotice = notebookFocusNotice,
+            onFocusNoticeShown = onNotebookFocusNoticeShown,
+            onOpenItem = { itemId -> onNotebookOpenItem(itemId, Screen.NOTEBOOK) },
+            onCreate = { kind, origin -> onNotebookCreate(kind, origin, Screen.NOTEBOOK) },
+            onJumpToDate = onNotebookJumpToDate,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        )
+
+        Screen.NOTEBOOK_EDITOR -> NotebookEditorScreen(
+            vm = notebookVm,
+            onBack = {
+                notebookVm.closeEditor()
+                onNotebookEditorClosed()
+            },
+            onPickOriginLesson = { onNotebookPickLesson(NotebookLessonTarget.ORIGIN) },
+            onPickDueLesson = { onNotebookPickLesson(NotebookLessonTarget.DUE) },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        )
 
         Screen.TEACHERS -> TeachersListScreen(
             teachers = teachers,
@@ -294,6 +370,11 @@ internal fun ScreenHost(
             val subjectName = lesson.subject.firstOrNull()
                 ?.let { timetableVm.subjectsById[it.id]?.name?.takeIf { name -> name.isNotBlank() } ?: it.name }
 
+            val lessonRef = remember(lesson) { notebookEntryRef(lesson) }
+            val notebookLinks = remember(notebookItems, lessonRef) {
+                NotebookSearch.linksForLesson(notebookItems, lessonRef)
+            }
+
             LessonDetailsScreen(
                 entry = lesson,
                 subjectsById = timetableVm.subjectsById,
@@ -310,6 +391,17 @@ internal fun ScreenHost(
                 cancelledStrike = cancelledStrike,
                 cancelledDesaturation = cancelledDesaturation,
                 cancelledBrightness = cancelledBrightness,
+                notebookLinks = notebookLinks,
+                onNotebookItemClick = { itemId ->
+                    onNotebookOpenItem(itemId, Screen.LESSON_DETAILS)
+                },
+                onCreateNote = {
+                    onNotebookCreate(NotebookKind.NOTE, lessonRef, Screen.LESSON_DETAILS)
+                },
+                onCreateTask = {
+                    onNotebookCreate(NotebookKind.TASK, lessonRef, Screen.LESSON_DETAILS)
+                },
+                onJumpToDate = onNotebookJumpToDate,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
