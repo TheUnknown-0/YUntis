@@ -56,6 +56,7 @@ internal fun ScreenHost(
     onLessonClick: (TimetableEntry) -> Unit,
     onOpenEvent: (TimetableEntry, Screen) -> Unit,
     onScreenChange: (Screen) -> Unit,
+    onExamClick: (Int) -> Unit,
     focusDate: Int,
     focusNonce: Int,
     onFocusConsumed: () -> Unit,
@@ -221,6 +222,7 @@ internal fun ScreenHost(
         )
 
         Screen.EVENTS -> EventsScreen(
+            onExamClick = onExamClick,
             events = timetableVm.events,
             holidays = timetableVm.holidays,
             messages = timetableVm.dayMessages,

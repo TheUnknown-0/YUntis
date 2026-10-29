@@ -3,6 +3,12 @@ package sh.lsx.untisx.ui.timetable
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.draw.drawWithContent
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -147,9 +153,12 @@ fun TimetableScreen(
         pageCount = { TimetableViewModel.WEEK_SPAN },
     )
     val scope = rememberCoroutineScope()
+    var highlightedDate by remember { mutableStateOf(0) }
+    val highlight = remember { Animatable(0f) }
 
     LaunchedEffect(focusNonce) {
         if (focusDate > 0) {
+            val date = focusDate
             val target = focusPageFor(vm, focusDate)
 
             if (animations && abs(target - pagerState.currentPage) <= 2) {
@@ -159,6 +168,22 @@ fun TimetableScreen(
             }
 
             onFocusConsumed()
+            vm.ensureWeekPage(target)
+            withTimeoutOrNull(30_000) {
+                snapshotFlow { vm.weeks.containsKey(vm.mondayForPage(target).toUntisDate()) }.first { it }
+            }
+            highlightedDate = date
+            if (animations) {
+                repeat(2) {
+                    highlight.animateTo(0.24f, tween(180))
+                    highlight.animateTo(0f, tween(260))
+                    delay(120)
+                }
+            } else {
+                highlight.snapTo(0.18f)
+                delay(1000)
+                highlight.snapTo(0f)
+            }
         }
     }
 
@@ -179,7 +204,13 @@ fun TimetableScreen(
             vm.ensureWeekPage(target)
         }
 
-        onPauseOrDispose { }
+        val refreshJob = scope.launch {
+            while (true) {
+                vm.ensureWeekPage(pagerState.settledPage)
+                delay(60_000)
+            }
+        }
+        onPauseOrDispose { refreshJob.cancel() }
     }
 
     LaunchedEffect(error) {
@@ -232,6 +263,8 @@ fun TimetableScreen(
                     val weekKey = weekStart.toUntisDate()
 
                     WeekPage(
+                        highlightedDate = highlightedDate,
+                        highlightAlpha = { highlight.value },
                         entries = vm.weeks[weekKey],
                         loading = weekKey in vm.loadingWeeks,
                         restrictedDays = vm.restrictedDays,
@@ -262,7 +295,7 @@ fun TimetableScreen(
 
         if (showLastRefreshed && vm.weeks.isNotEmpty()) {
             LastRefreshedLabel(
-                lastFetch = vm.lastFetch,
+                lastFetch = vm.weekFetchedAt[visibleMonday.toUntisDate()] ?: 0L,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(start = 52.dp, bottom = 24.dp),
@@ -273,6 +306,8 @@ fun TimetableScreen(
 
 @Composable
 private fun WeekPage(
+    highlightedDate: Int,
+    highlightAlpha: () -> Float,
     entries: List<TimetableEntry>?,
     loading: Boolean,
     restrictedDays: Set<Int>,
@@ -364,6 +399,8 @@ private fun WeekPage(
                 )
 
                 WeekGrid(
+                    highlightedDate = highlightedDate,
+                    highlightAlpha = highlightAlpha,
                     weekDays = weekDays,
                     displays = displays,
                     holidays = holidays,
@@ -500,6 +537,8 @@ private fun DayHeader(
 
 @Composable
 private fun WeekGrid(
+    highlightedDate: Int,
+    highlightAlpha: () -> Float,
     weekDays: List<LocalDate>,
     displays: List<LessonDisplay>,
     holidays: List<Holiday>,
@@ -520,6 +559,7 @@ private fun WeekGrid(
 ) {
     val today = rememberToday()
     val byDate = remember(displays) { displays.groupBy { it.entry.date } }
+    val highlightColor = MaterialTheme.colorScheme.primary
 
     Row(
         modifier = Modifier.fillMaxSize(),
@@ -557,7 +597,10 @@ private fun WeekGrid(
                 hideCancelled = hideCancelled,
                 onLessonClick = onLessonClick,
                 onEventClick = onEventClick,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).drawWithContent {
+                    drawContent()
+                    if (dateInt == highlightedDate) drawRect(highlightColor.copy(alpha = highlightAlpha()))
+                },
             )
         }
     }

@@ -9,6 +9,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import sh.lsx.untisx.data.AppClock
 import sh.lsx.untisx.data.SchoolYearStats
@@ -122,6 +123,7 @@ internal class TimetableStatsLoader(
                     progress = 0 to weeks.size
 
                     for ((index, weekStart) in weeks.withIndex()) {
+                        if (index > 0) delay(500)
                         val entries = fetchStatsWeek(currentAuth, weekStart)
 
                         data = withContext(Dispatchers.IO) {

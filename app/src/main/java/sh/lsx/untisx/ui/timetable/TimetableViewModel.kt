@@ -44,6 +44,7 @@ import sh.lsx.untisx.data.model.toVisibleWeekStart
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.data.notifications.SyncSchedule
 import sh.lsx.untisx.data.prefs.PasswordVault
 import sh.lsx.untisx.ui.util.UiText
 import java.time.LocalDate
@@ -132,6 +133,11 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     private var staticDataLoaded = false
     private var subjectsScanned = false
     private val weekCache = HashMap<Int, List<TimetableEntry>>()
+    var weekFetchedAt by mutableStateOf<Map<Int, Long>>(emptyMap())
+        private set
+    private val weekAttemptAt = HashMap<Int, Long>()
+    private var initialized = false
+    private val examsLock = Mutex()
     private val failedWeeks = HashSet<Int>()
     private val flightLock = Mutex()
     private val persistLock = Mutex()
@@ -196,9 +202,11 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             if (cached != null) {
                 Log.d(TAG, "cache loaded: ${cached.weeks.size} weeks")
                 applyCached(cached)
+                account?.let { SyncSchedule.rememberStarts(getApplication(), AccountPrefs.accountId(it), cached.weeks.values.flatten()) }
             }
 
-            refreshCurrentWeek()
+            initialized = true
+            ensureWeek(mondayForPage(lastPage))
             refreshExams(force = false)
         }
     }
@@ -219,7 +227,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     fun ensureWeekPage(page: Int) {
         lastPage = page
-        ensureWeek(mondayForPage(page))
+        if (initialized) ensureWeek(mondayForPage(page))
     }
 
     fun refreshVisibleWeek(monday: LocalDate) {
@@ -300,11 +308,11 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadHistoricalStats() = statsLoader.loadHistorical()
 
-    private suspend fun refreshExams(force: Boolean) {
-        val currentAuth = auth ?: return
+    private suspend fun refreshExams(force: Boolean) = examsLock.withLock {
+        val currentAuth = auth ?: return@withLock
         val now = System.currentTimeMillis()
 
-        if (!force && examsFetchedAt > 0L && now - examsFetchedAt < EXAMS_TTL_MS) return
+        if (examsFetchedAt > 0L && now - examsFetchedAt < if (force) 10_000L else EXAMS_TTL_MS) return@withLock
 
         try {
             val today = AppClock.today()
@@ -366,12 +374,9 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun refreshCurrentWeek() {
-        ensureWeek(anchorMonday, force = true)
-    }
-
     private fun applyCached(cached: TimetableCache.Data) {
         lastFetch = cached.lastFetch
+        weekFetchedAt = cached.weekFetchedAt.mapNotNull { (date, at) -> date.toIntOrNull()?.let { it to at } }.toMap()
 
         for ((key, entries) in cached.weeks) {
             val monday = key.toIntOrNull()
@@ -404,14 +409,22 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         backgroundScope.launch {
             val key = monday.toUntisDate()
 
-            if (!force && weekCache.containsKey(key)) return@launch
+            val now = System.currentTimeMillis()
+            if (!force && weekCache.containsKey(key) && now - (weekFetchedAt[key] ?: 0L) < 5 * 60_000L) {
+                onDone?.invoke(true)
+                return@launch
+            }
 
             val claimed = flightLock.withLock {
-                if (!force && key in loadingWeeks) null else {
+                if (key in loadingWeeks || now - (weekAttemptAt[key] ?: 0L) < if (force) 10_000L else 30_000L) null else {
                     loadingWeeks = loadingWeeks + key
+                    weekAttemptAt[key] = now
                     key
                 }
-            } ?: return@launch
+            } ?: run {
+                onDone?.invoke(false)
+                return@launch
+            }
 
             var success = false
 
@@ -426,6 +439,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 )
 
                 if (fresh != null) persistSession(fresh)
+                auth?.let { SyncSchedule.rememberStarts(getApplication(), AccountPrefs.accountId(it), entries) }
 
                 try {
                     auth?.let { statsLoader.recordWeek(monday, entries, refusedDays, it) }
@@ -467,6 +481,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
                 publishWeeks()
                 lastFetch = System.currentTimeMillis()
+                weekFetchedAt = weekFetchedAt + (claimed to lastFetch)
                 persistCache()
                 success = true
 
@@ -485,7 +500,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 synchronized(failedWeeks) { failedWeeks.add(claimed) }
 
                 if (force && weekCache.isNotEmpty()) {
-                    info = refreshFailureMessage(getApplication(), lastFetch, e)
+                    info = refreshFailureMessage(getApplication(), weekFetchedAt[claimed] ?: 0L, e)
                 } else {
                     error = classifyError(e)
                 }
@@ -550,7 +565,6 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
             mergeTimetableElements()
             persistCache()
-            scanSubjectsIfPossible()
 
             weekCache[anchorMonday.toUntisDate()]?.takeIf { it.isNotEmpty() }?.let { entries ->
                 runCatching {
@@ -678,6 +692,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
             TimetableCache.Data(
                 weeks = weeksSnapshot.mapKeys { (date, _) -> date.toString() },
+                weekFetchedAt = weekFetchedAt.mapKeys { (date, _) -> date.toString() },
                 subjects = subjectsSnapshot.ifEmpty { previous?.subjects.orEmpty() },
                 teachers = teachersSnapshot.ifEmpty { previous?.teachers.orEmpty() },
                 rooms = roomsSnapshot.ifEmpty { previous?.rooms.orEmpty() },

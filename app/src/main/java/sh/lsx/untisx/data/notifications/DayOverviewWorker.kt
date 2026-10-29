@@ -110,7 +110,7 @@ class DayOverviewWorker(
         val cache = TimetableCache.load(context, accountId) ?: return emptyList()
         val key = date.toUntisWeekStart().toUntisDate().toString()
 
-        return cache.weeks[key].orEmpty()
+        return cache.weeks[key].orEmpty().filter { it.date == date.toUntisDate() }
     }
 
     private fun mergeConsecutive(entries: List<TimetableEntry>): List<TimetableEntry> {

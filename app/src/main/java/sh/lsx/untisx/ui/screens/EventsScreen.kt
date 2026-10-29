@@ -71,6 +71,7 @@ fun EventsScreen(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     onEventClick: (TimetableEntry) -> Unit = {},
+    onExamClick: (Int) -> Unit = {},
     exams: List<ExamInfo> = emptyList(),
     subjectsById: Map<Int, MasterDataItem> = emptyMap(),
     subjectAliases: Map<String, SubjectAlias> = emptyMap(),
@@ -193,6 +194,7 @@ fun EventsScreen(
                                 key = { index, exam -> "exam-${exam.id}-${exam.date}-${exam.startTime}:$index" },
                             ) { index, exam ->
                                 ExamCard(
+                                    onClick = { onExamClick(exam.date) },
                                     exam = exam,
                                     subjectsById = subjectsById,
                                     subjectAliases = subjectAliases,
@@ -381,6 +383,7 @@ private fun EventCard(
 
 @Composable
 private fun ExamCard(
+    onClick: () -> Unit,
     exam: ExamInfo,
     subjectsById: Map<Int, MasterDataItem>,
     subjectAliases: Map<String, SubjectAlias> = emptyMap(),
@@ -396,7 +399,7 @@ private fun ExamCard(
     val timed = exam.startTime != 0 || exam.endTime != 0
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().tapHaptic(onClick),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {

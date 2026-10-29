@@ -141,6 +141,8 @@ internal fun MainApp(
     }
     var previousScreen by rememberSaveable { mutableStateOf(Screen.TIMETABLE) }
     var settingsCategory by rememberSaveable { mutableStateOf<SettingsCategory?>(null) }
+    var examFocusDate by rememberSaveable { mutableStateOf(0) }
+    var examFocusNonce by rememberSaveable { mutableStateOf(0) }
 
     LaunchedEffect(focusNonce) {
         when (focusScreen) {
@@ -309,9 +311,16 @@ internal fun MainApp(
                         },
                         onOpenEvent = { entry, from -> openEvent(entry, from) },
                         onScreenChange = { currentScreen = it },
-                        focusDate = focusDate,
-                        focusNonce = focusNonce,
-                        onFocusConsumed = onFocusConsumed,
+                        onExamClick = { date ->
+                            examFocusDate = date
+                            examFocusNonce++
+                            currentScreen = Screen.TIMETABLE
+                        },
+                        focusDate = if (examFocusDate > 0) examFocusDate else focusDate,
+                        focusNonce = focusNonce + examFocusNonce,
+                        onFocusConsumed = {
+                            if (examFocusDate > 0) examFocusDate = 0 else onFocusConsumed()
+                        },
                         theme = theme,
                         onThemeChange = onThemeChange,
                         hapticsEnabled = hapticsEnabled,
