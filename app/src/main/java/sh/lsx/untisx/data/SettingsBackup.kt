@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import sh.lsx.untisx.data.notifications.NotificationPrefs
 import sh.lsx.untisx.data.notifications.NotificationScheduler
+import sh.lsx.untisx.data.notifications.SyncProfile
 import sh.lsx.untisx.data.prefs.AnimationPrefs
 import sh.lsx.untisx.data.prefs.AppearancePrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
@@ -36,6 +37,8 @@ data class NotificationSettingsBackup(
     val changesSilent: Boolean? = null,
     val silentDuringLessons: Boolean? = null,
     val syncIntervalMinutes: Int? = null,
+    val syncProfile: String? = null,
+    val morningBoost: Boolean? = null,
     val overviewEnabled: Boolean? = null,
     val overviewMinute: Int? = null,
     val overviewShowChanges: Boolean? = null,
@@ -160,7 +163,9 @@ object SettingsBackupManager {
                 teacher = NotificationPrefs.notifyTeacherChange(context),
                 changesSilent = NotificationPrefs.changesSilent(context),
                 silentDuringLessons = NotificationPrefs.silentDuringLessons(context),
-                syncIntervalMinutes = NotificationPrefs.syncIntervalMinutes(context),
+                syncIntervalMinutes = NotificationPrefs.syncProfile(context).changesMinutes,
+                syncProfile = NotificationPrefs.syncProfile(context).name,
+                morningBoost = NotificationPrefs.morningBoost(context),
                 overviewEnabled = NotificationPrefs.isOverviewEnabled(context),
                 overviewMinute = NotificationPrefs.overviewMinute(context),
                 overviewShowChanges = NotificationPrefs.overviewShowChanges(context),
@@ -229,6 +234,17 @@ object SettingsBackupManager {
             notifications.changesSilent?.let { NotificationPrefs.setChangesSilent(context, it) }
             notifications.silentDuringLessons?.let { NotificationPrefs.setSilentDuringLessons(context, it) }
             notifications.syncIntervalMinutes?.let { NotificationPrefs.setSyncIntervalMinutes(context, it) }
+            val profile = notifications.syncProfile?.let { name ->
+                SyncProfile.entries.firstOrNull { it.name == name }
+            } ?: notifications.syncIntervalMinutes?.let { minutes ->
+                when {
+                    minutes <= 30 -> SyncProfile.HIGH
+                    minutes <= 60 -> SyncProfile.MEDIUM
+                    else -> SyncProfile.LOW
+                }
+            }
+            profile?.let { NotificationPrefs.setSyncProfile(context, it) }
+            notifications.morningBoost?.let { NotificationPrefs.setMorningBoost(context, it) }
             notifications.overviewEnabled?.let { NotificationPrefs.setOverviewEnabled(context, it) }
             notifications.overviewMinute?.let { NotificationPrefs.setOverviewMinute(context, it) }
             notifications.overviewShowChanges?.let { NotificationPrefs.setOverviewShowChanges(context, it) }

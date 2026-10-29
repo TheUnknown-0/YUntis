@@ -36,6 +36,7 @@ object NotificationScheduler {
 
     fun onAccountRemoved(context: Context, accountId: String) {
         ChangeBaseline.clear(context, accountId)
+        SyncSchedule.clear(context, accountId)
         NewsBaseline.clear(context, accountId)
         NotificationPrefs.clearExamReminderSentKeys(context, accountId)
 
@@ -66,7 +67,8 @@ object NotificationScheduler {
         }
 
         val request = PeriodicWorkRequestBuilder<TimetableSyncWorker>(
-            NotificationPrefs.syncIntervalMinutes(context).toLong(),
+            if (NotificationPrefs.morningBoost(context) && NotificationPrefs.areChangesEnabled(context)) 15L
+            else NotificationPrefs.syncProfile(context).changesMinutes.toLong(),
             TimeUnit.MINUTES,
         )
             .setConstraints(

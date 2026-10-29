@@ -410,4 +410,11 @@
     <string name="settings_notifications_news_events_desc">Notifies you about new events.</string>
     <string name="settings_notifications_news_announcements">New announcements</string>
     <string name="settings_notifications_news_announcements_desc">Notifies you about new daily announcements.</string>
+    <string name="settings_sync_frequency">Background checks</string>
+    <string name="settings_sync_low">Low · timetable every 2 hours</string>
+    <string name="settings_sync_medium">Medium · timetable every hour</string>
+    <string name="settings_sync_high">High · timetable every 30 minutes</string>
+    <string name="settings_sync_frequency_desc">Messages about every %1$d h, events every %2$d h. Android may delay background checks.</string>
+    <string name="settings_morning_boost">Before-school boost</string>
+    <string name="settings_morning_boost_desc">Check today’s timetable about every 15 minutes in the two hours before the earliest known lesson, including cancelled lessons. Requires a previously loaded timetable. Android battery restrictions may delay checks.</string>
 </resources>

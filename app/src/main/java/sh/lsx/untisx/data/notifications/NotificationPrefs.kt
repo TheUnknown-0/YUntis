@@ -29,6 +29,25 @@ object NotificationPrefs {
     private const val KEY_CHANGES_SILENT = "notif_changes_silent"
     private const val KEY_SILENT_DURING_LESSONS = "notif_silent_during_lessons"
     private const val KEY_SYNC_INTERVAL = "notif_sync_interval"
+    private const val KEY_SYNC_PROFILE = "notif_sync_profile"
+    private const val KEY_MORNING_BOOST = "notif_morning_boost"
+
+    fun syncProfile(context: Context): SyncProfile {
+        val stored = prefs(context).getString(KEY_SYNC_PROFILE, null)
+        return SyncProfile.entries.firstOrNull { it.name == stored } ?: when {
+            syncIntervalMinutes(context) <= 30 -> SyncProfile.HIGH
+            syncIntervalMinutes(context) <= 60 -> SyncProfile.MEDIUM
+            else -> SyncProfile.LOW
+        }
+    }
+
+    fun setSyncProfile(context: Context, profile: SyncProfile) =
+        prefs(context).edit { putString(KEY_SYNC_PROFILE, profile.name) }
+
+    fun morningBoost(context: Context): Boolean = prefs(context).getBoolean(KEY_MORNING_BOOST, false)
+
+    fun setMorningBoost(context: Context, enabled: Boolean) =
+        prefs(context).edit { putBoolean(KEY_MORNING_BOOST, enabled) }
 
     private const val KEY_OVERVIEW_ENABLED = "notif_overview_enabled"
     private const val KEY_OVERVIEW_MINUTE = "notif_overview_minute"

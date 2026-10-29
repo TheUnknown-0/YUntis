@@ -14,6 +14,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.Role
+import sh.lsx.untisx.data.notifications.SyncProfile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,7 +60,8 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
     var notifyTeacher by remember { mutableStateOf(NotificationPrefs.notifyTeacherChange(context)) }
     var changesSilent by remember { mutableStateOf(NotificationPrefs.changesSilent(context)) }
     var silentDuringLessons by remember { mutableStateOf(NotificationPrefs.silentDuringLessons(context)) }
-    var interval by remember { mutableIntStateOf(NotificationPrefs.syncIntervalMinutes(context)) }
+    var profile by remember { mutableStateOf(NotificationPrefs.syncProfile(context)) }
+    var morningBoost by remember { mutableStateOf(NotificationPrefs.morningBoost(context)) }
 
     var overviewEnabled by remember { mutableStateOf(NotificationPrefs.isOverviewEnabled(context)) }
     var overviewMinute by remember { mutableIntStateOf(NotificationPrefs.overviewMinute(context)) }
@@ -153,6 +167,66 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
 
         if (!enabled) return@Column
 
+        SettingsSectionCard(title = stringResource(R.string.settings_sync_frequency)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().selectableGroup(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                SyncProfile.entries.forEach { option ->
+                    val selected = profile == option
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer)
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = Haptics.haptic {
+                                    profile = option
+                                    NotificationPrefs.setSyncProfile(context, option)
+                                    reschedule()
+                                },
+                            )
+                            .heightIn(min = 52.dp)
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selected, onClick = null, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = stringResource(when (option) {
+                                SyncProfile.LOW -> R.string.settings_sync_low
+                                SyncProfile.MEDIUM -> R.string.settings_sync_medium
+                                SyncProfile.HIGH -> R.string.settings_sync_high
+                            }),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.settings_sync_frequency_desc, profile.messagesMinutes / 60, profile.eventsMinutes / 60),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_morning_boost),
+                description = stringResource(R.string.settings_morning_boost_desc),
+                checked = morningBoost,
+                enabled = changesEnabled,
+                onCheckedChange = {
+                    morningBoost = it
+                    NotificationPrefs.setMorningBoost(context, it)
+                    reschedule()
+                },
+            )
+        }
+
         SettingsSectionCard(
             title = stringResource(R.string.settings_notifications_changes),
         ) {
@@ -199,35 +273,6 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
                     NotificationPrefs.setNotifyTeacherChange(context, it)
                     reschedule()
                 },
-            )
-
-            Spacer(Modifier.height(6.dp))
-
-            Text(
-                text = stringResource(R.string.settings_notifications_interval),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-
-            Text(
-                text = intervalLabel(interval),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Slider(
-                value = interval.toFloat(),
-                onValueChange = { interval = it.roundToInt() },
-                onValueChangeFinished = {
-                    interval = snapInterval(interval)
-                    NotificationPrefs.setSyncIntervalMinutes(context, interval)
-                    reschedule()
-                },
-                valueRange = NotificationPrefs.MIN_SYNC_INTERVAL_MINUTES.toFloat()..
-                    NotificationPrefs.MAX_SYNC_INTERVAL_MINUTES.toFloat(),
-                steps = ((NotificationPrefs.MAX_SYNC_INTERVAL_MINUTES -
-                    NotificationPrefs.MIN_SYNC_INTERVAL_MINUTES) /
-                    NotificationPrefs.INTERVAL_STEP_MINUTES) - 1,
-                enabled = changesEnabled,
             )
 
             SettingsSwitchRow(
@@ -403,20 +448,6 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
             )
         }
     }
-}
-
-private fun intervalLabel(minutes: Int): String = when {
-    minutes < 60 -> "$minutes min"
-    minutes % 60 == 0 -> "${minutes / 60} h"
-    else -> "${minutes / 60} h ${minutes % 60} min"
-}
-
-private fun snapInterval(minutes: Int): Int {
-    val step = NotificationPrefs.INTERVAL_STEP_MINUTES
-    val snapped = ((minutes.toFloat() / step).roundToInt() * step)
-        .coerceIn(NotificationPrefs.MIN_SYNC_INTERVAL_MINUTES, NotificationPrefs.MAX_SYNC_INTERVAL_MINUTES)
-
-    return snapped
 }
 
 @Composable

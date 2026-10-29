@@ -410,4 +410,11 @@
     <string name="settings_notifications_news_events_desc">Benachrichtigt dich über neue Termine.</string>
     <string name="settings_notifications_news_announcements">Neue Nachrichten des Tages</string>
     <string name="settings_notifications_news_announcements_desc">Benachrichtigt dich über neue Nachrichten des Tages.</string>
+    <string name="settings_sync_frequency">Hintergrundabfragen</string>
+    <string name="settings_sync_low">Niedrig · Stundenplan alle 2 Stunden</string>
+    <string name="settings_sync_medium">Mittel · Stundenplan stündlich</string>
+    <string name="settings_sync_high">Hoch · Stundenplan alle 30 Minuten</string>
+    <string name="settings_sync_frequency_desc">Nachrichten etwa alle %1$d Std., Events alle %2$d Std. Android kann Hintergrundabfragen verzögern.</string>
+    <string name="settings_morning_boost">Morgen-Boost</string>
+    <string name="settings_morning_boost_desc">Den heutigen Plan in den zwei Stunden vor der frühesten bekannten Stunde etwa alle 15 Minuten prüfen, auch bei Ausfall der ersten Stunde. Benötigt einen zuvor geladenen Stundenplan. Androids Akku-Einstellungen können Abfragen verzögern.</string>
 </resources>

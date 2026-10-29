@@ -22,6 +22,7 @@ import sh.lsx.untisx.data.prefs.CredentialsPrefs
 import sh.lsx.untisx.data.prefs.PasswordVault
 import java.io.IOException
 import java.time.LocalDate
+import sh.lsx.untisx.data.AppClock
 
 class TimetableSyncWorker(
     appContext: Context,
@@ -57,9 +58,13 @@ class TimetableSyncWorker(
             val rooms = cache?.rooms?.associateBy { it.id }.orEmpty()
 
             var fresh: AuthData = auth
+            val now = System.currentTimeMillis()
+            val profile = NotificationPrefs.syncProfile(context)
+            val boost = SyncSchedule.isBoostWindow(context, accountId)
 
-            if (changesEnabled) {
-                fresh = syncChanges(context, accountId, fresh, subjects, teachers, rooms)
+            if (changesEnabled && SyncSchedule.due(context, accountId, "changes", if (boost) 15 else profile.changesMinutes, now)) {
+                fresh = syncChanges(context, accountId, fresh, subjects, teachers, rooms, boost)
+                SyncSchedule.completed(context, accountId, "changes", now)
             }
 
             if (newsEnabled) {
@@ -112,9 +117,11 @@ class TimetableSyncWorker(
         subjects: Map<Int, MasterDataItem>,
         teachers: Map<Int, MasterDataItem>,
         rooms: Map<Int, MasterDataItem>,
+        boost: Boolean = false,
     ): AuthData {
         val baseline = ChangeBaseline.load(context, accountId)
-        val monday = LocalDate.now().toUntisWeekStart()
+        val today = AppClock.today()
+        val monday = today.toUntisWeekStart()
 
         val filter = ChangeFilter(
             cancelled = NotificationPrefs.notifyCancelled(context),
@@ -126,16 +133,18 @@ class TimetableSyncWorker(
         val observed = HashMap<String, List<TimetableEntry>>()
         var fresh = auth
 
-        for (week in listOf(monday, monday.plusWeeks(1))) {
-            val fetched = TimetableSource.fetchWeek(context, fresh, week)
+        for (week in if (boost) listOf(monday) else listOf(monday, monday.plusWeeks(1))) {
+            val fetched = if (boost) TimetableSource.fetchRange(context, fresh, today, today)
+                else TimetableSource.fetchWeek(context, fresh, week)
             fetched.fresh?.let { fresh = it }
+            SyncSchedule.rememberStarts(context, accountId, fetched.entries)
 
             val key = week.toUntisDate().toString()
             val previous = baseline?.weeks?.get(key)
 
             if (previous != null) {
                 changes += ScheduleChangeDetector.detect(
-                    previous = previous,
+                    previous = if (boost) previous.filter { it.date == today.toUntisDate() } else previous,
                     fresh = fetched.entries,
                     subjects = subjects,
                     teachers = teachers,
@@ -145,11 +154,11 @@ class TimetableSyncWorker(
                 )
             }
 
-            observed[key] = fetched.entries
+            observed[key] = if (boost) previous.orEmpty().filter { it.date != today.toUntisDate() } + fetched.entries else fetched.entries
         }
 
         val currentKey = monday.toUntisDate()
-        val pruned = observed.filterKeys { key ->
+        val pruned = (baseline?.weeks.orEmpty() + observed).filterKeys { key ->
             key.toIntOrNull()?.let { it >= currentKey } ?: true
         }
 
@@ -181,6 +190,7 @@ class TimetableSyncWorker(
 
         val baseline = NewsBaseline.load(context, accountId)
         val now = System.currentTimeMillis()
+        val profile = NotificationPrefs.syncProfile(context)
 
         var messages = if (messagesEnabled) baseline?.messages else null
         var events = if (eventsEnabled) baseline?.events else null
@@ -189,12 +199,23 @@ class TimetableSyncWorker(
         var eventsAt = if (eventsEnabled) baseline?.eventsUpdatedAt ?: 0L else 0L
         var announcementsAt = if (announcementsEnabled) baseline?.announcementsUpdatedAt ?: 0L else 0L
 
+        fun checkpoint() = NewsBaseline.save(context, accountId, NewsBaseline.Data(
+            messages = messages,
+            events = events,
+            announcements = announcements,
+            messagesUpdatedAt = messagesAt,
+            eventsUpdatedAt = eventsAt,
+            announcementsUpdatedAt = announcementsAt,
+        ))
+
         val silent = NotificationRules.isDuringLessons(context)
 
-        if (messagesEnabled) {
+        if (messagesEnabled && SyncSchedule.due(context, accountId, "messages", profile.messagesMinutes, now)) {
             val data = try {
                 UntisClient.fetchMessages(auth, password)
             } catch (e: CancellationException) {
+                throw e
+            } catch (e: UntisException) {
                 throw e
             } catch (e: Exception) {
                 Log.d(TAG, "messages failed: ${e.javaClass.simpleName}")
@@ -215,10 +236,12 @@ class TimetableSyncWorker(
 
                 messages = incoming.mapTo(LinkedHashSet()) { NewsSignatures.message(it) }
                 messagesAt = now
+                checkpoint()
+                SyncSchedule.completed(context, accountId, "messages", now)
             }
         }
 
-        if (eventsEnabled) {
+        if (eventsEnabled && SyncSchedule.due(context, accountId, "events", profile.eventsMinutes, now)) {
             val today = LocalDate.now()
             val end = today.plusMonths(NEWS_EVENTS_AHEAD_MONTHS)
             val items = ArrayList<TimetableEntry>()
@@ -237,8 +260,11 @@ class TimetableSyncWorker(
                     anySuccess = true
                 } catch (e: CancellationException) {
                     throw e
+                } catch (e: UntisException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.d(TAG, "events failed: ${e.javaClass.simpleName}")
+                    return
                 }
 
                 cursor = chunkEnd.plusDays(1)
@@ -261,10 +287,12 @@ class TimetableSyncWorker(
 
                 events = items.mapTo(LinkedHashSet()) { NewsSignatures.event(it) }
                 eventsAt = now
+                checkpoint()
+                SyncSchedule.completed(context, accountId, "events", now)
             }
         }
 
-        if (announcementsEnabled) {
+        if (announcementsEnabled && SyncSchedule.due(context, accountId, "announcements", profile.announcementsMinutes, now)) {
             val today = LocalDate.now()
             val found = LinkedHashMap<Int, DayMessage>()
             var anySuccess = false
@@ -282,8 +310,11 @@ class TimetableSyncWorker(
                     }
                 } catch (e: CancellationException) {
                     throw e
+                } catch (e: UntisException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.d(TAG, "announcements failed: ${e.javaClass.simpleName}")
+                    return
                 }
             }
 
@@ -301,6 +332,8 @@ class TimetableSyncWorker(
 
                 announcements = items.mapTo(LinkedHashSet()) { NewsSignatures.announcement(it) }
                 announcementsAt = now
+                checkpoint()
+                SyncSchedule.completed(context, accountId, "announcements", now)
             }
         }
 

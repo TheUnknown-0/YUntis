@@ -27,6 +27,21 @@ object TimetableSource {
         from: LocalDate,
         to: LocalDate,
     ): Fetched {
+        val routes = context.getSharedPreferences("timetable_api_routes", Context.MODE_PRIVATE)
+        val key = AccountPrefs.accountId(auth)
+        val preferred = routes.getString(key, null)
+        if (preferred == "internal" || preferred == "rest") {
+            val password = PasswordVault.retrieve(context, key) ?: throw UntisException.BadCredentials
+            if (preferred == "rest") {
+                UntisClient.fetchTimetableEntries(auth, password, from, to)?.let { return Fetched(it, null) }
+            } else {
+                try {
+                    return Fetched(UntisClient.getTimetableIntern(auth, password, from, to), null)
+                } catch (e: UntisException.Api) {
+                    routes.edit().remove(key).apply()
+                }
+            }
+        }
         return try {
             val (entries, fresh) = SessionManager.withValidSession(context, auth) { current ->
                 UntisClient.getTimetable(
@@ -36,6 +51,7 @@ object TimetableSource {
                 )
             }
 
+            routes.edit().putString(key, "legacy").apply()
             Fetched(entries, fresh)
         } catch (e: UntisException.Api) {
             if (e.code != UntisClient.RPC_NO_TIMETABLE && e.code != UntisClient.RPC_NO_RIGHTS) throw e
@@ -44,6 +60,7 @@ object TimetableSource {
                 ?: throw UntisException.BadCredentials
 
             Fetched(UntisClient.getTimetableIntern(auth, password, from, to), fresh = null)
+                .also { routes.edit().putString(key, "internal").apply() }
         }
     }
 }
