@@ -14,6 +14,7 @@ An open-source timetable viewer for the Untis school system - built natively wit
 - **Messages** - read messages sent by your school
 - **Exams** - exams and tests are marked on the timetable, with a list of upcoming ones
 - **Lesson details** - lesson information, substitutions, topic and class register notes
+- **Notebook** - personal tasks and notes, lesson links, due dates, reminders, search and pinned entries
 - **Cancelled lessons** - showing up grayed out
 - **Subject colors** - every subject color can be customized
 - **Custom subject names** - rename subjects with short and long names
@@ -22,11 +23,13 @@ An open-source timetable viewer for the Untis school system - built natively wit
 - **Multi-account** - add several accounts and switch between them
 - **Themes & appearance** - dynamic colors, theme presets, custom accent color and animations
 - **English & German** - choose the app language independently of the system
-- **Offline** - your timetable is cached locally and opens instantly
+- **Offline** - your timetable is cached locally with encrypted storage
 - **Wear OS companion** - view your timetable and lesson details on a paired watch, including offline access
 - **Notifications** - alerts for cancellations and room/teacher changes, automatically silent during lessons, plus an overview of the upcoming school day
+- **Background sync** - configurable sync profiles and an optional before-school boost
+- **Data export & import** - transfer personal notebook tasks and notes separately from your settings backup
 - **In-app updates** - new versions install straight from the app
-- **Lightweight** - ~3 MB, no ads, no tracking
+- **Lightweight** - <10 MB, no ads, no tracking
 
 UntisX is in early development - expect bugs and incomplete features. If you find one, please [report it as an issue](https://codeberg.org/Losterixx/UntisX/issues).
 
@@ -43,13 +46,15 @@ UntisX is in early development - expect bugs and incomplete features. If you fin
 
 ## Privacy
 
-Your username and password are sent exclusively to your school's Untis server and nowhere else. On your device they are stored encrypted with the Android Keystore. There is no ads, analytics or tracking.
+Your username and password are sent exclusively to your school's Untis server and nowhere else. On your device they are stored encrypted using Android Keystore-backed keys, as are locally cached school data and notebook entries. There are no ads, analytics or tracking.
+
+Notebook export is available under **Settings > General > Data** for the active account. It includes only personal tasks and notes, not login details, passwords or sessions. Exported JSON files are **not encrypted**: anyone with access can read them. Store them safely. Notebook export and import are separate from the settings backup.
 
 The phone also contacts this project's releases for updates. Watch synchronization uses the Google Play services Data Layer, which may relay data through Google's infrastructure when a direct connection is unavailable.
 
 The watch receives timetable and display data for the active account, not passwords or login sessions. Its local cache is encrypted with Android Keystore. Account changes replace the watch snapshot when the devices synchronize; a disconnected watch can still show its previously received data until then.
 
-If you enable notifications, UntisX periodically checks your timetable on your school's Untis server in the background (you can choose the interval). The data is compared locally on your device to detect changes - nothing is sent anywhere else.
+Background timetable checks use your school's Untis server. Sync profiles control how often checks are requested; the optional before-school boost requests checks about every 15 minutes during the two hours before the earliest known lesson, including cancelled lessons. The boost requires a previously loaded timetable. Android battery restrictions may delay background work. Changes are detected locally; the optional watch receives the timetable snapshot described above.
 
 ---
 
@@ -93,19 +98,23 @@ cd UntisX
 
 The APK ends up in `app/build/outputs/apk/debug/app-debug.apk` and can be installed on a connected device with `adb install -r <apk>`.
 
-Release builds are signed with the project keystore, so you need to use the debug key.
+For local development, use debug builds. You can build both apps with:
 
 ```bash
-./gradlew assembleRelease
+./gradlew :app:assembleDebug :wear:assembleDebug
 ```
 
-Without the keystore, the release build asks for confirmation and falls back to the debug key.
+The watch APK is written to `wear/build/outputs/apk/debug/wear-debug.apk`. Build and install both apps with the same signing key for Data Layer synchronization. Debug builds cannot update the project's signed release APKs in place.
+
+Official release builds require the project keystore (`untisx.keystore` in the repository root) and the `keystorePassword` Gradle property. Without them, a release build only falls back to the debug key after explicit interactive confirmation; non-interactive builds abort. For your own distribution, use your own signing key consistently for both apps.
+
+Maintainers can use `./install_release.sh` or `./install_wear_release.sh` to run the respective tests, build a signed APK and install it via ADB. These scripts require the project keystore in the repository root or at `~/untisx.keystore`, and `KEYSTORE_PASSWORD` in a local `.env` file. `./deploy.sh` builds and uploads both `app-release.apk` and `wear-release.apk` to Codeberg; it also requires `CODEBERG_TOKEN` in `.env`. Never commit keystores, passwords or tokens.
 
 ### Wear OS
 
 The watch APK is a companion, not a standalone Untis client: first sign in and open the timetable on the phone, then open UntisX on the watch. Swipe horizontally between days, use the crown to scroll, and tap a lesson for details. Refresh requests are handled by the phone through WorkManager and may be delayed in the background.
 
-The watch checks freshness when reopened and updates the current day while visible. Refresh feedback distinguishes transferred phone cache, refreshed school data, failed school refreshes and delayed requests. Days without a cached week are shown as not loaded. Phone and watch refreshes share a per-week cache; exam markings also use the phone's saved exam list.
+The watch checks freshness when reopened and updates the current day while visible. A loading indicator shows refresh activity; only failed or delayed refreshes show status messages. The current date is underlined, and holidays show their full name when available. Days without a cached week are shown as not loaded. Phone and watch refreshes share a per-week cache; exam markings also use the phone's saved exam list.
 
 **Tested only with my Google Pixel Watch 2 paired with a Google Pixel 10 Pro** (stock Wear OS on the watch, GrapheneOS with Google Play Services on the phone). Other watches, phones and firmware versions have not been tested; compatibility is not guaranteed.
 
