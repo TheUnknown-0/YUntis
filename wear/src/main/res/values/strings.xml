@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">UntisX</string>
+    <string name="wear_waiting">Waiting for phone...</string>
+    <string name="wear_open_phone">Open the phone app to sync your timetable.</string>
+    <string name="wear_refresh">Refresh</string>
+    <string name="wear_updated">Updated: %1$s</string>
+    <string name="wear_sync_failed">School data could not be refreshed. Saved data is still available.</string>
+    <string name="wear_sync_delayed">Refresh is delayed. The phone may still be working.</string>
+    <string name="wear_not_loaded">No data loaded for this day.</string>
+    <string name="wear_no_lessons">No lessons</string>
+    <string name="wear_holiday">Holiday</string>
+    <string name="wear_restricted">Restricted</string>
+    <string name="wear_cancelled">Cancelled</string>
+    <string name="wear_irregular">Changed</string>
+    <string name="wear_exam">Exam</string>
+    <string name="wear_room">Room</string>
+    <string name="wear_teacher">Teacher</string>
+    <string name="wear_back">Back</string>
+    <string name="wear_substitution">Substitution</string>
+    <string name="wear_info">Info</string>
+    <string name="wear_topic">Topic</string>
+</resources>

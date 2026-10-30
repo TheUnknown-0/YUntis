@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import sh.lsx.untisx.data.LanguagePrefs
+import sh.lsx.untisx.data.wear.WearSync
 import sh.lsx.untisx.data.notebook.NotebookNotificationContract
 import sh.lsx.untisx.data.notifications.NotebookNotificationFocus
 import sh.lsx.untisx.data.notifications.Notifications
@@ -31,6 +32,7 @@ class MainActivity : AppCompatActivity() {
 
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        WearSync.observeAccounts(applicationContext)
 
         LanguagePrefs.apply(LanguagePrefs.get(this))
 

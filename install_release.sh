@@ -46,13 +46,38 @@ else
   echo "WARNING: No JDK detected; Gradle build may fail." >&2
 fi
 
+PHONE_SERIAL="${PHONE_SERIAL:-}"
+if [[ -z "$PHONE_SERIAL" ]]; then
+  phones=()
+
+  while read -r serial state rest; do
+    [[ "$state" == "device" ]] || continue
+    characteristics=$(adb -s "$serial" shell getprop ro.build.characteristics </dev/null | tr -d '\r')
+    [[ "$characteristics" == *watch* ]] || phones+=("$serial")
+  done < <(adb devices)
+
+  if [[ ${#phones[@]} -ne 1 ]]; then
+    echo 'ERROR: Connect exactly one authorized phone or set PHONE_SERIAL.' >&2
+    exit 1
+  fi
+
+  PHONE_SERIAL="${phones[0]}"
+fi
+
+if [[ $(adb -s "$PHONE_SERIAL" shell getprop ro.build.characteristics | tr -d '\r') == *watch* ]]; then
+  echo 'ERROR: PHONE_SERIAL identifies a watch.' >&2
+  exit 1
+fi
+
+echo "==> Phone: $PHONE_SERIAL"
+
 if [[ "$SKIP_TESTS" == true ]]; then
   echo '==> Skipping unit tests (--skip-tests).'
 else
   echo '==> Running unit tests...'
   
   set +e
-  ./gradlew :app:testDebugUnitTest --console=plain 2>&1 | tail -n 25
+  ./gradlew :app:testDebugUnitTest :core:testDebugUnitTest :wear:testDebugUnitTest --console=plain 2>&1 | tail -n 25
   tests_status=${PIPESTATUS[0]}
   set -e
 
@@ -64,7 +89,9 @@ else
 fi
 
 KEYSTORE_FILE="untisx.keystore"
-if [[ -f "$HOME/untisx.keystore" ]]; then
+if [[ -f "$KEYSTORE_FILE" ]]; then
+  :
+elif [[ -f "$HOME/untisx.keystore" ]]; then
   cp "$HOME/untisx.keystore" "$KEYSTORE_FILE"
   trap 'rm -f "$KEYSTORE_FILE"' EXIT
 else
@@ -95,7 +122,7 @@ fi
 echo '# Installing apk...'
 
 set +e
-adb install -r app/build/outputs/apk/release/app-release.apk 2>&1 | tail -n 1
+adb -s "$PHONE_SERIAL" install -r app/build/outputs/apk/release/app-release.apk 2>&1 | tail -n 1
 install_status=${PIPESTATUS[0]}
 set -e
 

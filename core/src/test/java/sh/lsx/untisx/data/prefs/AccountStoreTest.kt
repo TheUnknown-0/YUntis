@@ -3,6 +3,7 @@ package sh.lsx.untisx.data.prefs
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.async
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -40,6 +41,35 @@ class AccountStoreTest {
 
     private fun prefs() =
         context.getSharedPreferences(CorePrefs.PREFS_NAME, Context.MODE_PRIVATE)
+
+    @Test fun `late timetable result cannot recreate a removed accounts cache`() = runTest {
+        val auth = account("late-watch")
+        AccountStore.addAccount(context, auth, "secret")
+
+        val id = AccountPrefs.accountId(auth)
+        assertNotNull(AccountStore.mergeTimetableCache(context, id, sh.lsx.untisx.data.TimetableCache.Data()))
+        AccountStore.removeAccount(context, id)
+        assertNull(AccountStore.mergeTimetableCache(context, id, sh.lsx.untisx.data.TimetableCache.Data()))
+        assertNull(sh.lsx.untisx.data.TimetableCache.load(context, id))
+    }
+
+    @Test fun `concurrent timetable snapshots keep the newest week regardless of save order`() = runTest {
+        val auth = account("concurrent-watch")
+        AccountStore.addAccount(context, auth, "secret")
+        val id = AccountPrefs.accountId(auth)
+
+        val jobs = (1..10).map { index ->
+            async(kotlinx.coroutines.Dispatchers.IO) {
+                AccountStore.mergeTimetableCache(context, id, sh.lsx.untisx.data.TimetableCache.Data(
+                    weeks = mapOf("20261005" to listOf(sh.lsx.untisx.data.model.TimetableEntry(id = index))),
+                    weekFetchedAt = mapOf("20261005" to index.toLong()),
+                ))
+            }
+        }
+
+        jobs.forEach { it.await() }
+        assertEquals(10, sh.lsx.untisx.data.TimetableCache.load(context, id)?.weeks?.get("20261005")?.single()?.id)
+    }
 
     private fun account(user: String, sessionId: String = "session-1") = AuthData(
         server = "https://school.example",

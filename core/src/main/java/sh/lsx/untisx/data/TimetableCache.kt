@@ -10,6 +10,8 @@ import sh.lsx.untisx.data.model.Holiday
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.TimegridDay
+import sh.lsx.untisx.data.model.toUntisDate
+import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import java.io.File
 
 object TimetableCache {
@@ -69,6 +71,37 @@ object TimetableCache {
 
     fun clear(context: Context, accountId: String) {
         AtomicJsonFile.delete(file(context, accountId))
+    }
+
+    fun merge(previous: Data?, incoming: Data): Data {
+        if (previous == null) return incoming
+
+        val accepted = (incoming.weeks.keys + incoming.weekFetchedAt.keys).filter { key ->
+            key !in previous.weekFetchedAt ||
+                (incoming.weekFetchedAt[key] ?: 0L) >= (previous.weekFetchedAt[key] ?: 0L)
+        }.toSet()
+
+        val dates = accepted.flatMap { key ->
+            key.toIntOrNull()?.toUntisLocalDateOrNull()?.let { monday ->
+                (0..6).map { monday.plusDays(it.toLong()).toUntisDate() }
+            }.orEmpty()
+        }.toSet()
+
+        return incoming.copy(
+            weeks = previous.weeks + incoming.weeks.filterKeys { it in accepted },
+            weekFetchedAt = previous.weekFetchedAt + incoming.weekFetchedAt.filterKeys { it in accepted },
+            restrictedDays = (previous.restrictedDays - dates) + incoming.restrictedDays.filter { it in dates },
+            subjects = incoming.subjects.ifEmpty { previous.subjects },
+            teachers = incoming.teachers.ifEmpty { previous.teachers },
+            rooms = incoming.rooms.ifEmpty { previous.rooms },
+            holidays = incoming.holidays.ifEmpty { previous.holidays },
+            timegrid = incoming.timegrid.ifEmpty { previous.timegrid },
+            events = if (incoming.eventsFetchedAt >= previous.eventsFetchedAt) incoming.events else previous.events,
+            eventsFetchedAt = maxOf(incoming.eventsFetchedAt, previous.eventsFetchedAt),
+            messages = if (incoming.messagesFetchedAt >= previous.messagesFetchedAt) incoming.messages else previous.messages,
+            messagesFetchedAt = maxOf(incoming.messagesFetchedAt, previous.messagesFetchedAt),
+            lastFetch = maxOf(incoming.lastFetch, previous.lastFetch),
+        )
     }
 
     private fun migrateLegacy(context: Context, accountId: String) {

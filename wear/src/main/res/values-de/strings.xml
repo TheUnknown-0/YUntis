@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wear_waiting">Warte auf Handy...</string>
+    <string name="wear_open_phone">Öffne die zum synchronisieren die App auf deinem Handy.</string>
+    <string name="wear_refresh">Aktualisieren</string>
+    <string name="wear_updated">Stand: %1$s</string>
+    <string name="wear_sync_failed">Schuldaten konnten nicht aktualisiert werden. Gespeicherte Daten bleiben verfügbar.</string>
+    <string name="wear_sync_delayed">Aktualisierung verzögert. Das Handy arbeitet möglicherweise noch.</string>
+    <string name="wear_not_loaded">Für diesen Tag sind keine Daten geladen.</string>
+    <string name="wear_no_lessons">Keine Stunden</string>
+    <string name="wear_holiday">Ferien</string>
+    <string name="wear_restricted">Gesperrt</string>
+    <string name="wear_cancelled">Entfällt</string>
+    <string name="wear_irregular">Vertretung</string>
+    <string name="wear_exam">Klausur</string>
+    <string name="wear_room">Raum</string>
+    <string name="wear_teacher">Lehrer</string>
+    <string name="wear_back">Zurück</string>
+    <string name="wear_substitution">Vertretungstext</string>
+    <string name="wear_info">Info</string>
+    <string name="wear_topic">Thema</string>
+</resources>

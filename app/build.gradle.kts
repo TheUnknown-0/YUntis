@@ -108,6 +108,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
     implementation(libs.material)
+    implementation(libs.play.services.wearable)
     implementation(libs.androidx.work.runtime.ktx)
     testImplementation(testFixtures(project(":core")))
     testImplementation(libs.junit)

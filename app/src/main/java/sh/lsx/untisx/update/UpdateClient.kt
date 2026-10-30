@@ -34,16 +34,18 @@ internal data class Version(
 }
 
 @Serializable
-private data class CodebergRelease(
+internal data class CodebergRelease(
     @SerialName("tag_name") val tagName: String,
     @SerialName("draft") val draft: Boolean = false,
     @SerialName("prerelease") val prerelease: Boolean = false,
     @SerialName("body") val body: String = "",
     @SerialName("assets") val assets: List<CodebergAsset> = emptyList(),
-)
+) {
+    fun phoneApk(): CodebergAsset? = assets.firstOrNull { it.name == "app-release.apk" }
+}
 
 @Serializable
-private data class CodebergAsset(
+internal data class CodebergAsset(
     @SerialName("name") val name: String,
     @SerialName("browser_download_url") val downloadUrl: String,
 )
@@ -83,8 +85,8 @@ object UpdateClient {
 
         if (!isNewer(newest.second, installedVersionName(context))) return@withContext null
 
-        val asset = newest.first.assets.firstOrNull { it.name.endsWith(".apk") }
-            ?: throw IllegalStateException("No APK attached to ${newest.first.tagName}.")
+        val asset = newest.first.phoneApk()
+            ?: throw IllegalStateException("No phone APK attached to ${newest.first.tagName}.")
 
         UpdateInfo(
             versionName = newest.second.normalized,

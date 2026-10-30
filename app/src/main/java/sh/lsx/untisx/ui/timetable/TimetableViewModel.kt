@@ -46,6 +46,7 @@ import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.notifications.SyncSchedule
 import sh.lsx.untisx.data.prefs.PasswordVault
+import sh.lsx.untisx.data.wear.WearSync
 import sh.lsx.untisx.ui.util.UiText
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -335,6 +336,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             Log.d(TAG, "exams -> ${fetched.size}")
+            persistCache()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -690,7 +692,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             val accountId = AccountPrefs.accountId(currentAuth)
             val previous = TimetableCache.load(getApplication(), accountId)
 
-            TimetableCache.Data(
+            AccountStore.mergeTimetableCache(getApplication(), accountId, TimetableCache.Data(
                 weeks = weeksSnapshot.mapKeys { (date, _) -> date.toString() },
                 weekFetchedAt = weekFetchedAt.mapKeys { (date, _) -> date.toString() },
                 subjects = subjectsSnapshot.ifEmpty { previous?.subjects.orEmpty() },
@@ -708,9 +710,12 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                     previous != null -> previous.lastFetch
                     else -> System.currentTimeMillis()
                 },
-            ).also { TimetableCache.save(getApplication(), accountId, it) }
-        }
+            ))
+        } ?: return@withLock
 
         lastFetch = data.lastFetch
+        viewModelScope.launch(Dispatchers.IO) {
+            WearSync.push(getApplication(), data, currentAuth)
+        }
     }
 }

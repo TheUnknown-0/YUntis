@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 rootProject.name = "UntisX"
 include(":app")
 include(":core")
+include(":wear")

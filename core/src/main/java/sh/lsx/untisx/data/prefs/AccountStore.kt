@@ -340,6 +340,20 @@ object AccountStore {
         }
     }
 
+    suspend fun mergeTimetableCache(context: Context, id: String, data: TimetableCache.Data): TimetableCache.Data? =
+        mutex.withLock {
+            if (!_loaded.value) loadLocked(context)
+            if (_error.value != null || _accounts.value.none { AccountPrefs.accountId(it) == id }) return@withLock null
+
+            withContext(Dispatchers.IO) {
+                if (NotebookAccountLifecycle.isBlocked(context, id)) return@withContext null
+
+                TimetableCache.merge(TimetableCache.load(context, id), data).also {
+                    TimetableCache.save(context, id, it)
+                }
+            }
+        }
+
     suspend fun removeAccount(context: Context, id: String) {
         when (val result = removeAccountTransactional(context, id)) {
             AccountRemovalResult.Removed,
