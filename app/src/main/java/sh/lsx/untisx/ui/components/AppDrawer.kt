@@ -24,7 +24,6 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
@@ -149,23 +148,11 @@ internal fun AppDrawer(
         )
 
         SidebarItem(
-            icon = Icons.Outlined.Place,
-            label = stringResource(R.string.rooms),
-            badge = "...",
-            visible = open,
-            index = 4,
-            onClick = {
-                close()
-                onSelect(Screen.ROOMS)
-            },
-        )
-
-        SidebarItem(
             icon = Icons.AutoMirrored.Outlined.List,
             label = stringResource(R.string.stats),
             badge = statsBadge,
             visible = open,
-            index = 5,
+            index = 4,
             onClick = {
                 close()
                 onSelect(Screen.STATS)
@@ -179,7 +166,7 @@ internal fun AppDrawer(
             icon = Icons.Outlined.Settings,
             label = stringResource(R.string.settings),
             visible = open,
-            index = 6,
+            index = 5,
             onClick = {
                 close()
                 onSelect(Screen.SETTINGS)
@@ -190,7 +177,7 @@ internal fun AppDrawer(
             icon = Icons.Outlined.Info,
             label = stringResource(R.string.about),
             visible = open,
-            index = 7,
+            index = 6,
             onClick = {
                 close()
                 onSelect(Screen.ABOUT)

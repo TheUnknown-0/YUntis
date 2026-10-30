@@ -17,7 +17,7 @@ An open-source timetable viewer for the Untis school system - built natively wit
 - **Cancelled lessons** - showing up grayed out
 - **Subject colors** - every subject color can be customized
 - **Custom subject names** - rename subjects with short and long names
-- **Teachers & rooms** - the whole school at a glance
+- **Teachers** - browse your school's teacher list
 - **Statistics** - lessons total, held, cancelled and changed, cancellation rate and lessons by subject per school year
 - **Multi-account** - add several accounts and switch between them
 - **Themes & appearance** - dynamic colors, theme presets, custom accent color and animations
