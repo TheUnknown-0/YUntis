@@ -13,10 +13,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +45,8 @@ import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.SubjectAlias
 import sh.lsx.untisx.data.subjectLongLabel
+import sh.lsx.untisx.ui.theme.AppCard
+import sh.lsx.untisx.ui.theme.appCardShape
 import sh.lsx.untisx.ui.util.animatedItem
 import sh.lsx.untisx.ui.util.entranceEffect
 import sh.lsx.untisx.ui.util.rememberDateFormat
@@ -251,9 +251,9 @@ private fun MessageCard(
     message: DayMessage,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    AppCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = appCardShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),
@@ -336,12 +336,12 @@ private fun EventCard(
         stringResource(R.string.events_all_day)
     }
 
-    Card(
+    AppCard(
         modifier = modifier
             .sharedElementBounds("event-${event.id}-${event.date}-${event.startTime}")
             .fillMaxWidth()
             .tapHaptic(onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = appCardShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Row(
@@ -398,9 +398,9 @@ private fun ExamCard(
     val teachers = exam.teacherIds.mapNotNull { teachersById[it]?.name?.takeIf { name -> name.isNotBlank() } }.distinct()
     val timed = exam.startTime != 0 || exam.endTime != 0
 
-    Card(
+    AppCard(
         modifier = modifier.fillMaxWidth().tapHaptic(onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = appCardShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Row(
@@ -476,9 +476,9 @@ private fun HolidayCard(
     val start = holiday.startDate.tryLocalDate()
     val end = holiday.endDate.tryLocalDate()
 
-    Card(
+    AppCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = appCardShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Row(

@@ -25,6 +25,7 @@ data class AppearanceSettingsBackup(
     val themePreset: String? = null,
     val themeCustomSeed: String? = null,
     val animations: Boolean? = null,
+    val themeStyle: String? = null,
 )
 
 @Serializable
@@ -154,6 +155,7 @@ object SettingsBackupManager {
                 themePreset = theme.preset.name,
                 themeCustomSeed = colorToHex(theme.customSeed),
                 animations = AnimationPrefs.isEnabled(context),
+                themeStyle = theme.style.name,
             ),
             notifications = NotificationSettingsBackup(
                 enabled = NotificationPrefs.isEnabled(context),
@@ -219,8 +221,11 @@ object SettingsBackupManager {
                 ?.let { name -> ThemePreset.entries.firstOrNull { it.name == name } }
                 ?: current.preset
             val customSeed = appearance.themeCustomSeed?.let(::hexToColor) ?: current.customSeed
+            val style = appearance.themeStyle
+                ?.let { name -> ThemeStyle.entries.firstOrNull { it.name == name } }
+                ?: current.style
 
-            ThemePrefs.save(context, AppTheme(mode = mode, preset = preset, customSeed = customSeed))
+            ThemePrefs.save(context, AppTheme(mode = mode, preset = preset, customSeed = customSeed, style = style))
 
             appearance.animations?.let { AnimationPrefs.setEnabled(context, it) }
         }

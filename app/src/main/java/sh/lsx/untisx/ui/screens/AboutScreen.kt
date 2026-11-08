@@ -17,7 +17,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -42,6 +41,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sh.lsx.untisx.R
 import sh.lsx.untisx.data.prefs.AuthData
+import sh.lsx.untisx.ui.theme.AppCard
+import sh.lsx.untisx.ui.theme.appCardShape
 import sh.lsx.untisx.ui.util.personTypeName
 import sh.lsx.untisx.ui.util.uiTextString
 import sh.lsx.untisx.ui.util.Haptics
@@ -102,9 +103,9 @@ fun AboutScreen(
 private fun UpdatesCard() {
     val updateVm: UpdateViewModel = viewModel()
 
-    Card(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = appCardShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
@@ -159,9 +160,9 @@ private fun UpdatesCard() {
 
 @Composable
 private fun AppCard(versionName: String) {
-    Card(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = appCardShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
@@ -232,6 +233,8 @@ private fun LibrariesCard() {
         CreditRow("OkHttp", stringResource(R.string.about_lib_okhttp_desc))
         CreditRow("kotlinx.serialization", stringResource(R.string.about_lib_serialization_desc))
         CreditRow("Material 3", stringResource(R.string.about_lib_material3_desc))
+        CreditRow("Kalam", stringResource(R.string.about_kalam_credit))
+        CreditRow("Permanent Marker", stringResource(R.string.about_marker_credit))
     }
 }
 
@@ -372,9 +375,9 @@ private fun AboutCard(
     title: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = appCardShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),

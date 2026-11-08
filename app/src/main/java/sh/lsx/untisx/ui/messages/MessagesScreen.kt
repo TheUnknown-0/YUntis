@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,6 +38,8 @@ import sh.lsx.untisx.R
 import sh.lsx.untisx.data.model.DirectMessage
 import sh.lsx.untisx.data.model.parseMessageDateTime
 import sh.lsx.untisx.data.stripHtml
+import sh.lsx.untisx.ui.theme.AppCard
+import sh.lsx.untisx.ui.theme.appCardShape
 import sh.lsx.untisx.ui.util.animatedItem
 import sh.lsx.untisx.ui.util.entranceEffect
 import sh.lsx.untisx.ui.util.rememberDateFormat
@@ -156,12 +156,12 @@ private fun MessageCard(
     val time = remember(message.sentDateTime) { parseMessageDateTime(message.sentDateTime) }
     val preview = remember(message.preview) { stripHtml(message.preview) }
 
-    Card(
+    AppCard(
         modifier = modifier
             .sharedElementBounds("message-${message.id}")
             .fillMaxWidth()
             .tapHaptic(onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = appCardShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Row(

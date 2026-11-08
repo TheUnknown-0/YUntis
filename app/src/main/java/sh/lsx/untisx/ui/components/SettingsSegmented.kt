@@ -29,6 +29,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import sh.lsx.untisx.ui.theme.appCardEdge
+import sh.lsx.untisx.ui.theme.appCardShape
 import sh.lsx.untisx.ui.util.Haptics
 
 @Composable
@@ -63,7 +65,8 @@ fun SettingsSegmentedItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(shape)
+            .appCardEdge(index)
+            .clip(appCardShape(shape, index))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(
                 interactionSource = interactionSource,

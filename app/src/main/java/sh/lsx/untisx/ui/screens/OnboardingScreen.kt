@@ -32,10 +32,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -69,6 +67,10 @@ import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.ui.components.LanguageSettingsContent
 import sh.lsx.untisx.ui.components.ThemeAccentSettingsContent
 import sh.lsx.untisx.ui.components.ThemeModeSettingsContent
+import sh.lsx.untisx.ui.theme.AppCard
+import sh.lsx.untisx.ui.theme.appBackground
+import sh.lsx.untisx.ui.theme.appCardShape
+import sh.lsx.untisx.ui.theme.appScreenContainerColor
 import sh.lsx.untisx.ui.util.AppMotion
 import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
@@ -112,7 +114,10 @@ fun OnboardingScreen(
         onPauseOrDispose { }
     }
 
-    Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
+    Scaffold(
+        modifier = modifier.fillMaxSize().appBackground(),
+        containerColor = appScreenContainerColor(),
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
@@ -328,9 +333,9 @@ private fun WelcomePage(
 
         Spacer(Modifier.height(86.dp))
 
-        Card(
+        AppCard(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = appCardShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),
@@ -373,9 +378,9 @@ private fun PermissionsPage(
 
         Spacer(Modifier.height(24.dp))
 
-        Card(
+        AppCard(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = appCardShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),
@@ -418,9 +423,9 @@ private fun PermissionsPage(
             Spacer(Modifier.height(12.dp))
         }
 
-        Card(
+        AppCard(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = appCardShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),
@@ -453,9 +458,9 @@ private fun ExactAlarmCard() {
         onPauseOrDispose { }
     }
 
-    Card(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = appCardShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
@@ -515,9 +520,9 @@ private fun ThemePage(
 
         Spacer(Modifier.height(24.dp))
 
-        Card(
+        AppCard(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = appCardShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),
@@ -536,9 +541,9 @@ private fun ThemePage(
 
         Spacer(Modifier.height(12.dp))
 
-        Card(
+        AppCard(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = appCardShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),

@@ -8,9 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +24,8 @@ import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.model.toUntisLocalTime
+import sh.lsx.untisx.ui.theme.AppCard
+import sh.lsx.untisx.ui.theme.appCardShape
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.timetable.resolveNames
 import sh.lsx.untisx.ui.util.rememberDateFormat
@@ -73,7 +73,7 @@ fun EventDetailsScreen(
             modifier = Modifier
                 .sharedElementBounds("event-${entry.id}-${entry.date}-${entry.startTime}")
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer, appCardShape(16.dp))
                 .padding(horizontal = 16.dp, vertical = 20.dp),
         ) {
             Column {
@@ -227,9 +227,9 @@ fun EventDetailsScreen(
 
 @Composable
 private fun DetailCard(content: @Composable () -> Unit) {
-    Card(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = appCardShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),

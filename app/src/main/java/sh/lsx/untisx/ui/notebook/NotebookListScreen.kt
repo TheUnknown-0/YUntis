@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Clear
@@ -69,6 +68,7 @@ import sh.lsx.untisx.data.notebook.NotebookSearch
 import sh.lsx.untisx.data.notebook.NotebookStatusFilter
 import sh.lsx.untisx.data.notebook.SubjectRef
 import sh.lsx.untisx.data.subjectShortLabel
+import sh.lsx.untisx.ui.theme.appCardShape
 import sh.lsx.untisx.ui.timetable.rememberToday
 
 @Composable
@@ -404,7 +404,7 @@ private fun NotebookListContent(
                     null
                 },
                 placeholder = { Text(stringResource(R.string.notebook_search_hint)) },
-                shape = RoundedCornerShape(16.dp),
+                shape = appCardShape(16.dp),
             )
 
 

@@ -79,6 +79,7 @@ import sh.lsx.untisx.data.notebook.LessonKey
 import sh.lsx.untisx.data.notebook.NotebookLessonSummary
 import sh.lsx.untisx.data.subjectShortLabel
 import sh.lsx.untisx.R
+import sh.lsx.untisx.ui.theme.currentDayHighlight
 import sh.lsx.untisx.ui.util.AppMotion
 import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 import sh.lsx.untisx.ui.util.motionEffects
@@ -504,6 +505,7 @@ private fun DayHeader(
             style = MaterialTheme.typography.titleMedium,
             color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+            modifier = if (isToday) Modifier.currentDayHighlight() else Modifier,
         )
 
         Text(
@@ -737,32 +739,15 @@ private fun DayColumn(
 
             val overlayHeight = MINUTE_HEIGHT * (endMin - startMin).coerceAtLeast(5)
 
-            val overlayColor = MaterialTheme.colorScheme.primary
-
-            Box(
+            TimetableEventOverlay(
+                span = span,
+                height = overlayHeight,
+                onClick = { onEventClick(span.entry) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .offset(y = MINUTE_HEIGHT * startMin)
-                    .padding(horizontal = 1.dp)
-                    .height(overlayHeight)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(overlayColor.copy(alpha = 0.10f), RoundedCornerShape(6.dp))
-                    .border(1.dp, overlayColor.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
-                    .tapHaptic { onEventClick(span.entry) },
-                contentAlignment = Alignment.TopStart,
-            ) {
-                if (overlayHeight >= 18.dp) {
-                    Text(
-                        text = span.title.orEmpty(),
-                        fontSize = 8.sp,
-                        lineHeight = 9.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
-                    )
-                }
-            }
+                    .padding(horizontal = 1.dp),
+            )
         }
 
         placeholder?.let { type ->

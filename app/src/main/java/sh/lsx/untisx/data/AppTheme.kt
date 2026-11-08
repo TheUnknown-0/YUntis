@@ -1,10 +1,12 @@
 package sh.lsx.untisx.data
 
 import android.content.Context
-import sh.lsx.untisx.UntisXApp
 import androidx.core.content.edit
+import sh.lsx.untisx.UntisXApp
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
+enum class ThemeStyle { DEFAULT, NOTEBOOK }
 
 enum class ThemePreset(val seed: Int) {
     DEVICE(0),
@@ -20,14 +22,16 @@ data class AppTheme(
     val mode: ThemeMode = ThemeMode.SYSTEM,
     val preset: ThemePreset = ThemePreset.DEVICE,
     val customSeed: Int = ThemePreset.ORANGE.seed,
+    val style: ThemeStyle = ThemeStyle.DEFAULT,
 )
 
 object ThemePrefs {
     private const val KEY_MODE = "theme_mode"
     private const val KEY_PRESET = "theme_color"
     private const val KEY_CUSTOM_SEED = "theme_custom_color"
+    private const val KEY_STYLE = "theme_style"
 
-    val KEYS = listOf(KEY_MODE, KEY_PRESET, KEY_CUSTOM_SEED)
+    val KEYS = listOf(KEY_MODE, KEY_PRESET, KEY_CUSTOM_SEED, KEY_STYLE)
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
@@ -44,6 +48,8 @@ object ThemePrefs {
             mode = mode,
             preset = preset,
             customSeed = prefs.getInt(KEY_CUSTOM_SEED, ThemePreset.ORANGE.seed),
+            style = ThemeStyle.entries.firstOrNull { it.name == prefs.getString(KEY_STYLE, null) }
+                ?: ThemeStyle.DEFAULT,
         )
     }
 
@@ -52,6 +58,7 @@ object ThemePrefs {
             putString(KEY_MODE, theme.mode.name)
             putString(KEY_PRESET, theme.preset.name)
             putInt(KEY_CUSTOM_SEED, theme.customSeed)
+            putString(KEY_STYLE, theme.style.name)
         }
     }
 }

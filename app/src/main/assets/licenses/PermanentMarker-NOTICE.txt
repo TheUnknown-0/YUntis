@@ -1,0 +1,8 @@
+Permanent Marker — Font Diner
+Copyright (c) 2010 by Font Diner, Inc. All rights reserved.
+
+Bundled unmodified from Google Fonts:
+https://github.com/google/fonts/tree/main/apache/permanentmarker
+
+Licensed under the Apache License, Version 2.0.
+See PermanentMarker-Apache-2.0.txt in this directory.

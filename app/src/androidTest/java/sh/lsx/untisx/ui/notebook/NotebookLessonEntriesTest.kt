@@ -29,7 +29,6 @@ class NotebookLessonEntriesTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun lessonLinksNavigateToOppositeDays() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
         val origin = LessonRef(entryId = 1, date = 20261104, startTime = 800, endTime = 845)
         val target = origin.copy(entryId = 2, date = 20261111)
         val task = NotebookItem(
@@ -37,8 +36,13 @@ class NotebookLessonEntriesTest {
             origin = origin, due = DueRef(date = target.date, lesson = target),
         )
         var jumped = 0
+        var originAction = ""
+        var dueAction = ""
+
         compose.setContent {
             MaterialTheme {
+                originAction = stringResource(R.string.notebook_show_origin_in_timetable, notebookDateText(origin.date))
+                dueAction = stringResource(R.string.notebook_show_due_in_timetable, notebookDateText(target.date))
                 NotebookLessonSection(
                     links = NotebookLessonLinks(
                         sourced = listOf(task.copy(id = "source-task")),
@@ -51,13 +55,9 @@ class NotebookLessonEntriesTest {
             }
         }
 
-        compose.onNodeWithContentDescription(context.getString(
-            R.string.notebook_show_origin_in_timetable, notebookDateText(origin.date),
-        )).performClick()
+        compose.onNodeWithContentDescription(originAction).performClick()
         compose.runOnIdle { assertEquals(origin.date, jumped) }
-        compose.onNodeWithContentDescription(context.getString(
-            R.string.notebook_show_due_in_timetable, notebookDateText(target.date),
-        )).performClick()
+        compose.onNodeWithContentDescription(dueAction).performClick()
         compose.runOnIdle { assertEquals(target.date, jumped) }
     }
 

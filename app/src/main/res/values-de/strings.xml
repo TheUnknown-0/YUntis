@@ -77,6 +77,13 @@
     <string name="settings_appearance">Erscheinungsbild</string>
     <string name="settings_appearance_desc">Design, Akzentfarbe &amp; Animationen</string>
     <string name="settings_theme_mode">Modus</string>
+    <string name="settings_theme_style">Theme</string>
+    <string name="theme_style_default">Default</string>
+    <string name="theme_style_notebook">Notebook</string>
+    <string name="about_kalam_credit">Notebook-Handschrift, Indian Type Foundry, SIL OFL 1.1</string>
+    <string name="about_marker_credit">Notebook-Markerschrift, Font Diner, Apache 2.0</string>
+    <string name="theme_style_default_description">Klare Flächen und klassische Schrift</string>
+    <string name="theme_style_notebook_description">Heftpapier, Handschrift und Haftzettel</string>
     <string name="settings_accent_color">Akzentfarbe</string>
     <string name="settings_animations">Animationen</string>
     <string name="settings_animations_desc">Übergänge, Morphs und animierte Details</string>

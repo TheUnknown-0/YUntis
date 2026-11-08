@@ -10,6 +10,8 @@ import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestDispatcher
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -40,6 +42,7 @@ import java.time.ZoneOffset
 class NotebookReminderWorkerTest {
 
     private lateinit var context: Context
+    private lateinit var scheduledWorkDispatcher: TestDispatcher
 
     private val fixedNow = Instant.parse("2026-10-29T08:30:00Z").toEpochMilli()
     private val trigger = Instant.parse("2026-10-29T08:00:00Z").toEpochMilli()
@@ -61,11 +64,13 @@ class NotebookReminderWorkerTest {
         AccountStore.resetForTests()
         AccountStore.cryptor = FakeCryptor()
 
+        scheduledWorkDispatcher = StandardTestDispatcher()
         WorkManagerTestInitHelper.initializeTestWorkManager(
             context,
             Configuration.Builder()
                 .setExecutor(SynchronousExecutor())
                 .setTaskExecutor(SynchronousExecutor())
+                .setWorkerCoroutineContext(scheduledWorkDispatcher)
                 .build(),
         )
 
@@ -79,6 +84,8 @@ class NotebookReminderWorkerTest {
     @After
     fun tearDown() {
         NotebookReminderScheduler.cancelAll(context)
+        scheduledWorkDispatcher.scheduler.runCurrent()
+        WorkManagerTestInitHelper.closeWorkDatabase()
         context.getSharedPreferences(NotebookReminderLedger.PREFS, Context.MODE_PRIVATE)
             .edit().clear().commit()
         context.getSharedPreferences(NotebookNotificationFocus.PREFS_NAME, Context.MODE_PRIVATE)
@@ -122,8 +129,8 @@ class NotebookReminderWorkerTest {
         assertTrue(result is NotebookWriteResult.Success)
     }
 
-    private fun worker() = TestListenableWorkerBuilder<NotebookReminderWorker>(context)
-        .setInputData(NotebookReminderScheduler.inputData(accountId, "item-1", plan()))
+    private fun worker(plan: NotebookReminderPlan = plan()) = TestListenableWorkerBuilder<NotebookReminderWorker>(context)
+        .setInputData(NotebookReminderScheduler.inputData(accountId, "item-1", plan))
         .build()
 
     @Test
@@ -174,6 +181,28 @@ class NotebookReminderWorkerTest {
 
         assertTrue(result is ListenableWorker.Result.Success)
         assertEquals(0, shadowOf(manager).allNotifications.size)
+
+        val accountHash = NotebookReminderScheduler.accountHash(accountId)
+        val workName = NotebookReminderScheduler.workName(accountId, "item-1")
+        val replacement = NotebookReminderLedger.scheduleEntry(context, accountHash, workName)
+        assertNotNull(replacement)
+        assertEquals(6L, replacement?.revision)
+        assertEquals(trigger, replacement?.triggerAt)
+        assertFalse(NotebookReminderLedger.isDelivered(context, accountHash, workName, trigger))
+    }
+
+    @Test
+    fun `replacement revision can still notify once after stale work is rejected`() = runBlocking {
+        write(listOf(item().copy(updatedAt = 6)))
+
+        assertTrue(worker().doWork() is ListenableWorker.Result.Success)
+        assertEquals(0, shadowOf(manager).allNotifications.size)
+
+        val replacement = worker(plan().copy(revision = 6))
+        assertTrue(replacement.doWork() is ListenableWorker.Result.Success)
+        assertEquals(1, shadowOf(manager).allNotifications.size)
+        replacement.doWork()
+        assertEquals(1, shadowOf(manager).allNotifications.size)
     }
 
     @Test

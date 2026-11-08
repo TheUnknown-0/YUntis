@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
@@ -30,6 +28,8 @@ import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.notebook.NotebookItem
 import sh.lsx.untisx.data.notebook.NotebookKind
 import sh.lsx.untisx.data.notebook.NotebookLessonLinks
+import sh.lsx.untisx.ui.theme.AppCard
+import sh.lsx.untisx.ui.theme.appCardShape
 
 @Composable
 internal fun NotebookLessonSection(
@@ -45,9 +45,9 @@ internal fun NotebookLessonSection(
 
     val sections = notebookLessonSections(links)
 
-    Card(
+    AppCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = appCardShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
@@ -119,10 +119,10 @@ internal fun NotebookLessonRow(
     val title = item.displayTitle.ifBlank { stringResource(R.string.notebook_untitled) }
     val subject = item.subject?.displayName?.takeIf { it.isNotBlank() }
 
-    Card(
+    AppCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = appCardShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
         Box(modifier = Modifier.fillMaxWidth().padding(12.dp)) {

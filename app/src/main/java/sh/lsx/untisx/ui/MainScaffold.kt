@@ -74,6 +74,8 @@ import sh.lsx.untisx.ui.notebook.NotebookLessonTarget
 import sh.lsx.untisx.ui.notebook.NotebookListState
 import sh.lsx.untisx.ui.notebook.NotebookViewModel
 import sh.lsx.untisx.ui.screens.settings.SettingsCategory
+import sh.lsx.untisx.ui.theme.appBackground
+import sh.lsx.untisx.ui.theme.appScreenContainerColor
 import sh.lsx.untisx.ui.timetable.ErrorBanner
 import sh.lsx.untisx.ui.timetable.InfoBanner
 import sh.lsx.untisx.ui.timetable.LessonCardOptions
@@ -504,8 +506,10 @@ internal fun MainApp(
 
         Box(modifier = Modifier.fillMaxSize()) {
             Scaffold(
+                containerColor = appScreenContainerColor(),
                 modifier = Modifier
                     .fillMaxSize()
+                    .appBackground()
                     .graphicsLayer {
                         val progress = backProgress.value
 

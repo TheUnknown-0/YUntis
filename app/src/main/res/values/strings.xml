@@ -77,6 +77,13 @@
     <string name="settings_appearance">Appearance</string>
     <string name="settings_appearance_desc">Theme, accent color &amp; animations</string>
     <string name="settings_theme_mode">Mode</string>
+    <string name="settings_theme_style">Theme</string>
+    <string name="theme_style_default">Default</string>
+    <string name="theme_style_notebook">Notebook</string>
+    <string name="about_kalam_credit">Notebook handwriting, Indian Type Foundry, SIL OFL 1.1</string>
+    <string name="about_marker_credit">Notebook marker lettering, Font Diner, Apache 2.0</string>
+    <string name="theme_style_default_description">Clean surfaces and classic typography</string>
+    <string name="theme_style_notebook_description">Notebook paper, handwriting and sticky notes</string>
     <string name="settings_accent_color">Accent Color</string>
     <string name="settings_animations">Animations</string>
     <string name="settings_animations_desc">Transitions, morphs and animated details</string>

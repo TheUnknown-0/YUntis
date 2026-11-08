@@ -1,6 +1,7 @@
 package sh.lsx.untisx.ui.screens
 
 import android.content.Context
+import android.content.res.Resources
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,6 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,11 +32,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,6 +61,8 @@ import sh.lsx.untisx.data.prefs.AccountRemovalResult
 import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.prefs.AuthPrefs
+import sh.lsx.untisx.ui.theme.AppCard
+import sh.lsx.untisx.ui.theme.appCardShape
 import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.personTypeName
 import sh.lsx.untisx.ui.util.uiTextString
@@ -92,12 +96,12 @@ private suspend fun notebookExportText(context: Context, accountId: String): Str
         }
     }
 
-private fun indeterminateRemovalMessage(context: Context, accountId: String): String {
+private fun indeterminateRemovalMessage(resources: Resources, accountId: String): String {
     val stillListed = AccountStore.snapshot.any {
         AccountPrefs.accountId(it) == accountId
     }
 
-    return context.getString(
+    return resources.getString(
         if (stillListed) {
             R.string.notebook_delete_indeterminate_listed
         } else {
@@ -122,6 +126,7 @@ private fun appVersion(context: Context): String = runCatching {
 @Composable
 fun ProfileScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val resources by rememberUpdatedState(LocalResources.current)
     val scope = rememberCoroutineScope()
 
     val accounts by AccountStore.accounts.collectAsStateWithLifecycle()
@@ -195,7 +200,7 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                     removalState = removalState?.copy(exported = true)
                     exportError = null
                 } else {
-                    exportError = context.getString(R.string.notebook_delete_export_failed)
+                    exportError = resources.getString(R.string.notebook_delete_export_failed)
                 }
 
                 exporting = false
@@ -235,7 +240,7 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                             AuthPrefs.clear(context)
                             NotificationScheduler.onAccountRemoved(context, id)
                             resetRemoval()
-                            removalNotice = context.getString(
+                            removalNotice = resources.getString(
                                 R.string.notebook_delete_cleanup_pending,
                             )
                         }
@@ -243,13 +248,13 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                         NotebookAccountRemovalOutcome.RETAINED -> {
                             NotebookReminderScheduler.ensureAll(context)
                             val failure = (result as AccountRemovalResult.Retained).failure
-                            removalError = context.getString(notebookRetainedMessage(failure))
+                            removalError = resources.getString(notebookRetainedMessage(failure))
                         }
 
                         NotebookAccountRemovalOutcome.INDETERMINATE -> {
                             NotebookReminderScheduler.ensureAll(context)
                             resetRemoval()
-                            removalNotice = indeterminateRemovalMessage(context, id)
+                            removalNotice = indeterminateRemovalMessage(resources, id)
                         }
                     }
                 }
@@ -258,7 +263,7 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
         } catch (e: Exception) {
             NotebookReminderScheduler.ensureAll(context)
             resetRemoval()
-            removalNotice = indeterminateRemovalMessage(context, id)
+            removalNotice = indeterminateRemovalMessage(resources, id)
         } finally {
             deleting = false
         }
@@ -561,9 +566,9 @@ private fun ProfileCard(
     title: String,
     content: @Composable () -> Unit,
 ) {
-    Card(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = appCardShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
@@ -599,4 +604,3 @@ private fun ProfileRow(label: String, value: String) {
          )
      }
  }
-

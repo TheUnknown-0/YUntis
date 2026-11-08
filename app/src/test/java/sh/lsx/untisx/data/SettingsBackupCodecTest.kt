@@ -16,6 +16,7 @@ class SettingsBackupCodecTest {
             general = GeneralSettingsBackup(language = "GERMAN", haptics = false),
             appearance = AppearanceSettingsBackup(
                 themeMode = "DARK",
+                themeStyle = "NOTEBOOK",
                 themeCustomSeed = "#445566",
                 animations = true,
             ),
@@ -35,6 +36,13 @@ class SettingsBackupCodecTest {
 
         assertTrue(decoded is DecodeResult.Valid)
         assertEquals(backup, (decoded as DecodeResult.Valid).backup)
+    }
+
+    @Test
+    fun `legacy appearance backups have no style override`() {
+        val decoded = SettingsBackupCodec.decode("""{"appearance":{"themeMode":"LIGHT"}}""")
+        assertTrue(decoded is DecodeResult.Valid)
+        assertNull((decoded as DecodeResult.Valid).backup.appearance?.themeStyle)
     }
 
     @Test

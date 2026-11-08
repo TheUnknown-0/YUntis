@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -45,9 +44,19 @@ import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.model.toUntisLocalTime
 import sh.lsx.untisx.data.SubjectAlias
+import sh.lsx.untisx.data.ThemeStyle
 import sh.lsx.untisx.data.notebook.NotebookLessonLinks
 import sh.lsx.untisx.data.subjectLongLabel
 import sh.lsx.untisx.ui.notebook.NotebookLessonSection
+import sh.lsx.untisx.ui.theme.AppCard
+import sh.lsx.untisx.ui.theme.LocalThemeAppearance
+import sh.lsx.untisx.ui.theme.NotebookExamMark
+import sh.lsx.untisx.ui.theme.appCardShape
+import sh.lsx.untisx.ui.theme.notebookInk
+import sh.lsx.untisx.ui.theme.notebookNoteColor
+import sh.lsx.untisx.ui.theme.notebookPaperSeed
+import sh.lsx.untisx.ui.theme.stickyNoteBackground
+import sh.lsx.untisx.ui.theme.tornNotebookPaper
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.timetable.LessonCardColors
 import sh.lsx.untisx.ui.timetable.LessonCardOptions
@@ -100,11 +109,25 @@ fun LessonDetailsScreen(
     val today = rememberToday()
 
     val cancelled = entry.cancelled
-    val cardColors = if (cancelled) {
-        cancelledCardColors(color, textColor, cancelledDesaturation, cancelledBrightness)
+    val notebook = LocalThemeAppearance.current.style == ThemeStyle.NOTEBOOK
+    val paperSeed = notebookPaperSeed(entry.id, entry.date, entry.startTime)
+    val paper = if (notebook) notebookNoteColor(color, LocalThemeAppearance.current.dark) else color
+    val ink = if (notebook) notebookInk(paper, textColor) else textColor
+
+    val baseColors = if (cancelled) {
+        cancelledCardColors(paper, ink, cancelledDesaturation, cancelledBrightness, notebook)
     } else {
-        LessonCardColors(container = color, title = textColor, body = textColor.copy(alpha = 0.8f))
+        LessonCardColors(container = paper, title = ink, body = ink.copy(alpha = if (notebook) 1f else 0.8f))
     }
+
+    val cardColors = if (notebook) {
+        val noteInk = notebookInk(baseColors.container, ink)
+
+        baseColors.copy(title = noteInk, body = noteInk)
+    } else {
+        baseColors
+    }
+
     val showExamOutline = exam != null || entry.exam != null
     val examColor = lessonOptions.examColor ?: MaterialTheme.colorScheme.error
     val examBadgeText = if (lessonOptions.examColor == null) {
@@ -127,11 +150,20 @@ fun LessonDetailsScreen(
             modifier = Modifier
                 .sharedElementBounds("lesson-${entry.id}-${entry.date}-${entry.startTime}")
                 .fillMaxWidth()
-                .lessonCardBackground(
-                    container = cardColors.container,
-                    cornerRadius = 16.dp,
-                    examColor = if (showExamOutline) examColor else null,
-                    strikeSlit = cancelled && cancelledStrike,
+                .then(
+                    if (notebook && cancelled && cancelledStrike) Modifier.tornNotebookPaper(paperSeed) else Modifier,
+                )
+                .then(
+                    if (notebook) {
+                        Modifier.stickyNoteBackground(cardColors.container, null, paperSeed)
+                    } else {
+                        Modifier.lessonCardBackground(
+                            container = cardColors.container,
+                            cornerRadius = 16.dp,
+                            examColor = if (showExamOutline) examColor else null,
+                            strikeSlit = cancelled && cancelledStrike,
+                        )
+                    },
                 ),
         ) {
             Column(
@@ -143,7 +175,7 @@ fun LessonDetailsScreen(
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = cardColors.title,
-                    modifier = if (showExamBadge) Modifier.padding(end = 84.dp) else Modifier,
+                    modifier = if (showExamBadge) Modifier.padding(end = if (notebook) 124.dp else 84.dp) else Modifier,
                 )
 
                 subjectEl?.let { it -> subjectsById[it.id]?.longName }
@@ -166,23 +198,34 @@ fun LessonDetailsScreen(
             }
 
             if (showExamBadge) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
-                        .background(examColor, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                ) {
-                    Text(
+                if (notebook) {
+                    NotebookExamMark(
                         text = examType ?: stringResource(R.string.lesson_exam),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = examBadgeText,
+                        paper = cardColors.container,
+                        seed = paperSeed,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 16.dp, end = 16.dp),
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp)
+                            .background(examColor, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                    ) {
+                        Text(
+                            text = examType ?: stringResource(R.string.lesson_exam),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = examBadgeText,
+                        )
+                    }
                 }
             }
 
-            if (cancelled && cancelledStrike) {
+            if (!notebook && cancelled && cancelledStrike) {
                 StrikeOverlay(
                     color = lessonOptions.strikeColor,
                     modifier = Modifier.matchParentSize(),
@@ -437,9 +480,9 @@ private fun formatLessonDate(date: LocalDate, entry: TimetableEntry): String {
 
 @Composable
 private fun DetailCard(content: @Composable () -> Unit) {
-    Card(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = appCardShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),

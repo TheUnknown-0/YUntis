@@ -9,9 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +27,8 @@ import sh.lsx.untisx.data.model.DirectMessage
 import sh.lsx.untisx.data.model.MessageAttachment
 import sh.lsx.untisx.data.model.parseMessageDateTime
 import sh.lsx.untisx.data.stripHtml
+import sh.lsx.untisx.ui.theme.AppCard
+import sh.lsx.untisx.ui.theme.appCardShape
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.util.sharedElementBounds
 import sh.lsx.untisx.ui.util.tapHaptic
@@ -104,7 +104,7 @@ private fun MessageHeader(message: DirectMessage) {
         modifier = Modifier
             .sharedElementBounds("message-${message.id}")
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.secondaryContainer, appCardShape(16.dp))
             .padding(horizontal = 16.dp, vertical = 20.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -209,7 +209,7 @@ private fun ReplyRow(reply: DirectMessage) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, appCardShape(10.dp))
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -244,9 +244,9 @@ private fun DetailCard(
     title: String?,
     content: @Composable () -> Unit,
 ) {
-    Card(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = appCardShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),

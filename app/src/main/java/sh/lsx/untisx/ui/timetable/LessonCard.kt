@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -56,11 +57,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.atan2
 import kotlin.math.sqrt
 import sh.lsx.untisx.R
+import sh.lsx.untisx.ui.theme.LocalThemeAppearance
+import sh.lsx.untisx.data.ThemeStyle
+import sh.lsx.untisx.ui.theme.notebookNoteColor
+import sh.lsx.untisx.ui.theme.notebookInk
+import sh.lsx.untisx.ui.theme.stickyNoteBackground
+import sh.lsx.untisx.ui.theme.tornNotebookPaper
+import sh.lsx.untisx.ui.theme.notebookPaperSeed
+import sh.lsx.untisx.ui.theme.paperVariation
+import sh.lsx.untisx.ui.theme.NotebookLessonTextStyle
+import sh.lsx.untisx.ui.theme.notebookLessonTypeScale
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.notebook.NotebookLessonSummary
 import sh.lsx.untisx.ui.util.AppMotion
@@ -105,9 +117,10 @@ internal fun cancelledCardColors(
     textColor: Color,
     desaturation: Float,
     brightness: Float,
+    notebook: Boolean = false,
 ): LessonCardColors {
-    val grayAmount = desaturation.coerceIn(0f, 1f)
-    val darkAmount = brightness.coerceIn(0f, 1f)
+    val grayAmount = desaturation.coerceIn(if (notebook) 0.8f else 0f, 1f)
+    val darkAmount = if (notebook) 0.55f + 0.25f * brightness.coerceIn(0f, 1f) else brightness.coerceIn(0f, 1f)
 
     val luma = 0.299f * color.red + 0.587f * color.green + 0.114f * color.blue
     val desaturated = lerp(color, Color(luma, luma, luma, color.alpha), grayAmount)
@@ -188,6 +201,11 @@ internal fun LessonCard(
 ) {
     val entry = lesson.entry
     val cancelled = entry.cancelled
+    val notebook = LocalThemeAppearance.current.style == ThemeStyle.NOTEBOOK
+    val paperSeed = notebookPaperSeed(entry.id, entry.date, entry.startTime)
+    val badgeRotation = remember(paperSeed) { paperVariation(paperSeed).badgeRotation }
+    val noteColor = if (notebook) notebookNoteColor(color, LocalThemeAppearance.current.dark) else color
+    val inkColor = if (notebook) notebookInk(noteColor, textColor) else textColor
 
     val bounds = if (sharedElement) {
         Modifier.sharedElementBounds("lesson-${entry.id}-${entry.date}-${entry.startTime}")
@@ -196,12 +214,19 @@ internal fun LessonCard(
     }
 
     val target = if (cancelled) {
-        cancelledCardColors(color, textColor, cancelledDesaturation, cancelledBrightness)
+        cancelledCardColors(noteColor, inkColor, cancelledDesaturation, cancelledBrightness, notebook).let {
+            if (notebook) {
+                val ink = notebookInk(it.container, inkColor)
+                it.copy(title = ink, body = ink)
+            } else {
+                it
+            }
+        }
     } else {
         LessonCardColors(
-            container = color,
-            title = textColor,
-            body = textColor.copy(alpha = 0.8f),
+            container = noteColor,
+            title = inkColor,
+            body = inkColor.copy(alpha = if (notebook) 1f else 0.8f),
         )
     }
 
@@ -238,22 +263,36 @@ internal fun LessonCard(
     val density = LocalDensity.current
     val measured = cell.width > 0 && cell.height > 0
     val compact = measured && with(density) { cell.width.toDp() } < 64.dp
-    val cardCornerRadius = 6.dp
+    val shortNote = notebook && measured && with(density) { cell.height.toDp() } < 72.dp
+    val noteTypeScale = if (shortNote) {
+        notebookLessonTypeScale(with(density) { cell.height.toDp().value }, density.fontScale)
+    } else {
+        1f
+    }
+    val noteTextStyle = if (notebook) NotebookLessonTextStyle else LocalTextStyle.current
+    val cardCornerRadius = if (notebook) 1.dp else 6.dp
 
     Box(
         modifier = modifier
             .then(bounds)
-            .onSizeChanged { cell = it },
+            .onSizeChanged { cell = it }
+            .then(if (notebook && cancelled && strike) Modifier.tornNotebookPaper(paperSeed) else Modifier),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(1.dp)
-                .lessonCardBackground(
-                    container = container,
-                    cornerRadius = cardCornerRadius,
-                    examColor = if (lesson.exam != null) examColor else null,
-                    strikeSlit = cancelled && strike && measured,
+                .padding(if (notebook) 2.dp else 1.dp)
+                .then(
+                    if (notebook) {
+                        Modifier.stickyNoteBackground(container, if (lesson.exam != null) examColor else null, paperSeed)
+                    } else {
+                        Modifier.lessonCardBackground(
+                            container = container,
+                            cornerRadius = cardCornerRadius,
+                            examColor = if (lesson.exam != null) examColor else null,
+                            strikeSlit = cancelled && strike && measured,
+                        )
+                    },
                 )
                 .padding(horizontal = if (compact) 2.dp else 4.dp, vertical = 2.dp),
             verticalArrangement = Arrangement.SpaceBetween,
@@ -261,8 +300,9 @@ internal fun LessonCard(
             if (lesson.teachers.isNotBlank()) {
                 Text(
                     text = changedText(lesson.origTeachers, lesson.teachers, options.showChanges),
-                    fontSize = 9.sp,
-                    lineHeight = 11.sp,
+                    style = noteTextStyle,
+                    fontSize = (if (notebook && !shortNote) 10.sp else 9.sp) * noteTypeScale,
+                    lineHeight = (if (notebook) 12.sp else 11.sp) * noteTypeScale,
                     color = bodyColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -275,7 +315,17 @@ internal fun LessonCard(
 
             Text(
                 text = lesson.label,
-                fontSize = if (compact) 9.sp else 13.sp,
+                style = noteTextStyle,
+                fontSize = (if (notebook) {
+                    if (compact) 11.sp else if (shortNote) 13.sp else 15.sp
+                } else {
+                    if (compact) 9.sp else 13.sp
+                }) * noteTypeScale,
+                lineHeight = if (notebook) {
+                    (if (compact) 14.sp else if (shortNote) 16.sp else 18.sp) * noteTypeScale
+                } else {
+                    TextUnit.Unspecified
+                },
                 fontWeight = FontWeight.Bold,
                 color = titleColor,
                 maxLines = 1,
@@ -287,8 +337,13 @@ internal fun LessonCard(
             if (lesson.rooms.isNotBlank()) {
                 Text(
                     text = changedText(lesson.origRooms, lesson.rooms, options.showChanges),
-                    fontSize = if (compact) 8.sp else 9.sp,
-                    lineHeight = 11.sp,
+                    style = noteTextStyle,
+                    fontSize = (if (notebook) {
+                        if (shortNote || compact) 9.sp else 10.sp
+                    } else {
+                        if (compact) 8.sp else 9.sp
+                    }) * noteTypeScale,
+                    lineHeight = (if (notebook) 12.sp else 11.sp) * noteTypeScale,
                     color = bodyColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -341,12 +396,13 @@ internal fun LessonCard(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(1.dp)
+                    .graphicsLayer { rotationZ = if (notebook) badgeRotation else 0f }
                     .background(
                         examColor,
                         RoundedCornerShape(
-                            topStart = cardCornerRadius,
+                            topStart = if (notebook) 0.dp else cardCornerRadius,
                             topEnd = 0.dp,
-                            bottomEnd = cardCornerRadius,
+                            bottomEnd = if (notebook) 0.dp else cardCornerRadius,
                             bottomStart = 0.dp,
                         ),
                     )
@@ -365,7 +421,7 @@ internal fun LessonCard(
         }
 
         AnimatedVisibility(
-            visible = cancelled && strike && measured,
+            visible = !notebook && cancelled && strike && measured,
             enter = fadeIn(animationSpec = if (animations) AppMotion.effects() else snap()) +
                 scaleIn(
                     initialScale = 0.6f,

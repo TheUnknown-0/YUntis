@@ -51,6 +51,8 @@ import sh.lsx.untisx.ui.components.UpdateDialog
 import sh.lsx.untisx.ui.screens.LoginScreen
 import sh.lsx.untisx.ui.screens.OnboardingScreen
 import sh.lsx.untisx.ui.theme.UntisXTheme
+import sh.lsx.untisx.ui.theme.appScreenContainerColor
+import sh.lsx.untisx.ui.theme.appBackground
 import sh.lsx.untisx.ui.timetable.LessonCardOptions
 import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 import sh.lsx.untisx.ui.util.LocalHapticsEnabled
@@ -166,7 +168,7 @@ internal fun AppRoot(
         LocalHapticsEnabled provides hapticsEnabled,
         LocalAnimationsEnabled provides animationsEnabled,
     ) {
-        UntisXTheme(mode = theme.mode, preset = theme.preset, customSeed = theme.customSeed) {
+        UntisXTheme(mode = theme.mode, preset = theme.preset, customSeed = theme.customSeed, style = theme.style) {
             val updateVm: UpdateViewModel = viewModel()
 
             LaunchedEffect(Unit) {
@@ -210,7 +212,10 @@ internal fun AppRoot(
                         },
                     )
 
-                    currentAuth == null -> Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+                    currentAuth == null -> Scaffold(
+                        modifier = Modifier.fillMaxSize().appBackground(),
+                        containerColor = appScreenContainerColor(),
+                    ) { padding ->
                         LoginScreen(modifier = Modifier.padding(padding))
                     }
 
@@ -285,7 +290,10 @@ internal fun AppRoot(
 
 @Composable
 private fun AccountsUnavailableScreen(onRetry: () -> Unit) {
-    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+    Scaffold(
+        modifier = Modifier.fillMaxSize().appBackground(),
+        containerColor = appScreenContainerColor(),
+    ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
@@ -311,7 +319,10 @@ private fun AccountsUnavailableScreen(onRetry: () -> Unit) {
 
 @Composable
 private fun AccountsUnreadableScreen(onStartOver: () -> Unit) {
-    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+    Scaffold(
+        modifier = Modifier.fillMaxSize().appBackground(),
+        containerColor = appScreenContainerColor(),
+    ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)

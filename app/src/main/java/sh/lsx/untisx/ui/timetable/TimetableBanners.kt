@@ -9,8 +9,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,6 +25,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import sh.lsx.untisx.R
+import sh.lsx.untisx.ui.theme.AppCard
+import sh.lsx.untisx.ui.theme.appCardShape
 import sh.lsx.untisx.ui.util.AppMotion
 import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
@@ -76,11 +76,11 @@ private fun Banner(
             fadeOut(animationSpec = if (animations) AppMotion.effects() else snap()),
         modifier = modifier,
     ) {
-        Card(
+        AppCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .alpha(0.9f),
-            shape = RoundedCornerShape(14.dp),
+            shape = appCardShape(14.dp),
             colors = CardDefaults.cardColors(containerColor = container),
             elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         ) {
