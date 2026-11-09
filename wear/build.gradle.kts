@@ -43,7 +43,9 @@ android {
                 signingConfigs.getByName("release")
             } else {
                 // -PallowDebugSigning=true answers the question below for builds without a console
-                val allowDebugSigning = project.findProperty("allowDebugSigning") == "true"
+                // the watch app is installed by hand; with the phone release keys configured, no question is asked
+                val allowDebugSigning = project.findProperty("allowDebugSigning") == "true" ||
+                    !(project.findProperty("yuntis.releaseKeystore") as String?).isNullOrBlank()
 
                 if (!allowDebugSigning && gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
                     val answer = System.console()?.readLine(

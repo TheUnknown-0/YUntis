@@ -1,3 +1,12 @@
+## 0.10.1
+
+YUntis hat jetzt einen eigenen Signaturschlüssel. Updates installieren sich wie bisher einfach über die alte Version, alle Daten bleiben erhalten.
+
+### Intern
+* [Signatur] Eigener Release-Schlüssel (RSA 4096) mit Schlüssel-Rotation vom bisherigen Schlüssel, damit künftige Updates und das Auto-Update sauber funktionieren
+
+## 0.10.0
+
 Das bisher größte Update: Widgets, Kalender-Export, mehrere Konten nebeneinander, Klausur-Lernplan, eigene Fehlzeiten und vieles mehr.
 
 ### Neu
