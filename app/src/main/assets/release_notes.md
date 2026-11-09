@@ -10,6 +10,7 @@ Lernen mit Pomodoro und Atempausen, ein Papierkorb für Hausaufgaben, der Schulh
 * [Widgets] Neuer Stil **Schulheft**, liniert oder kariert, mit Randlinie und Handschrift
 * [Stunde] Knopf „Name“: Kursen direkt einen eigenen Namen geben, z. B. „Geschichte“ statt „G1“
 * [Klassenplan] In der Klassen- bzw. Jahrgangsansicht stehen die eigenen Kurse bei parallelen Stunden vorne
+* [Dino] Dino-Modus von Grund auf neu: detaillierte Kulisse mit Schule, Tag-Nacht-Wechsel und Wetter, Dino mit Schulranzen, Ducken unter Papierfliegern, Sterne und Serien, Pause mit Countdown
 
 ### Verbessert
 * [Tagesansicht] Wischen folgt dem Finger, der nächste Tag gleitet herein; über das Wochenende ohne Aufblitzen des falschen Tages
