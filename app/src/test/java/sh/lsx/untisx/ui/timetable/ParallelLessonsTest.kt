@@ -24,6 +24,7 @@ class ParallelLessonsTest {
             code = if (cancelled) "cancelled" else null,
             layoutStartPosition = layoutStart,
             layoutWidth = layoutWidth,
+            subject = listOf(sh.lsx.untisx.data.model.TimetableElement(id = id)),
         ),
         subject = label,
         rooms = "",
@@ -72,5 +73,21 @@ class ParallelLessonsTest {
 
         assertEquals(2, stacks.size)
         assertTrue(stacks.all { it.hidden.isEmpty() })
+    }
+
+    @Test
+    fun `in a class timetable the own course is shown first`() {
+        val lessons = listOf(
+            lesson(1, "BI_L", 800, 845),
+            lesson(2, "DE_L", 800, 845),
+            lesson(3, "MA_L", 800, 845),
+            lesson(4, "PH_L", 800, 845),
+        )
+        val stack = stackParallelLessons(lessons, ownSubjectIds = setOf(3)).single()
+        assertEquals("MA_L", stack.shown.label)
+        assertEquals(listOf("BI_L", "DE_L", "PH_L"), stack.hidden.map { it.label })
+
+        // without own courses the order stays as before
+        assertEquals("BI_L", stackParallelLessons(lessons).single().shown.label)
     }
 }

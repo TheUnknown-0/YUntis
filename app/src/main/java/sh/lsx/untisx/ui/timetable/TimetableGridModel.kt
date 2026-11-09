@@ -184,7 +184,15 @@ private fun overlaps(a: TimetableEntry, b: TimetableEntry): Boolean =
  * from the server keep it. The shown lesson is the earliest, preferring held over cancelled
  * and longer over shorter lessons.
  */
-internal fun stackParallelLessons(lessons: List<LessonDisplay>): List<LessonStack> {
+internal fun stackParallelLessons(lessons: List<LessonDisplay>, ownSubjectIds: Set<Int> = emptySet()): List<LessonStack> =
+    stackParallelLessonsByTime(lessons).map { stack ->
+        if (ownSubjectIds.isEmpty() || stack.hidden.isEmpty()) return@map stack
+        // in a class or year timetable the own courses come first (stable: held before cancelled stays)
+        val sorted = stack.all.sortedBy { lesson -> if (lesson.entry.subject.any { it.id in ownSubjectIds }) 0 else 1 }
+        LessonStack(sorted.first(), sorted.drop(1))
+    }
+
+private fun stackParallelLessonsByTime(lessons: List<LessonDisplay>): List<LessonStack> {
     val (laidOut, free) = lessons.partition { it.entry.hasServerLayout() }
 
     val ordered = free.sortedWith(

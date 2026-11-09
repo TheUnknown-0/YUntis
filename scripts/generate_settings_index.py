@@ -30,6 +30,10 @@ CHIP = re.compile(r"label\s*=\s*\{\s*Text\(stringResource\(R\.string\.(\w+)\)\)"
 
 # dialog choices and preview captions are not settings of their own
 SKIP = re.compile(r"^(notebook_import_choice_\w+|settings_preview_\w+)$")
+# a card: SettingsSectionCard(title = stringResource(R.string.x)), also over two lines
+SECTION = re.compile(r"SettingsSectionCard\(\s*(?:\n\s*)?title\s*=\s*stringResource\(R\.string\.(\w+)\)")
+# option lists: `Something.VALUE to R.string.x` (chips, segmented buttons)
+OPTION = re.compile(r"\b[A-Z]\w*\.[A-Z_]+\s+to\s+R\.string\.(\w+)")
 
 entries = []
 for category, files in CATEGORIES.items():
@@ -38,8 +42,14 @@ for category, files in CATEGORIES.items():
         path = UI / rel
         if not path.exists():
             continue
-        lines = path.read_text(encoding="utf-8").splitlines()
+        text = path.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        # line number -> title of the card that starts there
+        sections = {text.count("\n", 0, m.start()) + text[m.start():m.end()].count("\n"): m.group(1) for m in SECTION.finditer(text)}
+        anchor = None
         for i, line in enumerate(lines):
+            if i in sections:
+                anchor = sections[i]
             for m in list(TITLE.finditer(line)) + list(CHIP.finditer(line)):
                 title = m.group(1)
                 if title in seen or SKIP.match(title):
@@ -53,12 +63,20 @@ for category, files in CATEGORIES.items():
                     if TITLE.search(nxt):
                         break
                 seen.add(title)
-                entries.append((category, title, desc))
+                entries.append((category, title, desc, None))
+            for m in OPTION.finditer(line):
+                title = m.group(1)
+                if title in seen or SKIP.match(title) or anchor is None:
+                    continue
+                seen.add(title)
+                # an option has no row of its own: the jump goes to its card
+                entries.append((category, title, anchor, anchor))
 
 body = []
-for category, title, desc in entries:
+for category, title, desc, anchor in entries:
     d = f"R.string.{desc}" if desc else "0"
-    body.append(f"    SettingsSearchEntry(SettingsCategory.{category}, R.string.{title}, {d}),")
+    a = f", anchor = R.string.{anchor}" if anchor else ""
+    body.append(f"    SettingsSearchEntry(SettingsCategory.{category}, R.string.{title}, {d}{a}),")
 
 OUT.write_text(
     "package sh.lsx.untisx.ui.screens.settings\n\n"

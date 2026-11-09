@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dino mode, additions of the rework. The older dino_ strings live in strings.xml. -->
+    <string name="dino_controls">Tap: jump, hold for a higher jump. Round button at the bottom left: duck under paper planes, in the air it makes you dive.</string>
+    <string name="dino_jump">Jump</string>
+    <string name="dino_duck">Duck</string>
+    <string name="dino_duck_hint">Duck!</string>
+    <string name="dino_pause_action">Pause game</string>
+    <string name="dino_paused_title">Paused</string>
+    <string name="dino_resume">Resume</string>
+    <string name="dino_restart">Restart</string>
+    <string name="dino_streak">Streak ×%1$d</string>
+    <string name="dino_best_streak">Longest streak: %1$d</string>
+    <string name="dino_summary_full">%1$d cancellations jumped · %2$d obstacles · %3$d stars · %4$d school days</string>
+    <string name="dino_sign_cancelled">CANCELLED</string>
+    <string name="dino_sign_invented">by chance</string>
+    <string name="dino_sign_school_out">SCHOOL\'S OUT!</string>
+    <string name="dino_a11y_game">Dino game. Tap to jump, hold to jump higher.</string>
+</resources>

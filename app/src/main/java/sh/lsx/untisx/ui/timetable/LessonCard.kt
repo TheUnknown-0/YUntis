@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LocalTextStyle
@@ -22,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -277,6 +279,14 @@ internal fun LessonCard(
     }
     val noteTextStyle = if (notebook) NotebookLessonTextStyle else LocalTextStyle.current
     val cardCornerRadius = if (notebook) 1.dp else 6.dp
+    // the exam badge sits in the top right corner; the teacher line makes room for it
+    var examBadgeWidth by remember { mutableIntStateOf(0) }
+    val badgeShown = options.showExamBadge && lesson.exam != null
+    val teacherEndPadding = if (badgeShown && examBadgeWidth > 0) {
+        with(density) { examBadgeWidth.toDp() } - (if (compact) 1.dp else 3.dp)
+    } else {
+        0.dp
+    }
 
     Box(
         modifier = modifier
@@ -315,6 +325,7 @@ internal fun LessonCard(
                     fontWeight = FontWeight.Bold,
                     textDecoration = if (marked) TextDecoration.LineThrough else null,
                     modifier = Modifier
+                        .padding(end = teacherEndPadding.coerceAtLeast(0.dp))
                         .alpha(if (options.showTeacher) 1f else 0f)
                         .then(if (options.showTeacher) Modifier else Modifier.clearAndSetSemantics {}),
                 )
@@ -373,6 +384,11 @@ internal fun LessonCard(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 1.dp, end = 1.dp)
+                        // long types like "KLA/LEK" get an ellipsis instead of covering the card
+                        .then(
+                            if (measured) Modifier.widthIn(max = with(density) { cell.width.toDp() } * 0.62f) else Modifier,
+                        )
+                        .onSizeChanged { examBadgeWidth = it.width }
                         .background(
                             examColor,
                             RoundedCornerShape(
@@ -391,6 +407,7 @@ internal fun LessonCard(
                         fontWeight = FontWeight.Bold,
                         color = examTextColor,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

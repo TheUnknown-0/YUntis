@@ -101,6 +101,7 @@ fun LessonDetailsScreen(
     onTeacherClick: ((Int) -> Unit)? = null,
     onJumpToDate: (Int) -> Unit = {},
     onEditColor: (() -> Unit)? = null,
+    onEditName: (() -> Unit)? = null,
     ownExam: ExamInfo? = null,
     onAddExam: (() -> Unit)? = null,
     showNotebook: Boolean = true,
@@ -216,7 +217,7 @@ fun LessonDetailsScreen(
                     )
                 }
 
-                if (onAddExam != null || onEditColor != null) {
+                if (onAddExam != null || onEditColor != null || onEditName != null) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -229,6 +230,16 @@ fun LessonDetailsScreen(
                                 background = if (ownExam != null) OwnExamColor else cardColors.title.copy(alpha = 0.12f),
                                 content = if (ownExam != null) Color.White else cardColors.title,
                                 onClick = onAddExam,
+                            )
+                        }
+
+                        if (onEditName != null) {
+                            HeaderPill(
+                                text = stringResource(R.string.lesson_edit_name),
+                                background = cardColors.title.copy(alpha = 0.12f),
+                                content = cardColors.title,
+                                onClick = onEditName,
+                                icon = true,
                             )
                         }
 

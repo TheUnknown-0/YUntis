@@ -50,4 +50,29 @@ object PlannerPrefs {
     }
 
     fun examKey(id: Int, date: Int, start: Int, own: Boolean) = "$id-$date-$start-${if (own) "o" else "s"}"
+
+    /** Own start and end (minutes of the day) of a suggested study block, or null for the suggestion. */
+    fun slotTime(context: Context, examKey: String, slotKey: String): Pair<Int, Int>? {
+        val value = prefs(context).getString("time_${examKey}_$slotKey", null) ?: return null
+        val start = value.substringBefore('-').toIntOrNull() ?: return null
+        val end = value.substringAfter('-').toIntOrNull() ?: return null
+        return (start to end).takeIf { end > start }
+    }
+
+    fun setSlotTime(context: Context, examKey: String, slotKey: String, startMinute: Int?, endMinute: Int?) {
+        val edit = prefs(context).edit()
+        if (startMinute == null || endMinute == null || endMinute <= startMinute) {
+            edit.remove("time_${examKey}_$slotKey")
+        } else {
+            edit.putString("time_${examKey}_$slotKey", "$startMinute-$endMinute")
+        }
+        edit.apply()
+    }
+
+    /** The suggested blocks with the times the user set instead. */
+    fun withOwnTimes(context: Context, examKey: String, slots: List<StudySlot>): List<StudySlot> = slots.map { slot ->
+        slotTime(context, examKey, slot.key)?.let { (start, end) ->
+            slot.copy(start = java.time.LocalTime.of(start / 60, start % 60), end = java.time.LocalTime.of(end / 60, end % 60))
+        } ?: slot
+    }
 }

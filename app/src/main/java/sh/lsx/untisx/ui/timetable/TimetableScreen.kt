@@ -5,6 +5,11 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.draw.drawWithContent
 import kotlinx.coroutines.flow.first
@@ -42,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -105,6 +111,9 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.TextStyle
 import kotlin.math.abs
+
+/** Subject ids of the own timetable, to put own courses first in a class timetable. */
+internal val LocalOwnSubjects = androidx.compose.runtime.compositionLocalOf { emptySet<Int>() }
 
 @OptIn(ExperimentalMaterial3Api::class)
 internal enum class DayPlaceholder {
@@ -190,22 +199,47 @@ fun TimetableScreen(
         if (compare != null) compare.onExit() else focusedDay = null
     }
 
-    fun stepDay(direction: Int) {
-        val current = activeDay ?: return
+    /** Next or previous school day; across a weekend the week page changes without a second animation. */
+    suspend fun stepDay(direction: Int) {
+        val current = focusedDay ?: activeDay ?: return
         val next = current + direction
 
         when {
             next in 1..5 -> focusedDay = next
             direction > 0 -> {
+                pagerState.scrollToPage((pagerState.currentPage + 1).coerceAtMost(TimetableViewModel.WEEK_SPAN - 1))
                 focusedDay = 1
-                scope.launch { pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(TimetableViewModel.WEEK_SPAN - 1)) }
             }
             else -> {
+                pagerState.scrollToPage((pagerState.currentPage - 1).coerceAtLeast(0))
                 focusedDay = 5
-                scope.launch { pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0)) }
             }
         }
     }
+
+    // day view swipe: the day follows the finger, slides out and the next one slides in
+    val daySwipe = remember { Animatable(0f) }
+    val swipeDensity = LocalDensity.current
+    fun dragDay(amount: Float) {
+        scope.launch { daySwipe.snapTo(daySwipe.value + amount) }
+    }
+    fun endDaySwipe(width: Float, cancelled: Boolean) {
+        scope.launch {
+            val offset = daySwipe.value
+            val threshold = minOf(width * 0.2f, with(swipeDensity) { 96.dp.toPx() })
+            if (cancelled || abs(offset) < threshold || width <= 0f) {
+                daySwipe.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow))
+                return@launch
+            }
+            val direction = if (offset < 0) 1 else -1
+            daySwipe.animateTo(-direction * width, tween(130))
+            stepDay(direction)
+            daySwipe.snapTo(direction * width * 0.5f)
+            daySwipe.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
+        }
+    }
+    // leaving the day view or switching by header must not leave the grid shifted
+    LaunchedEffect(activeDay == null) { if (activeDay == null) daySwipe.snapTo(0f) }
     val highlight = remember { Animatable(0f) }
 
     LaunchedEffect(focusNonce) {
@@ -319,6 +353,15 @@ fun TimetableScreen(
                     )
                 }
 
+                // in a class or year timetable the own courses are shown first in parallel stacks
+                val ownSubjects = if (vm.viewTarget == null) {
+                    emptySet()
+                } else {
+                    remember(vm.viewTarget, vm.weeks.size) {
+                        vm.ownWeeks().values.flatten().flatMap { lesson -> lesson.subject.map { it.id } }.toSet()
+                    }
+                }
+
                 HorizontalPager(
                     state = pagerState,
                     // in the day view a swipe moves by one day instead of one week
@@ -330,6 +373,7 @@ fun TimetableScreen(
                     val weekStart = vm.mondayForPage(page)
                     val weekKey = weekStart.toUntisDate()
 
+                    CompositionLocalProvider(LocalOwnSubjects provides ownSubjects) {
                     WeekPage(
                         highlightedDate = highlightedDate,
                         highlightAlpha = { highlight.value },
@@ -362,7 +406,9 @@ fun TimetableScreen(
                         onDayHeaderClick = { date ->
                             if (compare == null) focusedDay = if (focusedDay == null) date.dayOfWeek.value else null
                         },
-                        onSwipeDay = ::stepDay,
+                        swipeOffset = { daySwipe.value },
+                        onSwipeDrag = ::dragDay,
+                        onSwipeEnd = ::endDaySwipe,
                         compare = compare?.let { source ->
                             val other = source.vm
                             val otherKey = other.mondayForPage(page).toUntisDate()
@@ -380,6 +426,7 @@ fun TimetableScreen(
                             )
                         },
                     )
+                    }
                 }
             }
         }
@@ -454,9 +501,13 @@ private fun WeekPage(
     exams: List<ExamInfo>,
     focusedDay: Int? = null,
     onDayHeaderClick: (LocalDate) -> Unit = {},
-    onSwipeDay: (Int) -> Unit = {},
+    swipeOffset: () -> Float = { 0f },
+    onSwipeDrag: (Float) -> Unit = {},
+    onSwipeEnd: (width: Float, cancelled: Boolean) -> Unit = { _, _ -> },
     compare: CompareWeek? = null,
 ) {
+    val currentDrag by rememberUpdatedState(onSwipeDrag)
+    val currentEnd by rememberUpdatedState(onSwipeEnd)
     val compareDisplays = compare?.let { other ->
         remember(other.entries, other.exams, other.subjectsById, other.teachersById, other.roomsById, subjectAliases) {
             lessonDisplays(
@@ -510,17 +561,21 @@ private fun WeekPage(
                     .fillMaxSize()
                     .then(
                         if (focusedDay != null) {
-                            Modifier.pointerInput(Unit) {
-                                var dragged = 0f
-                                detectHorizontalDragGestures(
-                                    onDragStart = { dragged = 0f },
-                                    onDragEnd = {
-                                        val threshold = 64.dp.toPx()
-                                        if (dragged <= -threshold) onSwipeDay(1)
-                                        if (dragged >= threshold) onSwipeDay(-1)
-                                    },
-                                ) { _, amount -> dragged += amount }
-                            }
+                            Modifier
+                                .pointerInput(Unit) {
+                                    detectHorizontalDragGestures(
+                                        onDragEnd = { currentEnd(size.width.toFloat(), false) },
+                                        onDragCancel = { currentEnd(size.width.toFloat(), true) },
+                                    ) { change, amount ->
+                                        change.consume()
+                                        currentDrag(amount)
+                                    }
+                                }
+                                .graphicsLayer {
+                                    val offset = swipeOffset()
+                                    translationX = offset
+                                    alpha = 1f - (abs(offset) / size.width.coerceAtLeast(1f)).coerceIn(0f, 1f) * 0.6f
+                                }
                         } else {
                             Modifier
                         },
@@ -1080,7 +1135,8 @@ private fun DayColumn(
         }
 
         var openStack by remember { mutableStateOf<LessonStack?>(null) }
-        val stacks = remember(lessons) { stackParallelLessons(lessons) }
+        val ownSubjects = LocalOwnSubjects.current
+        val stacks = remember(lessons, ownSubjects) { stackParallelLessons(lessons, ownSubjects) }
 
         openStack?.let { stack ->
             ParallelLessonsDialog(

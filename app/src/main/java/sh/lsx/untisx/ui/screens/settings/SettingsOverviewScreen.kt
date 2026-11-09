@@ -47,6 +47,8 @@ internal data class SettingsSearchEntry(
     val category: SettingsCategory,
     @param:StringRes val title: Int,
     @param:StringRes val description: Int = 0,
+    /** For an option without a row of its own: the card to jump to. */
+    @param:StringRes val anchor: Int = 0,
 )
 
 internal object SettingsSearch {
@@ -86,6 +88,7 @@ fun SettingsOverviewScreen(
                 title = resources.getString(entry.title).trim(),
                 description = if (entry.description != 0) resources.getString(entry.description) else "",
                 page = resources.getString(entry.category.titleRes),
+                jumpTo = resources.getString(if (entry.anchor != 0) entry.anchor else entry.title).trim(),
             )
         }.distinctBy { it.entry.category to it.title }
     }
@@ -147,7 +150,7 @@ fun SettingsOverviewScreen(
                             .clip(RoundedCornerShape(14.dp))
                             .background(MaterialTheme.colorScheme.surfaceContainer)
                             .tapHaptic {
-                                SettingsFocus.target = hit.title
+                                SettingsFocus.target = hit.jumpTo
                                 onOpenCategory(hit.entry.category)
                             }
                             .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -181,4 +184,5 @@ private data class Resolved(
     val title: String,
     val description: String,
     val page: String,
+    val jumpTo: String,
 )

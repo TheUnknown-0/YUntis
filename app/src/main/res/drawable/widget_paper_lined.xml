@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ruled notebook paper, like the Schulheft style of the app. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/widget_paper_lined_tile"
+    android:tileMode="repeat" />

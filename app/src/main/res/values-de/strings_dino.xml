@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dino-Modus, Ergänzungen der Überarbeitung. Die älteren dino_-Texte stehen in strings.xml. -->
+    <string name="dino_controls">Tippen: springen, gedrückt halten springt höher. Runder Knopf unten links: unter Papierfliegern ducken, in der Luft geht es damit im Sturzflug nach unten.</string>
+    <string name="dino_jump">Springen</string>
+    <string name="dino_duck">Ducken</string>
+    <string name="dino_duck_hint">Ducken!</string>
+    <string name="dino_pause_action">Spiel pausieren</string>
+    <string name="dino_paused_title">Pausiert</string>
+    <string name="dino_resume">Weiter</string>
+    <string name="dino_restart">Neu starten</string>
+    <string name="dino_streak">Serie ×%1$d</string>
+    <string name="dino_best_streak">Längste Serie: %1$d</string>
+    <string name="dino_summary_full">%1$d Ausfälle übersprungen · %2$d Hindernisse · %3$d Sterne · %4$d Schultage</string>
+    <string name="dino_sign_cancelled">ENTFALL</string>
+    <string name="dino_sign_invented">Zufall</string>
+    <string name="dino_sign_school_out">SCHULSCHLUSS!</string>
+    <string name="dino_a11y_game">Dino-Spiel. Tippen zum Springen, gedrückt halten springt höher.</string>
+</resources>

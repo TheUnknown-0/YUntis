@@ -796,6 +796,68 @@ class NotebookViewModel internal constructor(
         }
     }
 
+    private val _trash = MutableStateFlow<List<sh.lsx.untisx.data.homework.TrashedHomework>>(emptyList())
+
+    /** Completed homework cleared into the trash, restorable for two days. */
+    val trash: StateFlow<List<sh.lsx.untisx.data.homework.TrashedHomework>> = _trash.asStateFlow()
+
+    fun refreshTrash() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            _trash.value = sh.lsx.untisx.data.homework.HomeworkTrash.load(context, accountId)
+        }
+    }
+
+    /** Moves all completed homework into the trash; [onDone] gets how many. */
+    fun trashCompleted(onDone: (Int) -> Unit = {}) {
+        val done = data?.items.orEmpty().filter { it.isTask && it.isCompleted }
+        if (done.isEmpty()) return
+
+        viewModelScope.launch {
+            val trash = sh.lsx.untisx.data.homework.HomeworkTrash
+            // into the trash first, so nothing is lost if the app stops in between
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { trash.add(context, accountId, done) }
+            when (val result = repository.removeAll(done.mapTo(mutableSetOf()) { it.id })) {
+                is NotebookWriteResult.Success -> {
+                    applyLoaded(result.data)
+                    done.forEach { reminders.cancel(context, accountId, it.id) }
+                    onDone(done.size)
+                }
+
+                is NotebookWriteResult.ReadFailed -> {
+                    trash.remove(context, accountId, done.mapTo(mutableSetOf()) { it.id })
+                    _notice.value = NotebookNotice.READ_ONLY
+                }
+
+                else -> {
+                    trash.remove(context, accountId, done.mapTo(mutableSetOf()) { it.id })
+                    _notice.value = NotebookNotice.DELETE_FAILED
+                }
+            }
+            refreshTrash()
+        }
+    }
+
+    /** Puts homework from the trash back into the list. */
+    fun restoreFromTrash(ids: Set<String>) {
+        val entries = _trash.value.filter { it.item.id in ids }
+        if (entries.isEmpty()) return
+
+        viewModelScope.launch {
+            when (val result = repository.restore(entries.map { it.item })) {
+                is NotebookWriteResult.Success -> {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        sh.lsx.untisx.data.homework.HomeworkTrash.remove(context, accountId, ids)
+                    }
+                    applyLoaded(result.data)
+                }
+
+                is NotebookWriteResult.ReadFailed -> _notice.value = NotebookNotice.READ_ONLY
+                else -> _notice.value = NotebookNotice.SAVE_FAILED
+            }
+            refreshTrash()
+        }
+    }
+
     fun undoLastAction() {
         val undo = _pendingUndo.value ?: return
 

@@ -143,14 +143,29 @@ private fun ExamPlanCard(
 
     val key = PlannerPrefs.examKey(exam.id, exam.date, exam.startTime, exam.own)
     var sessions by remember(key) { mutableIntStateOf(PlannerPrefs.sessions(context, key)) }
+    var timesVersion by remember(key) { mutableIntStateOf(0) }
     var done by remember(key) { mutableStateOf(PlannerPrefs.doneSlots(context, key)) }
+    // the study timer checks blocks off in its own screen; read them again when coming back
+    androidx.lifecycle.compose.LifecycleResumeEffect(key) {
+        done = PlannerPrefs.doneSlots(context, key)
+        timesVersion++
+        onPauseOrDispose { }
+    }
 
     val short = subjectsById[exam.subjectId]?.name?.takeIf { it.isNotBlank() } ?: exam.subjectName
     val subject = subjectLongLabel(subjectAliases, short).ifBlank { short }
     val type = exam.examType.ifBlank { stringResource(R.string.lesson_exam) }
     val countdown = remember(exam, lessons, loadedWeeks) { StudyPlan.countdown(exam, now, lessons, loadedWeeks) }
-    val slots = remember(exam, lessons, sessions, holidays) {
-        StudyPlan.suggest(exam, now.toLocalDate(), lessons, holidays, sessions, otherExamDays = otherExamDays, earliestToday = now.toLocalTime())
+    val slots = remember(exam, lessons, sessions, holidays, timesVersion) {
+        val suggested = StudyPlan.suggest(exam, now.toLocalDate(), lessons, holidays, sessions, otherExamDays = otherExamDays, earliestToday = now.toLocalTime())
+        PlannerPrefs.withOwnTimes(context, key, suggested)
+    }
+    var editing by remember(key) { mutableStateOf<sh.lsx.untisx.data.planner.StudySlot?>(null) }
+    fun studyNow(slot: sh.lsx.untisx.data.planner.StudySlot?) {
+        val minutes = slot?.let { java.time.Duration.between(it.start, it.end).toMinutes() } ?: 0L
+        context.startActivity(
+            sh.lsx.untisx.ui.planner.PomodoroActivity.intent(context, "$type $subject", key, slot?.key.orEmpty(), minutes),
+        )
     }
 
     AppCard(modifier = Modifier.fillMaxWidth(), shape = appCardShape(16.dp)) {
@@ -193,9 +208,15 @@ private fun ExamPlanCard(
                 }
             }
 
-            if (onShare != null) {
-                TextButton(onClick = onShare, modifier = Modifier.align(Alignment.End)) {
-                    Text(stringResource(R.string.share_title))
+            Row(Modifier.align(Alignment.End)) {
+                // the next open block is checked off when the timer is done
+                TextButton(onClick = { studyNow(slots.firstOrNull { it.key !in done }) }) {
+                    Text(stringResource(R.string.pomodoro_study_now))
+                }
+                if (onShare != null) {
+                    TextButton(onClick = onShare) {
+                        Text(stringResource(R.string.share_title))
+                    }
                 }
             }
 
@@ -252,7 +273,7 @@ private fun ExamPlanCard(
                             done = PlannerPrefs.doneSlots(context, key)
                         },
                     )
-                    Column(Modifier.weight(1f)) {
+                    Column(Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).tapHaptic { editing = slot }) {
                         Text(
                             slot.date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale) + " " + shortDate.format(slot.date) +
                                 ", " + slot.start.format(timeFormat) + " – " + slot.end.format(timeFormat),
@@ -271,8 +292,66 @@ private fun ExamPlanCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    if (!checked) {
+                        TextButton(onClick = { studyNow(slot) }) { Text("▶") }
+                    }
                 }
             }
         }
     }
+
+    editing?.let { slot ->
+        SlotTimeDialog(
+            slot = slot,
+            own = PlannerPrefs.slotTime(context, key, slot.key) != null,
+            onSave = { start, end ->
+                PlannerPrefs.setSlotTime(context, key, slot.key, start, end)
+                timesVersion++
+                editing = null
+            },
+            onReset = {
+                PlannerPrefs.setSlotTime(context, key, slot.key, null, null)
+                timesVersion++
+                editing = null
+            },
+            onDismiss = { editing = null },
+        )
+    }
+}
+
+/** Change start and end of a study block; the time pickers are the system ones. */
+@Composable
+private fun SlotTimeDialog(
+    slot: sh.lsx.untisx.data.planner.StudySlot,
+    own: Boolean,
+    onSave: (Int, Int) -> Unit,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var start by remember { mutableIntStateOf(slot.start.hour * 60 + slot.start.minute) }
+    var end by remember { mutableIntStateOf(slot.end.hour * 60 + slot.end.minute) }
+    val dateFormat = rememberDateFormat("EEEEdMMMM")
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.exam_plan_edit_slot)) },
+        text = {
+            Column {
+                Text(dateFormat.format(slot.date), style = MaterialTheme.typography.bodyMedium)
+                sh.lsx.untisx.ui.components.SettingsTimeRow(label = stringResource(R.string.exam_plan_slot_start), minute = start, onPick = { start = it })
+                sh.lsx.untisx.ui.components.SettingsTimeRow(label = stringResource(R.string.exam_plan_slot_end), minute = end, onPick = { end = it })
+                if (end <= start) {
+                    Text(stringResource(R.string.exam_plan_slot_invalid), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = end > start, onClick = { onSave(start, end) }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = {
+            Row {
+                if (own) TextButton(onClick = onReset) { Text(stringResource(R.string.exam_plan_slot_reset)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            }
+        },
+    )
 }

@@ -214,6 +214,53 @@ class NotebookRepository(
         }
     }
 
+    /** Removes several items in one write (e.g. into the trash); unknown ids are ignored. */
+    suspend fun removeAll(itemIds: Set<String>): NotebookWriteResult = lock.withLock {
+        if (accountBlocked()) return@withLock NotebookWriteResult.ReadFailed(NotebookReadFailure.IO)
+
+        val current = when (val loaded = loadCurrentLocked()) {
+            is Current.Ok -> loaded.data
+            is Current.Failed -> return@withLock NotebookWriteResult.ReadFailed(loaded.reason)
+        }
+
+        val items = current.items.filterNot { it.id in itemIds }
+        if (items.size == current.items.size) return@withLock NotebookWriteResult.Success(current)
+
+        val written = writeLocked(current, items, clock())
+        if (written is NotebookWriteResult.Success) itemIds.forEach { deleteDraftsForItemLocked(it) }
+        written
+    }
+
+    /** Puts items back as they were (from the trash); an id taken in the meantime gets a new one. */
+    suspend fun restore(restored: List<NotebookItem>): NotebookWriteResult = lock.withLock {
+        if (accountBlocked()) return@withLock NotebookWriteResult.ReadFailed(NotebookReadFailure.IO)
+
+        val current = when (val loaded = loadCurrentLocked()) {
+            is Current.Ok -> loaded.data
+            is Current.Failed -> return@withLock NotebookWriteResult.ReadFailed(loaded.reason)
+        }
+
+        val used = current.items.mapTo(mutableSetOf()) { it.id }
+        val added = restored.map { item ->
+            val id = if (item.id.isNotBlank() && item.id !in used) {
+                item.id
+            } else {
+                generateId(used) ?: return@withLock NotebookWriteResult.Invalid(
+                    listOf(NotebookValidationIssue(null, "id", "Could not allocate a unique item ID.")),
+                )
+            }
+            used += id
+            NotebookValidator.normalize(item.copy(id = id))
+        }
+        val items = current.items + added
+        if (items.size > NotebookValidator.MAX_ITEMS) {
+            return@withLock NotebookWriteResult.Invalid(
+                listOf(NotebookValidationIssue(null, "items", "At most ${NotebookValidator.MAX_ITEMS} items are supported.")),
+            )
+        }
+        writeLocked(current, items, clock())
+    }
+
     suspend fun setCompleted(itemId: String, completed: Boolean): NotebookWriteResult = lock.withLock {
         if (accountBlocked()) return@withLock NotebookWriteResult.ReadFailed(NotebookReadFailure.IO)
 

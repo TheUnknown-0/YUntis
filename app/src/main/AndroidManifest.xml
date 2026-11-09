@@ -119,6 +119,16 @@
             android:name=".data.absences.ExcuseReminderReceiver"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.planner.PomodoroActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.UntisX" />
+
+        <receiver
+            android:name=".data.planner.PomodoroReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.updates"

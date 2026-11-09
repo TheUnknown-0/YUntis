@@ -18,7 +18,7 @@ import java.time.LocalDateTime
 
 /** A large, resizable widget with a whole school day and arrows to browse days. */
 class FullDayWidgetProvider : AppWidgetProvider() {
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = WidgetUpdater.updateAll(context)
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = WidgetUpdater.updateAll(context, ids)
 
     override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: Bundle) =
         WidgetUpdater.updateAll(context)

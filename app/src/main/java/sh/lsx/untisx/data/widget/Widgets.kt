@@ -38,7 +38,7 @@ import java.time.ZoneId
 
 /** Today's (or the next school day's) lessons. */
 class DayWidgetProvider : AppWidgetProvider() {
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = WidgetUpdater.updateAll(context)
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = WidgetUpdater.updateAll(context, ids)
 
     override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: android.os.Bundle) =
         WidgetUpdater.updateAll(context)
@@ -46,7 +46,7 @@ class DayWidgetProvider : AppWidgetProvider() {
 
 /** The lesson running now or coming next. */
 class NextWidgetProvider : AppWidgetProvider() {
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = WidgetUpdater.updateAll(context)
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = WidgetUpdater.updateAll(context, ids)
 }
 
 object WidgetUpdater {
@@ -68,12 +68,20 @@ object WidgetUpdater {
     )
 
     /** Redraws all widgets from the cached timetable of the active account. Cheap, no network. */
-    fun updateAll(context: Context) {
+    fun updateAll(context: Context, requested: IntArray = IntArray(0)) {
         val app = context.applicationContext
         val manager = AppWidgetManager.getInstance(app)
-        val dayIds = manager.getAppWidgetIds(ComponentName(app, DayWidgetProvider::class.java))
-        val nextIds = manager.getAppWidgetIds(ComponentName(app, NextWidgetProvider::class.java))
-        val fullIds = manager.getAppWidgetIds(ComponentName(app, FullDayWidgetProvider::class.java))
+
+        // some launchers (e.g. widget stacks) ask for ids the normal list does not contain yet
+        fun idsOf(provider: Class<*>): IntArray {
+            val extra = requested.filter { id ->
+                id != 0 && runCatching { manager.getAppWidgetInfo(id)?.provider?.className }.getOrNull() == provider.name
+            }
+            return (manager.getAppWidgetIds(ComponentName(app, provider)).toList() + extra).distinct().toIntArray()
+        }
+        val dayIds = idsOf(DayWidgetProvider::class.java)
+        val nextIds = idsOf(NextWidgetProvider::class.java)
+        val fullIds = idsOf(FullDayWidgetProvider::class.java)
         if (dayIds.isEmpty() && nextIds.isEmpty() && fullIds.isEmpty()) return
 
         scope.launch {

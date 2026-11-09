@@ -1,3 +1,26 @@
+## 0.11.1
+
+Lernen mit Pomodoro und Atempausen, ein Papierkorb für Hausaufgaben, der Schulheft-Stil für Widgets und flüssiges Wischen in der Tagesansicht.
+
+### Neu
+* [Lernen] „Jetzt lernen“ an jedem Lernblock: Pomodoro-Timer mit Lernrunden und Pausen, läuft auch im Hintergrund weiter und hakt den Block am Ende ab
+* [Lernen] In den Pausen Box-Atmung oder 4-7-8-Atmung mit animiertem Kreis, eine kurze Meditation oder einfach Pause
+* [Klausuren] Lernblöcke lassen sich zeitlich anpassen (Beginn und Ende), „Vorschlag“ stellt sie zurück
+* [Hausaufgaben] „Erledigte löschen“ schiebt alle erledigten Hausaufgaben in einen Papierkorb; dort lassen sie sich zwei Tage lang wiederherstellen
+* [Widgets] Neuer Stil **Schulheft**, liniert oder kariert, mit Randlinie und Handschrift
+* [Stunde] Knopf „Name“: Kursen direkt einen eigenen Namen geben, z. B. „Geschichte“ statt „G1“
+* [Klassenplan] In der Klassen- bzw. Jahrgangsansicht stehen die eigenen Kurse bei parallelen Stunden vorne
+
+### Verbessert
+* [Tagesansicht] Wischen folgt dem Finger, der nächste Tag gleitet herein; über das Wochenende ohne Aufblitzen des falschen Tages
+* [Einstellungen] Die Suche findet auch Optionen wie „Schulheft“ oder „Post-it“ und springt zur passenden Karte
+* [Widgets] Vorschau in der Widget-Auswahl
+
+### Behoben
+* [Stundenplan] Lange Klausurarten wie „KLA/LEK …“ überdeckten das Lehrerkürzel
+* [Tagesansicht] Wischen sprang teils falsch oder übersprang Tage
+* [Widgets] In Widget-Stapeln (z. B. Moto) konnte eine Seite komplett schwarz bleiben
+
 ## 0.11.0
 
 YUntis weckt dich jetzt selbst, schaltet im Unterricht stumm, erinnert an Entschuldigungen und teilt Hausaufgaben per QR-Code. Dazu Widget-Stile bis hin zum Post-it und eine Suche in den Einstellungen.

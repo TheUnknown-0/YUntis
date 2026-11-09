@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -164,6 +165,7 @@ internal fun ScreenHost(
     val spatialSpec = motionSpatial<IntOffset>()
     val colorState = LocalSubjectColorState.current
     var colorDialogFor by remember { mutableStateOf<String?>(null) }
+    var nameDialogFor by remember { mutableStateOf<String?>(null) }
     var ownExamEdit by remember { mutableStateOf<Pair<ExamInfo, Boolean>?>(null) }
     val defaultExamType = stringResource(R.string.own_exam_default_type)
 
@@ -237,6 +239,13 @@ internal fun ScreenHost(
                 .fillMaxSize()
                 .padding(padding),
         )
+    }
+
+    val context = LocalContext.current
+    val homeworkTrash by notebookVm.trash.collectAsState()
+    if (screen == Screen.HOMEWORK) {
+        // expired entries go when the page opens
+        LaunchedEffect(notebookVm) { notebookVm.refreshTrash() }
     }
 
     when (screen) {
@@ -387,6 +396,17 @@ internal fun ScreenHost(
                     ),
                 )
             },
+            trash = homeworkTrash,
+            onTrashCompleted = {
+                notebookVm.trashCompleted { count ->
+                    android.widget.Toast.makeText(
+                        context,
+                        context.resources.getQuantityString(R.plurals.homework_trashed, count, count),
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            },
+            onRestore = notebookVm::restoreFromTrash,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -693,6 +713,7 @@ internal fun ScreenHost(
                 onTeacherClick = onTeacherClick.takeUnless { lessonReadOnly },
                 showNotebook = !lessonReadOnly,
                 onEditColor = subjectName?.takeIf { it.isNotBlank() }?.let { { colorDialogFor = it } },
+                onEditName = subjectName?.takeIf { it.isNotBlank() }?.let { { nameDialogFor = it } },
                 ownExam = lessonVm.examFor(lesson)?.takeIf { it.own },
                 onAddExam = if (lessonReadOnly) null else {
                     {
@@ -715,6 +736,18 @@ internal fun ScreenHost(
                     .fillMaxSize()
                     .padding(padding),
             )
+
+            nameDialogFor?.let { name ->
+                sh.lsx.untisx.ui.components.SubjectNameDialog(
+                    subject = name,
+                    alias = subjectAliases[name],
+                    onApply = { short, long ->
+                        onSubjectAlias(name, short, long)
+                        nameDialogFor = null
+                    },
+                    onDismiss = { nameDialogFor = null },
+                )
+            }
 
             colorDialogFor?.let { name ->
                 SubjectColorDialog(

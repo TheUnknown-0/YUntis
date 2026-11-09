@@ -14,7 +14,10 @@ import androidx.core.content.ContextCompat
 import sh.lsx.untisx.R
 
 /** How the widgets look; one setting for all of them. */
-enum class WidgetStyle { AUTO, LIGHT, DARK, DYNAMIC, POSTIT }
+enum class WidgetStyle { AUTO, LIGHT, DARK, DYNAMIC, POSTIT, NOTEBOOK }
+
+/** Paper of the Schulheft style: ruled like the app, or squared like a maths notebook. */
+enum class NotebookPaper { LINED, SQUARED }
 
 /** Paper colours of the Post-it style. */
 enum class PostItColor(@param:ColorInt val paper: Int) {
@@ -35,6 +38,11 @@ object WidgetStylePrefs {
 
     fun postItColor(context: Context): PostItColor =
         runCatching { PostItColor.valueOf(prefs(context).getString("postit", null) ?: "") }.getOrDefault(PostItColor.YELLOW)
+
+    fun notebookPaper(context: Context): NotebookPaper =
+        runCatching { NotebookPaper.valueOf(prefs(context).getString("paper", null) ?: "") }.getOrDefault(NotebookPaper.LINED)
+
+    fun setNotebookPaper(context: Context, paper: NotebookPaper) = save(context) { putString("paper", paper.name) }
 
     /** Background opacity in percent (20 to 100). */
     fun opacity(context: Context): Int = prefs(context).getInt("opacity", 100).coerceIn(20, 100)
@@ -58,6 +66,7 @@ class WidgetLook(
     val style: WidgetStyle,
     val colors: Colors?,
     val opacity: Int,
+    val paper: NotebookPaper = NotebookPaper.LINED,
 ) {
     class Colors(
         @param:ColorInt val background: Int,
@@ -70,10 +79,12 @@ class WidgetLook(
     )
 
     val postIt: Boolean get() = style == WidgetStyle.POSTIT
+    val notebook: Boolean get() = style == WidgetStyle.NOTEBOOK
 
     /** Text in the handwriting font for the Post-it style; other styles leave it as is. */
     fun text(value: CharSequence): CharSequence {
-        if (!postIt || value.isEmpty()) return value
+        // widgets only get system fonts: the Schulheft style uses the system handwriting too
+        if (!(postIt || notebook) || value.isEmpty()) return value
         return SpannableString(value).apply {
             setSpan(TypefaceSpan("casual"), 0, length, Spanned.SPAN_INCLUSIVE_INCLUSIVE)
         }
@@ -84,12 +95,31 @@ class WidgetLook(
     /** Background, paper shade and tape of a widget root. */
     fun applyFrame(views: RemoteViews) {
         val alpha = opacity * 255 / 100
-        views.setInt(R.id.widget_bg, "setImageResource", if (postIt) R.drawable.widget_background_postit else R.drawable.widget_background)
+        views.setInt(
+            R.id.widget_bg,
+            "setImageResource",
+            when {
+                postIt -> R.drawable.widget_background_postit
+                notebook -> R.drawable.widget_background_notebook
+                else -> R.drawable.widget_background
+            },
+        )
         colors?.let { views.setInt(R.id.widget_bg, "setColorFilter", it.background) }
         views.setInt(R.id.widget_bg, "setImageAlpha", alpha)
         views.setViewVisibility(R.id.widget_shade, if (postIt) View.VISIBLE else View.GONE)
         views.setViewVisibility(R.id.widget_tape, if (postIt) View.VISIBLE else View.GONE)
         if (postIt) views.setInt(R.id.widget_shade, "setImageAlpha", alpha)
+        views.setViewVisibility(R.id.widget_paper, if (notebook) View.VISIBLE else View.GONE)
+        views.setViewVisibility(R.id.widget_margin, if (notebook) View.VISIBLE else View.GONE)
+        if (notebook) {
+            views.setInt(
+                R.id.widget_paper,
+                "setImageResource",
+                if (paper == NotebookPaper.SQUARED) R.drawable.widget_paper_squared else R.drawable.widget_paper_lined,
+            )
+            views.setInt(R.id.widget_paper, "setImageAlpha", alpha)
+            views.setInt(R.id.widget_margin, "setImageAlpha", alpha)
+        }
     }
 
     enum class Role { TEXT, SOFT, ACCENT }
@@ -127,6 +157,18 @@ class WidgetLook(
             highlight = R.drawable.widget_row_highlight_ink,
         )
 
+        /** Paper and ink of the Schulheft style, the same as in the app. */
+        private val NOTEBOOK_LIGHT = Colors(
+            background = 0xFFF5EFDF.toInt(), text = 0xFF302E29.toInt(), soft = 0xFF625B4D.toInt(),
+            accent = 0xFF2D5A9B.toInt(), cancelled = 0xFFC0392B.toInt(), changed = 0xFFB5651D.toInt(),
+            highlight = R.drawable.widget_row_highlight_ink,
+        )
+        private val NOTEBOOK_DARK = Colors(
+            background = 0xFF25241F.toInt(), text = 0xFFF2E9D5.toInt(), soft = 0xFFD0C7B5.toInt(),
+            accent = 0xFF9DB8E8.toInt(), cancelled = 0xFFFF7B6B.toInt(), changed = 0xFFF0B060.toInt(),
+            highlight = R.drawable.widget_row_highlight_dark,
+        )
+
         fun resolve(context: Context): WidgetLook {
             val style = WidgetStylePrefs.style(context)
             val night = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
@@ -136,8 +178,9 @@ class WidgetLook(
                 WidgetStyle.DARK -> DARK
                 WidgetStyle.POSTIT -> postIt(WidgetStylePrefs.postItColor(context).paper)
                 WidgetStyle.DYNAMIC -> dynamic(context, night) ?: if (night) DARK else LIGHT
+                WidgetStyle.NOTEBOOK -> if (night) NOTEBOOK_DARK else NOTEBOOK_LIGHT
             }
-            return WidgetLook(style, colors, WidgetStylePrefs.opacity(context))
+            return WidgetLook(style, colors, WidgetStylePrefs.opacity(context), WidgetStylePrefs.notebookPaper(context))
         }
 
         /** Material You colours from the wallpaper (Android 12+). */

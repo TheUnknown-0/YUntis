@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Checkbox
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sh.lsx.untisx.R
 import sh.lsx.untisx.data.SubjectAlias
+import sh.lsx.untisx.data.homework.TrashedHomework
 import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.notebook.NotebookItem
 import sh.lsx.untisx.data.subjectLongLabel
@@ -102,8 +104,12 @@ fun HomeworkScreen(
     onCreate: () -> Unit,
     modifier: Modifier = Modifier,
     onShare: ((NotebookItem) -> Unit)? = null,
+    trash: List<TrashedHomework> = emptyList(),
+    onTrashCompleted: (() -> Unit)? = null,
+    onRestore: (Set<String>) -> Unit = {},
 ) {
     val today = rememberToday()
+    var showTrash by rememberSaveable { mutableStateOf(false) }
     val groups = remember(items, today) { groupOpenHomework(items, today) }
     val done = remember(items) {
         items.filter { it.isTask && it.isCompleted }.sortedByDescending { it.completedAt ?: 0L }
@@ -158,13 +164,23 @@ fun HomeworkScreen(
 
             if (done.isNotEmpty()) {
                 item(key = "done-header") {
-                    TextButton(onClick = { showDone = !showDone }) {
-                        Text(
-                            stringResource(
-                                if (showDone) R.string.homework_hide_done else R.string.homework_show_done,
-                                done.size,
-                            ),
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { showDone = !showDone }) {
+                            Text(
+                                stringResource(
+                                    if (showDone) R.string.homework_hide_done else R.string.homework_show_done,
+                                    done.size,
+                                ),
+                            )
+                        }
+                        Spacer(Modifier.weight(1f))
+                        if (onTrashCompleted != null) {
+                            TextButton(onClick = onTrashCompleted) {
+                                Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.homework_trash_done))
+                            }
+                        }
                     }
                 }
                 if (showDone) {
@@ -177,6 +193,34 @@ fun HomeworkScreen(
                             onToggle = { onToggle(item.id) },
                             onOpen = { onOpen(item.id) },
                         )
+                    }
+                }
+            }
+
+            if (trash.isNotEmpty()) {
+                item(key = "trash-header") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { showTrash = !showTrash }) {
+                            Text(stringResource(R.string.homework_trash_title, trash.size))
+                        }
+                        Spacer(Modifier.weight(1f))
+                        if (showTrash && trash.size > 1) {
+                            TextButton(onClick = { onRestore(trash.mapTo(mutableSetOf()) { it.item.id }) }) {
+                                Text(stringResource(R.string.homework_trash_restore_all))
+                            }
+                        }
+                    }
+                }
+                if (showTrash) {
+                    item(key = "trash-hint") {
+                        Text(
+                            stringResource(R.string.homework_trash_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    items(trash, key = { "trash-${it.item.id}" }) { entry ->
+                        TrashRow(entry, subjectColor(entry.item, subjectColors, defaultColor)) { onRestore(setOf(entry.item.id)) }
                     }
                 }
             }
@@ -313,5 +357,40 @@ private fun dueText(item: NotebookItem): String? {
         stringResource(R.string.homework_due_lesson, day, "%02d:%02d".format(lesson.startTime / 100, lesson.startTime % 100))
     } else {
         stringResource(R.string.homework_due_day, day)
+    }
+}
+
+/** A homework in the trash: when it disappears, and a button to bring it back. */
+@Composable
+private fun TrashRow(entry: TrashedHomework, color: Color, onRestore: () -> Unit) {
+    val format = sh.lsx.untisx.ui.util.rememberDateFormat("EEEdMMM")
+    val time = sh.lsx.untisx.ui.util.rememberTimeFormat()
+    val gone = java.time.Instant.ofEpochMilli(entry.expiresAt()).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+    ) {
+        Box(Modifier.size(width = 4.dp, height = 32.dp).clip(RoundedCornerShape(2.dp)).background(color.copy(alpha = 0.5f)))
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                entry.item.displayTitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textDecoration = TextDecoration.LineThrough,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                stringResource(R.string.homework_trash_gone_at, format.format(gone.toLocalDate()) + ", " + gone.toLocalTime().format(time)),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        TextButton(onClick = onRestore) { Text(stringResource(R.string.homework_trash_restore)) }
     }
 }
