@@ -87,6 +87,8 @@ data class LessonCardOptions(
     val showRoom: Boolean = true,
     val showChanges: Boolean = true,
     val showExamBadge: Boolean = true,
+    /** Marks gaps between lessons (free periods) with their length. */
+    val showFreePeriods: Boolean = true,
     val strikeColor: Color = Color(SubjectColorsPrefs.DEFAULT_STRIKE_COLOR),
     val examColor: Color? = null,
 )

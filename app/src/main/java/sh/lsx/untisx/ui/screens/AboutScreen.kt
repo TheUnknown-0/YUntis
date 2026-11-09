@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -73,6 +74,17 @@ fun AboutScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         AppCard(versionName)
+
+        UpdateCard()
+
+        val notes = remember { ReleaseNotesParser.bundled(context) }
+        var showNotes by remember { mutableStateOf(false) }
+        if (notes.isNotBlank()) {
+            androidx.compose.material3.OutlinedButton(onClick = { showNotes = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.about_whats_new, versionName))
+            }
+        }
+        if (showNotes) WhatsNewDialog(versionName, notes) { showNotes = false }
 
         LinksCard(
             onOpen = uriHandler::openUri,

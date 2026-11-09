@@ -31,6 +31,7 @@ import sh.lsx.untisx.data.model.ExamInfo
 import sh.lsx.untisx.data.subjectLongLabel
 import androidx.compose.ui.res.stringResource
 import sh.lsx.untisx.R
+import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import sh.lsx.untisx.data.AppClock
 import sh.lsx.untisx.ui.game.DinoGameScreen
 import sh.lsx.untisx.ui.homework.HomeworkScreen
@@ -78,6 +79,7 @@ import sh.lsx.untisx.ui.screens.settings.SettingsOverviewScreen
 import sh.lsx.untisx.ui.screens.settings.TimetableSettingsScreen
 import sh.lsx.untisx.ui.timetable.LessonCardOptions
 import sh.lsx.untisx.ui.timetable.TimetableScreen
+import sh.lsx.untisx.ui.timetable.CompareSource
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.util.motionEffects
 import sh.lsx.untisx.ui.util.motionSpatial
@@ -88,6 +90,12 @@ internal fun ScreenHost(
     padding: PaddingValues,
     auth: AuthData,
     timetableVm: TimetableViewModel,
+    compare: CompareSource? = null,
+    lessonVm: TimetableViewModel = timetableVm,
+    lessonReadOnly: Boolean = false,
+    profileStartAdding: Boolean = false,
+    selectedSubjectId: Int = 0,
+    onSubjectClick: (Int) -> Unit = {},
     messagesVm: MessagesViewModel,
     notebookVm: NotebookViewModel,
     notebookItems: List<NotebookItem>,
@@ -219,6 +227,7 @@ internal fun ScreenHost(
             focusDate = focusDate,
             focusNonce = focusNonce,
             onFocusConsumed = onFocusConsumed,
+            compare = compare,
             onLessonClick = onLessonClick,
             onEventClick = { onOpenEvent(it, Screen.TIMETABLE) },
             selectingLesson = notebookLessonTarget != null,
@@ -231,6 +240,8 @@ internal fun ScreenHost(
 
     when (screen) {
         Screen.PROFILE -> ProfileScreen(
+            startAdding = profileStartAdding,
+            onOpenRights = { onScreenChange(Screen.RIGHTS) },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -292,6 +303,10 @@ internal fun ScreenHost(
                             modifier = settingsModifier,
                         )
 
+                        SettingsCategory.CALENDAR -> sh.lsx.untisx.ui.screens.settings.CalendarSettingsScreen(
+                            modifier = settingsModifier,
+                        )
+
                         SettingsCategory.TIMETABLE -> TimetableSettingsScreen(
                             vm = timetableVm,
                             knownSubjects = knownSubjects,
@@ -344,6 +359,9 @@ internal fun ScreenHost(
         )
 
         Screen.ABSENCES -> AbsencesScreen(
+            lessons = timetableVm.ownEntries(),
+            subjects = timetableVm.subjectsById,
+            onOpenDate = onExamClick,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -378,6 +396,75 @@ internal fun ScreenHost(
         Screen.TEACHERS -> TeachersListScreen(
             teachers = teachers,
             modifier = Modifier.padding(padding),
+        )
+
+        Screen.EXAMS -> sh.lsx.untisx.ui.screens.ExamPlanScreen(
+            exams = timetableVm.exams,
+            weeks = timetableVm.ownWeeks(),
+            holidays = timetableVm.holidays,
+            subjectsById = timetableVm.subjectsById,
+            subjectAliases = subjectAliases,
+            colorFor = { name -> subjectColors[name]?.let { Color(it) } ?: Color(defaultSubjectColor) },
+            onOpenDate = onExamClick,
+            onLoadWeeksUntil = timetableVm::preloadWeeksUntil,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        )
+
+        Screen.RIGHTS -> sh.lsx.untisx.ui.screens.RightsScreen(
+            auth = auth,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        )
+
+        Screen.SEARCH -> {
+            val data = remember(
+                timetableVm.subjectsById, timetableVm.teachersById, timetableVm.roomsById,
+                timetableVm.exams, timetableVm.events, notebookItems, messagesVm.incoming, timetableVm.weeks,
+            ) {
+                sh.lsx.untisx.ui.screens.SearchData(
+                    subjects = timetableVm.subjectsById,
+                    teachers = timetableVm.teachersById,
+                    rooms = timetableVm.roomsById,
+                    exams = timetableVm.exams,
+                    events = timetableVm.events,
+                    notebook = notebookItems,
+                    messages = messagesVm.incoming,
+                    lessons = timetableVm.ownEntries(),
+                )
+            }
+
+            sh.lsx.untisx.ui.screens.SearchScreen(
+                data = data,
+                onOpen = { target ->
+                    when (target) {
+                        is sh.lsx.untisx.ui.screens.SearchTarget.Subject -> onSubjectClick(target.id)
+                        is sh.lsx.untisx.ui.screens.SearchTarget.Teacher -> onTeacherClick(target.id)
+                        sh.lsx.untisx.ui.screens.SearchTarget.Rooms -> onScreenChange(Screen.ROOMS)
+                        is sh.lsx.untisx.ui.screens.SearchTarget.Note -> onNotebookOpenItem(target.itemId, Screen.SEARCH)
+                        is sh.lsx.untisx.ui.screens.SearchTarget.Date -> onExamClick(target.date)
+                        is sh.lsx.untisx.ui.screens.SearchTarget.Event -> onOpenEvent(target.entry, Screen.SEARCH)
+                        is sh.lsx.untisx.ui.screens.SearchTarget.Lesson -> onLessonClick(target.entry)
+                        is sh.lsx.untisx.ui.screens.SearchTarget.Message -> {
+                            messagesVm.open(target.message)
+                            onScreenChange(Screen.MESSAGE_DETAILS)
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            )
+        }
+
+        Screen.CHANGES -> sh.lsx.untisx.ui.screens.ChangeHistoryScreen(
+            accountId = sh.lsx.untisx.data.prefs.AccountPrefs.accountId(auth),
+            onOpenDate = onExamClick,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
         )
 
         Screen.EVENTS -> EventsScreen(
@@ -439,10 +526,33 @@ internal fun ScreenHost(
             progress = timetableVm.statsProgress,
             upToDate = timetableVm.statsUpToDate,
             onLoadHistory = timetableVm::loadHistoricalStats,
+            onSubjectClick = onSubjectClick,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
         )
+
+        Screen.SUBJECT_YEAR -> {
+            val year = timetableVm.statsSchoolYear()
+            val subjectName = timetableVm.subjectsById[selectedSubjectId]?.name.orEmpty()
+
+            sh.lsx.untisx.ui.screens.SubjectYearScreen(
+                subjectId = selectedSubjectId,
+                subjectsById = timetableVm.subjectsById,
+                stats = timetableVm.currentYearStats(),
+                yearStart = year?.startDate?.toUntisLocalDateOrNull(),
+                yearEnd = year?.endDate?.toUntisLocalDateOrNull(),
+                weeks = timetableVm.ownWeeks(),
+                holidays = timetableVm.holidays,
+                exams = timetableVm.exams,
+                notebook = notebookItems,
+                color = subjectColors[subjectName]?.let { Color(it) } ?: Color(defaultSubjectColor),
+                onOpenDate = onExamClick,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            )
+        }
 
         Screen.DINO -> {
             val realDays = remember(timetableVm.weeks, subjectColors, subjectTextColors, subjectAliases) {
@@ -519,25 +629,25 @@ internal fun ScreenHost(
         } else {
             val lesson = selectedLesson
             val subjectName = lesson.subject.firstOrNull()
-                ?.let { timetableVm.subjectsById[it.id]?.name?.takeIf { name -> name.isNotBlank() } ?: it.name }
+                ?.let { lessonVm.subjectsById[it.id]?.name?.takeIf { name -> name.isNotBlank() } ?: it.name }
 
             val lessonRef = remember(lesson) { notebookEntryRef(lesson) }
-            val notebookLinks = remember(notebookItems, lessonRef) {
-                NotebookSearch.linksForLesson(notebookItems, lessonRef)
+            val notebookLinks = remember(notebookItems, lessonRef, lessonReadOnly) {
+                if (lessonReadOnly) null else NotebookSearch.linksForLesson(notebookItems, lessonRef)
             }
 
             LessonDetailsScreen(
                 entry = lesson,
-                subjectsById = timetableVm.subjectsById,
-                teachersById = timetableVm.teachersById,
-                roomsById = timetableVm.roomsById,
+                subjectsById = lessonVm.subjectsById,
+                teachersById = lessonVm.teachersById,
+                roomsById = lessonVm.roomsById,
                 color = subjectColors[subjectName]?.let { Color(it) } ?: Color(defaultSubjectColor),
                 textColor = Color(
                     subjectName?.let { subjectTextColors[it] } ?: lessonTextColor,
                 ),
                 subjectAliases = subjectAliases,
-                notes = timetableVm.lessonNotes,
-                exam = timetableVm.examFor(lesson),
+                notes = lessonVm.lessonNotes,
+                exam = lessonVm.examFor(lesson),
                 lessonOptions = lessonOptions,
                 cancelledStrike = cancelledStrike,
                 cancelledDesaturation = cancelledDesaturation,
@@ -553,11 +663,13 @@ internal fun ScreenHost(
                     onNotebookCreate(NotebookKind.TASK, lessonRef, Screen.LESSON_DETAILS)
                 },
                 onJumpToDate = onNotebookJumpToDate,
-                onTeacherClick = onTeacherClick,
+                onTeacherClick = onTeacherClick.takeUnless { lessonReadOnly },
+                showNotebook = !lessonReadOnly,
                 onEditColor = subjectName?.takeIf { it.isNotBlank() }?.let { { colorDialogFor = it } },
-                ownExam = timetableVm.examFor(lesson)?.takeIf { it.own },
-                onAddExam = {
-                    val existing = timetableVm.examFor(lesson)?.takeIf { it.own }
+                ownExam = lessonVm.examFor(lesson)?.takeIf { it.own },
+                onAddExam = if (lessonReadOnly) null else {
+                    {
+                    val existing = lessonVm.examFor(lesson)?.takeIf { it.own }
                     ownExamEdit = if (existing != null) {
                         existing to false
                     } else {
@@ -569,6 +681,7 @@ internal fun ScreenHost(
                             endTime = lesson.endTime,
                             type = defaultExamType,
                         ) to true
+                    }
                     }
                 },
                 modifier = Modifier

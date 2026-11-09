@@ -1,5 +1,6 @@
 package sh.lsx.untisx.ui.screens
 
+import sh.lsx.untisx.ui.util.tapHaptic
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -52,6 +53,7 @@ internal fun SubjectStatsCard(
     nameFor: (Int) -> String,
     locale: Locale,
     olderDaysMissing: Boolean,
+    onSubjectClick: ((Int) -> Unit)? = null,
 ) {
     AppCard(
         modifier = Modifier.fillMaxWidth(),
@@ -89,7 +91,7 @@ internal fun SubjectStatsCard(
             }
 
             totals.forEachIndexed { index, total ->
-                SubjectRow(total, nameFor(total.subjectId), locale, index)
+                SubjectRow(total, nameFor(total.subjectId), locale, index, onSubjectClick?.let { click -> { click(total.subjectId) } })
             }
         }
     }
@@ -105,7 +107,7 @@ private fun Legend(color: Color, label: String) {
 }
 
 @Composable
-private fun SubjectRow(total: SubjectTotals, name: String, locale: Locale, index: Int) {
+private fun SubjectRow(total: SubjectTotals, name: String, locale: Locale, index: Int, onClick: (() -> Unit)? = null) {
     var started by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { started = true }
     val animations = LocalAnimationsEnabled.current
@@ -115,7 +117,13 @@ private fun SubjectRow(total: SubjectTotals, name: String, locale: Locale, index
         label = "subjectBar",
     )
 
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.tapHaptic(onClick) else Modifier)
+            .padding(vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = name,

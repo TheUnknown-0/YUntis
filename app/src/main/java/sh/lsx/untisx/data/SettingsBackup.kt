@@ -74,6 +74,7 @@ data class TimetableSettingsBackup(
     val showChanges: Boolean? = null,
     val hideCancelled: Boolean? = null,
     val showExamBadge: Boolean? = null,
+    val showFreePeriods: Boolean? = null,
 )
 
 @Serializable
@@ -202,6 +203,7 @@ object SettingsBackupManager {
                 showChanges = AppearancePrefs.showChanges(context),
                 hideCancelled = AppearancePrefs.hideCancelled(context),
                 showExamBadge = AppearancePrefs.showExamBadge(context),
+                showFreePeriods = AppearancePrefs.showFreePeriods(context),
             ),
         )
     }
@@ -338,6 +340,7 @@ object SettingsBackupManager {
             timetable.showChanges?.let { AppearancePrefs.setShowChanges(context, it) }
             timetable.hideCancelled?.let { AppearancePrefs.setHideCancelled(context, it) }
             timetable.showExamBadge?.let { AppearancePrefs.setShowExamBadge(context, it) }
+            timetable.showFreePeriods?.let { AppearancePrefs.setShowFreePeriods(context, it) }
         }
     }
 

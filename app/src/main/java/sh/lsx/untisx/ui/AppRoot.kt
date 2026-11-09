@@ -96,6 +96,7 @@ internal fun AppRoot(
     var showChanges by remember { mutableStateOf(AppearancePrefs.showChanges(context)) }
     var hideCancelled by remember { mutableStateOf(AppearancePrefs.hideCancelled(context)) }
     var showExamBadge by remember { mutableStateOf(AppearancePrefs.showExamBadge(context)) }
+    var showFreePeriods by remember { mutableStateOf(AppearancePrefs.showFreePeriods(context)) }
 
     val accounts by AccountStore.accounts.collectAsStateWithLifecycle()
     val activeId by AccountStore.activeId.collectAsStateWithLifecycle()
@@ -152,6 +153,7 @@ internal fun AppRoot(
                 showChanges = AppearancePrefs.showChanges(context)
                 hideCancelled = AppearancePrefs.hideCancelled(context)
                 showExamBadge = AppearancePrefs.showExamBadge(context)
+                showFreePeriods = AppearancePrefs.showFreePeriods(context)
             }
         }
 
@@ -185,6 +187,8 @@ internal fun AppRoot(
             LaunchedEffect(Unit) {
                 Notifications.ensureChannels(context)
                 NotificationScheduler.ensureAll(context)
+                sh.lsx.untisx.data.calendar.CalendarExportWorker.ensure(context)
+                sh.lsx.untisx.data.update.AppUpdater.ensure(context)
             }
 
             LaunchedEffect(currentAuth?.let { AccountPrefs.accountId(it) }) {
@@ -257,6 +261,7 @@ internal fun AppRoot(
                             showRoom = showRoom,
                             showChanges = showChanges,
                             showExamBadge = showExamBadge,
+                            showFreePeriods = showFreePeriods,
                             strikeColor = Color(strikeColor ?: SubjectColorsPrefs.DEFAULT_STRIKE_COLOR),
                             examColor = examColor?.let { Color(it) },
                         ),
@@ -265,6 +270,7 @@ internal fun AppRoot(
                             AppearancePrefs.setShowRoom(context, updated.showRoom)
                             AppearancePrefs.setShowChanges(context, updated.showChanges)
                             AppearancePrefs.setShowExamBadge(context, updated.showExamBadge)
+                            AppearancePrefs.setShowFreePeriods(context, updated.showFreePeriods)
                         },
                         hideCancelled = hideCancelled,
                         onHideCancelledChange = { AppearancePrefs.setHideCancelled(context, it) },

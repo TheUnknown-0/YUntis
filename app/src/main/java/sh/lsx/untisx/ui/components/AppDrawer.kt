@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -26,7 +29,9 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
@@ -67,6 +72,8 @@ internal fun AppDrawer(
     ModalDrawerSheet(
         modifier = Modifier.fillMaxWidth(0.85f),
     ) {
+        // the list is taller than small screens, so it scrolls
+        Column(Modifier.verticalScroll(rememberScrollState())) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -124,6 +131,17 @@ internal fun AppDrawer(
             onClick = {
                 close()
                 onSelect(Screen.EVENTS)
+            },
+        )
+
+        SidebarItem(
+            icon = Icons.Outlined.Star,
+            label = stringResource(R.string.exam_plan_title),
+            visible = open,
+            index = 1,
+            onClick = {
+                close()
+                onSelect(Screen.EXAMS)
             },
         )
 
@@ -187,10 +205,21 @@ internal fun AppDrawer(
         )
 
         SidebarItem(
+            icon = Icons.Outlined.Refresh,
+            label = stringResource(R.string.history_title),
+            visible = open,
+            index = 7,
+            onClick = {
+                close()
+                onSelect(Screen.CHANGES)
+            },
+        )
+
+        SidebarItem(
             icon = Icons.Outlined.PlayArrow,
             label = stringResource(R.string.dino_title),
             visible = open,
-            index = 7,
+            index = 8,
             onClick = {
                 close()
                 onSelect(Screen.DINO)
@@ -221,6 +250,7 @@ internal fun AppDrawer(
                 onSelect(Screen.ABOUT)
             },
         )
+            }
     }
 }
 

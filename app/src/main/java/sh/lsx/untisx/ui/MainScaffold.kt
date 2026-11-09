@@ -13,7 +13,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +37,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -41,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -80,7 +87,10 @@ import sh.lsx.untisx.ui.theme.appScreenContainerColor
 import sh.lsx.untisx.ui.timetable.ErrorBanner
 import sh.lsx.untisx.ui.timetable.InfoBanner
 import sh.lsx.untisx.ui.timetable.LessonCardOptions
+import sh.lsx.untisx.ui.timetable.CompareSource
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
+import sh.lsx.untisx.ui.timetable.compareLabel
+import sh.lsx.untisx.ui.timetable.timetableViewModel
 import sh.lsx.untisx.ui.util.AppMotion
 import sh.lsx.untisx.ui.util.uiTextString
 
@@ -147,9 +157,18 @@ internal fun MainApp(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val drawerOpen = drawerState.targetValue == DrawerValue.Open
     val scope = rememberCoroutineScope()
-    val timetableVm: TimetableViewModel = viewModel(
-        key = AccountPrefs.accountId(auth),
-    )
+    val accountId = AccountPrefs.accountId(auth)
+    val timetableVm: TimetableViewModel = timetableViewModel(accountId)
+    val accounts by AccountStore.accounts.collectAsStateWithLifecycle()
+
+    // a second account shown next to the active one; never the active account itself
+    var compareAccountId by rememberSaveable { mutableStateOf<String?>(null) }
+    val compareAuth = accounts.firstOrNull { AccountPrefs.accountId(it) == compareAccountId && compareAccountId != accountId }
+    val compareVm = compareAuth?.let { timetableViewModel(AccountPrefs.accountId(it)) }
+    var lessonFromCompare by rememberSaveable { mutableStateOf(false) }
+    // the account menu's "add account" opens the login form directly
+    var profileStartAdding by rememberSaveable { mutableStateOf(false) }
+    val currentCompareVm by rememberUpdatedState(compareVm)
     val messagesVm: MessagesViewModel = viewModel(
         key = "messages:${AccountPrefs.accountId(auth)}",
     )
@@ -168,14 +187,27 @@ internal fun MainApp(
     val context = LocalContext.current
 
     DisposableEffect(timetableVm) {
-        onDispose { timetableVm.cancelBackgroundWork() }
+        // the previous account may stay visible as the compared one; its loading must go on then
+        onDispose { if (timetableVm !== currentCompareVm) timetableVm.cancelBackgroundWork() }
+    }
+
+    fun switchAccount(id: String) {
+        if (id == accountId) return
+        // switching to the compared account swaps the two sides
+        if (compareAccountId == id) compareAccountId = accountId
+        scope.launch { AccountStore.setActive(context, id) }
     }
 
     var currentScreen by rememberSaveable { mutableStateOf(Screen.TIMETABLE) }
+
+    LaunchedEffect(currentScreen) {
+        if (currentScreen != Screen.PROFILE) profileStartAdding = false
+    }
     var selectedLesson by rememberSaveable(stateSaver = timetableEntrySaver) {
         mutableStateOf<TimetableEntry?>(null)
     }
     var selectedTeacherId by rememberSaveable { mutableStateOf(0) }
+    var selectedSubjectId by rememberSaveable { mutableStateOf(0) }
     var selectedEvent by rememberSaveable(stateSaver = timetableEntrySaver) {
         mutableStateOf<TimetableEntry?>(null)
     }
@@ -199,6 +231,20 @@ internal fun MainApp(
         }
     }
     var pendingNotebookLeave by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    // notes of the installed version, shown once after an update
+    val whatsNew = remember {
+        val prefs = context.getSharedPreferences("whats_new", android.content.Context.MODE_PRIVATE)
+        val current = sh.lsx.untisx.data.update.AppUpdater.currentVersion(context)
+        val seen = prefs.getString("seen", null)
+        prefs.edit().putString("seen", current).apply()
+        val notes = sh.lsx.untisx.ui.screens.ReleaseNotesParser.bundled(context)
+        if (seen != current && notes.isNotBlank()) current to notes else null
+    }
+    var showWhatsNew by rememberSaveable { mutableStateOf(whatsNew != null) }
+    if (showWhatsNew && whatsNew != null) {
+        sh.lsx.untisx.ui.screens.WhatsNewDialog(whatsNew.first, whatsNew.second) { showWhatsNew = false }
+    }
 
     fun requestNotebookLeave(action: () -> Unit) {
         val editor = notebookVm.editorState.value as? NotebookEditorState.Ready
@@ -250,6 +296,20 @@ internal fun MainApp(
                 requestNotebookLeave {
                 timetableVm.ensureEvents()
                 currentScreen = Screen.EVENTS
+                onFocusConsumed()
+                }
+            }
+
+            sh.lsx.untisx.data.absences.AbsenceAlerts.FOCUS_ABSENCES -> {
+                requestNotebookLeave {
+                currentScreen = Screen.ABSENCES
+                onFocusConsumed()
+                }
+            }
+
+            sh.lsx.untisx.data.update.AppUpdater.FOCUS_ABOUT -> {
+                requestNotebookLeave {
+                currentScreen = Screen.ABOUT
                 onFocusConsumed()
                 }
             }
@@ -381,6 +441,8 @@ internal fun MainApp(
             currentScreen == Screen.NOTEBOOK -> currentScreen = Screen.TIMETABLE
             currentScreen == Screen.EVENT_DETAILS -> currentScreen = previousScreen
             currentScreen == Screen.TEACHER_INFO -> currentScreen = Screen.LESSON_DETAILS
+            currentScreen == Screen.SUBJECT_YEAR -> currentScreen = Screen.STATS
+            currentScreen == Screen.RIGHTS -> currentScreen = Screen.PROFILE
             currentScreen == Screen.MESSAGE_DETAILS -> currentScreen = Screen.MESSAGES
             else -> currentScreen = Screen.TIMETABLE
         }
@@ -485,7 +547,14 @@ internal fun MainApp(
             TimetableTargetSheet(
                 current = timetableVm.viewTarget,
                 ownClassId = timetableVm.ownClassId,
-                classes = timetableVm.targetClasses,
+                classes = if (
+                    sh.lsx.untisx.data.rights.RightsProbe.status(context, accountId, sh.lsx.untisx.data.rights.ProbeKey.OTHER_CLASSES) ==
+                    sh.lsx.untisx.data.rights.ProbeStatus.REFUSED
+                ) {
+                    timetableVm.targetClasses.filter { it.id == timetableVm.ownClassId }
+                } else {
+                    timetableVm.targetClasses
+                },
                 students = timetableVm.targetStudents,
                 loading = timetableVm.targetsLoading,
                 onPick = {
@@ -510,6 +579,7 @@ internal fun MainApp(
             Screen.TEACHER_INFO -> stringResource(R.string.teacher_info)
             Screen.EVENT_DETAILS -> stringResource(R.string.event)
             Screen.EVENTS -> stringResource(R.string.events)
+            Screen.EXAMS -> stringResource(R.string.exam_plan_title)
             Screen.MESSAGES -> stringResource(R.string.messages)
             Screen.MESSAGE_DETAILS -> stringResource(R.string.messages)
             Screen.NOTEBOOK -> stringResource(R.string.notebook_title)
@@ -524,6 +594,10 @@ internal fun MainApp(
             Screen.TEACHERS -> stringResource(R.string.teachers)
             Screen.ROOMS -> stringResource(R.string.rooms)
             Screen.STATS -> stringResource(R.string.stats)
+            Screen.SUBJECT_YEAR -> stringResource(R.string.subject_year_title)
+            Screen.RIGHTS -> stringResource(R.string.rights_title)
+            Screen.CHANGES -> stringResource(R.string.history_title)
+            Screen.SEARCH -> stringResource(R.string.search_title)
             Screen.HOMEWORK -> stringResource(R.string.homework_title)
             Screen.ABSENCES -> stringResource(R.string.absences_title)
             Screen.DINO -> stringResource(R.string.dino_title)
@@ -566,7 +640,87 @@ internal fun MainApp(
                                 }
                             },
                             onBack = { goBack() },
-                            onProfile = { currentScreen = Screen.PROFILE },
+                            onProfile = {
+                                profileStartAdding = false
+                                currentScreen = Screen.PROFILE
+                            },
+                            onSearch = { requestNotebookLeave { currentScreen = Screen.SEARCH } },
+                            accountInitial = auth.user.trim().take(1).uppercase().takeIf { accounts.size > 1 && it.isNotBlank() },
+                            accountMenu = { close ->
+                                accounts.forEach { account ->
+                                    val id = AccountPrefs.accountId(account)
+
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(account.user, style = MaterialTheme.typography.bodyLarge)
+                                                Text(
+                                                    account.displayName,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        },
+                                        leadingIcon = {
+                                            if (id == accountId) Icon(Icons.Outlined.Check, contentDescription = null)
+                                        },
+                                        onClick = {
+                                            close()
+                                            requestNotebookLeave { switchAccount(id) }
+                                        },
+                                    )
+                                }
+
+                                HorizontalDivider()
+
+                                accounts.filter { AccountPrefs.accountId(it) != accountId }.forEach { other ->
+                                    val id = AccountPrefs.accountId(other)
+
+                                    if (id != compareAccountId) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.compare_with, other.user)) },
+                                            leadingIcon = { Icon(painterResource(R.drawable.ic_compare_columns), contentDescription = null) },
+                                            onClick = {
+                                                close()
+                                                compareAccountId = id
+                                            },
+                                        )
+                                    }
+                                }
+
+                                if (compareVm != null) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.compare_exit)) },
+                                        leadingIcon = { Icon(Icons.Outlined.Close, contentDescription = null) },
+                                        onClick = {
+                                            close()
+                                            compareAccountId = null
+                                        },
+                                    )
+                                }
+
+                                if (accounts.size < 2) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.account_menu_add)) },
+                                        leadingIcon = { Icon(Icons.Outlined.Add, contentDescription = null) },
+                                        onClick = {
+                                            close()
+                                            profileStartAdding = true
+                                            currentScreen = Screen.PROFILE
+                                        },
+                                    )
+                                }
+
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.account_menu_manage)) },
+                                    leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
+                                    onClick = {
+                                        close()
+                                        profileStartAdding = false
+                                        currentScreen = Screen.PROFILE
+                                    },
+                                )
+                            },
                             onTitleClick = if (isTimetable) {
                                 {
                                     timetableVm.loadTargets()
@@ -618,10 +772,33 @@ internal fun MainApp(
                         selectedEvent = selectedEvent,
                         onLessonClick = { entry ->
                             selectedLesson = entry
+                            lessonFromCompare = false
                             timetableVm.loadLessonNotes(entry)
                             currentScreen = Screen.LESSON_DETAILS
                         },
+                        compare = compareVm?.let { other ->
+                            CompareSource(
+                                vm = other,
+                                ownLabel = compareLabel(auth, compareAuth),
+                                otherLabel = compareAuth?.let { compareLabel(it, auth) }.orEmpty(),
+                                onLessonClick = { entry ->
+                                    selectedLesson = entry
+                                    lessonFromCompare = true
+                                    other.loadLessonNotes(entry)
+                                    currentScreen = Screen.LESSON_DETAILS
+                                },
+                                onExit = { compareAccountId = null },
+                            )
+                        },
+                        lessonVm = if (lessonFromCompare && compareVm != null) compareVm else timetableVm,
+                        lessonReadOnly = lessonFromCompare && compareVm != null,
+                        profileStartAdding = profileStartAdding,
                         selectedTeacherId = selectedTeacherId,
+                        selectedSubjectId = selectedSubjectId,
+                        onSubjectClick = { id ->
+                            selectedSubjectId = id
+                            currentScreen = Screen.SUBJECT_YEAR
+                        },
                         onTeacherClick = { id ->
                             selectedTeacherId = id
                             currentScreen = Screen.TEACHER_INFO

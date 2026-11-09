@@ -127,7 +127,7 @@ class DayOverviewWorker(
                 last.teacher == entry.teacher &&
                 last.klasse == entry.klasse &&
                 last.room == entry.room &&
-                last.endTime == entry.startTime
+                (entry.startTime / 100 * 60 + entry.startTime % 100) - (last.endTime / 100 * 60 + last.endTime % 100) in 0..5
             ) {
                 merged[merged.size - 1] = last.copy(endTime = entry.endTime)
             } else {

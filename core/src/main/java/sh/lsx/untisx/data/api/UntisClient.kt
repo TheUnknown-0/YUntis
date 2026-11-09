@@ -72,6 +72,14 @@ object UntisClient {
 
     suspend fun getHolidays(auth: AuthData): List<Holiday> = UntisMasterDataApi.getHolidays(auth)
 
+    /** Time of the school's last Untis import (epoch millis); changes whenever the timetable data changed. */
+    suspend fun getLatestImportTime(auth: AuthData): Long =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            UntisRpc.rpcCall(auth, "getLatestImportTime").let { result ->
+                (result as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull() ?: 0L
+            }
+        }
+
     data class MasterData(
         val subjects: List<MasterDataItem>,
         val teachers: List<MasterDataItem>,
@@ -158,7 +166,15 @@ object UntisClient {
     data class PeriodNotes(
         val topic: String?,
         val notes: List<String>,
+        val homeworks: List<String> = emptyList(),
+        /** True when the teacher checked attendance for this lesson. */
+        val attendanceChecked: Boolean? = null,
+        /** True when an absence of the student is recorded for this lesson. */
+        val absent: Boolean = false,
     )
+
+    /** A teacher or room that was swapped: [current] replaces [previous] (either may be empty). */
+    data class Swap(val kind: String, val current: String, val previous: String)
 
     suspend fun fetchPeriodNotes(
         auth: AuthData,
@@ -171,6 +187,11 @@ object UntisClient {
         val substitution: String?,
         val topic: String?,
         val notes: List<String>,
+        val homeworks: List<String> = emptyList(),
+        val swaps: List<Swap> = emptyList(),
+        val exam: String? = null,
+        val attendanceChecked: Boolean? = null,
+        val absent: Boolean = false,
     )
 
     suspend fun fetchLessonDetails(

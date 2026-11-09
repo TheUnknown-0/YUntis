@@ -33,6 +33,7 @@ object NotificationScheduler {
         ensureOverviewAlarm(context)
         ensureExamReminderAlarm(context)
         NotebookReminderScheduler.ensureAll(context)
+        sh.lsx.untisx.data.planner.PlannerScheduler.ensureAll(context)
     }
 
     fun onAccountRemoved(context: Context, accountId: String) {

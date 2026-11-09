@@ -103,6 +103,7 @@ fun LessonDetailsScreen(
     onEditColor: (() -> Unit)? = null,
     ownExam: ExamInfo? = null,
     onAddExam: (() -> Unit)? = null,
+    showNotebook: Boolean = true,
 ) {
     val timeFormat = rememberTimeFormat()
 
@@ -404,7 +405,62 @@ fun LessonDetailsScreen(
                     }
                 }
 
-                is TimetableViewModel.NotesState.Loaded -> {
+                is TimetableViewModel.NotesState.Loaded -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (state.swaps.isNotEmpty() || state.exam != null) {
+                        DetailCard {
+                            Text(
+                                text = stringResource(R.string.lesson_changes),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            state.swaps.forEach { swap ->
+                                val label = stringResource(if (swap.kind == "room") R.string.lesson_room else R.string.lesson_teacher)
+                                val line = when {
+                                    swap.current.isNotBlank() && swap.previous.isNotBlank() ->
+                                        stringResource(R.string.lesson_swap, label, swap.current, swap.previous)
+                                    swap.current.isNotBlank() -> stringResource(R.string.lesson_swap_added, label, swap.current)
+                                    else -> stringResource(R.string.lesson_swap_removed, label, swap.previous)
+                                }
+                                Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                            state.exam?.let {
+                                Text(
+                                    stringResource(R.string.lesson_exam_detail, it),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                    }
+
+                    if (state.homeworks.isNotEmpty()) {
+                        DetailCard {
+                            Text(
+                                text = stringResource(R.string.lesson_school_homework),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            state.homeworks.forEach { homework ->
+                                Text("• $homework", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+
+                    if (state.attendanceChecked != null || state.absent) {
+                        Text(
+                            text = stringResource(
+                                when {
+                                    state.absent -> R.string.lesson_attendance_absent
+                                    state.attendanceChecked == true -> R.string.lesson_attendance_checked
+                                    else -> R.string.lesson_attendance_open
+                                },
+                            ),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (state.absent) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        )
+                    }
+
                     state.topic?.let { topic ->
                         DetailCard {
                             Text(
@@ -444,14 +500,16 @@ fun LessonDetailsScreen(
             }
         }
 
-        NotebookLessonSection(
-            links = notebookLinks,
-            today = today,
-            onItemClick = onNotebookItemClick,
-            onCreateNote = onCreateNote,
-            onCreateTask = onCreateTask,
-            onJumpToDate = onJumpToDate,
-        )
+        if (showNotebook) {
+            NotebookLessonSection(
+                links = notebookLinks,
+                today = today,
+                onItemClick = onNotebookItemClick,
+                onCreateNote = onCreateNote,
+                onCreateTask = onCreateTask,
+                onJumpToDate = onJumpToDate,
+            )
+        }
     }
 }
 

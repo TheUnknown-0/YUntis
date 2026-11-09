@@ -204,3 +204,35 @@ internal fun stackParallelLessons(lessons: List<LessonDisplay>): List<LessonStac
 
     return laidOut.map { LessonStack(it) } + stacks.map { (shown, hidden) -> LessonStack(shown, hidden) }
 }
+
+/** A gap of at least [FREE_MIN_MINUTES] between lessons that take place; cancelled lessons count as free. */
+internal data class FreeGap(val start: Int, val end: Int) {
+    val minutes: Int get() = minutesOf(end) - minutesOf(start)
+}
+
+internal const val FREE_MIN_MINUTES = 40
+
+internal fun freeGaps(lessons: List<TimetableEntry>, minMinutes: Int = FREE_MIN_MINUTES): List<FreeGap> {
+    val busy = lessons
+        .filter { !it.cancelled && it.endTime > it.startTime }
+        .sortedBy { it.startTime }
+
+    val gaps = ArrayList<FreeGap>()
+    var blockEnd = -1
+
+    busy.forEach { lesson ->
+        if (blockEnd >= 0 && minutesOf(lesson.startTime) - minutesOf(blockEnd) >= minMinutes) {
+            gaps += FreeGap(blockEnd, lesson.startTime)
+        }
+        if (lesson.endTime > blockEnd) blockEnd = lesson.endTime
+    }
+
+    return gaps
+}
+
+/** "45 min", "2 h", "1 h 30". */
+internal fun freeDurationText(minutes: Int): String = when {
+    minutes < 60 -> "$minutes min"
+    minutes % 60 == 0 -> "${minutes / 60} h"
+    else -> "${minutes / 60} h ${minutes % 60}"
+}

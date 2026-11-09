@@ -47,13 +47,21 @@ import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AccountStore
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.notifications.SyncSchedule
+import sh.lsx.untisx.data.notifications.ScheduleChangeDetector
+import sh.lsx.untisx.data.history.ChangeHistory
 import sh.lsx.untisx.data.prefs.PasswordVault
 import sh.lsx.untisx.data.wear.WearSync
 import sh.lsx.untisx.ui.util.UiText
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-class TimetableViewModel(app: Application) : AndroidViewModel(app) {
+/**
+ * Timetable of one account. [boundAccountId] pins it to that account so a second instance can show
+ * another account next to the active one; without it the active account at creation is used.
+ */
+class TimetableViewModel(app: Application, private val boundAccountId: String?) : AndroidViewModel(app) {
+
+    constructor(app: Application) : this(app, null)
 
     sealed interface NotesState {
         data object Loading : NotesState
@@ -63,6 +71,11 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             val substitution: String?,
             val topic: String?,
             val notes: List<String>,
+            val homeworks: List<String> = emptyList(),
+            val swaps: List<UntisClient.Swap> = emptyList(),
+            val exam: String? = null,
+            val attendanceChecked: Boolean? = null,
+            val absent: Boolean = false,
         ) : NotesState
 
         data object Unavailable : NotesState
@@ -121,6 +134,43 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     var lastFetch by mutableLongStateOf(0L)
         private set
+
+    /** Time of the school's last Untis import, 0 if unknown or not shared. */
+    var schoolImportTime by mutableLongStateOf(0L)
+        private set
+    private var importCheckedAt = 0L
+    private var importUnsupported = false
+    private val importAtFetch = HashMap<Int, Long>()
+    private val fullFetchAt = HashMap<Int, Long>()
+
+    /**
+     * The school's import time, asked at most once a minute. Cheap compared to a whole week, so a
+     * week whose import time did not change is not loaded again (see [ensureWeek]).
+     */
+    private suspend fun latestImport(): Long {
+        if (importUnsupported) return 0L
+        val now = System.currentTimeMillis()
+        if (now - importCheckedAt < 60_000L) return schoolImportTime
+
+        return try {
+            val account = requireAuth()
+            val (time, fresh) = SessionManager.withValidSession(getApplication(), account) { UntisClient.getLatestImportTime(it) }
+            if (fresh != null) persistSession(fresh)
+            importCheckedAt = now
+            schoolImportTime = time
+            time
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: UntisException.Api) {
+            importUnsupported = true
+            0L
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    /** Day view: the shown weekday (1 = Monday), or null for the whole week. */
+    var focusedDay by mutableStateOf<Int?>(null)
 
     val events get() = eventsLoader.events
     val eventsLoading get() = eventsLoader.loading
@@ -202,7 +252,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         backgroundScope.launch {
             AccountStore.ensureLoaded(getApplication())
 
-            val account = AccountStore.active
+            val account = boundAccount()
             val cached = account?.let {
                 withContext(Dispatchers.IO) { TimetableCache.load(getApplication(), AccountPrefs.accountId(it)) }
             }
@@ -271,6 +321,19 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     /** All loaded weeks of the account's own timetable, also while another timetable is shown. */
     fun ownEntries(): List<TimetableEntry> = (savedOwnWeeks ?: weekCache).values.flatten()
+
+    /** The own weeks by their Monday, also while another timetable is shown. */
+    fun ownWeeks(): Map<Int, List<TimetableEntry>> = if (viewTarget == null) weeks else (savedOwnWeeks ?: weekCache).toMap()
+
+    /** Loads the own weeks from now up to [last] in the background, without moving the timetable. */
+    fun preloadWeeksUntil(last: LocalDate) {
+        if (!initialized || viewTarget != null) return
+        var monday = anchorMonday
+        while (!monday.isAfter(last)) {
+            ensureWeek(monday)
+            monday = monday.plusWeeks(1)
+        }
+    }
 
     /** The account's own class, offered first in the picker. */
     val ownClassId: Int get() = auth?.session?.klasseId ?: 0
@@ -425,6 +488,11 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                         substitution = detail.substitution,
                         topic = detail.topic,
                         notes = detail.notes,
+                        homeworks = detail.homeworks,
+                        swaps = detail.swaps,
+                        exam = detail.exam,
+                        attendanceChecked = detail.attendanceChecked,
+                        absent = detail.absent,
                     )
                 }
             } catch (e: CancellationException) {
@@ -589,6 +657,17 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
 
+            // nothing imported since this week was loaded: skip the download, but load fully at least
+            // every half hour, because changes made directly in WebUntis may not move the import time
+            if (!force && viewTarget == null && weekCache.containsKey(key) && now - (fullFetchAt[key] ?: 0L) < 30 * 60_000L) {
+                val imported = latestImport()
+                if (imported > 0 && imported == importAtFetch[key]) {
+                    weekFetchedAt = weekFetchedAt + (key to now)
+                    onDone?.invoke(true)
+                    return@launch
+                }
+            }
+
             val claimed = flightLock.withLock {
                 if (key in loadingWeeks || now - (weekAttemptAt[key] ?: 0L) < if (force) 10_000L else 30_000L) null else {
                     loadingWeeks = loadingWeeks + key
@@ -604,6 +683,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
             try {
                 val forTarget = viewTarget
+                val importBefore = if (forTarget == null) latestImport() else 0L
                 val (entries, fresh, allRefused, refusedDays) = fetch.fetchWeek(claimed, monday, anchorMonday, forTarget)
 
                 Log.d(
@@ -638,9 +718,29 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                         Log.d(TAG, "stats week record failed: ${e.javaClass.simpleName}")
                     }
 
+                    val previousWeek = weekCache[claimed]
                     weekCache[claimed] = entries
                         .let(::mergeConsecutiveLessons)
                         .sortedWith(compareBy({ it.date }, { it.startTime }))
+
+                    // what changed since the last load goes into the change history
+                    if (previousWeek != null) {
+                        auth?.let { account ->
+                            val detected = ScheduleChangeDetector.detect(
+                                previous = previousWeek,
+                                fresh = weekCache[claimed].orEmpty(),
+                                subjects = subjectsById,
+                                teachers = teachersById,
+                                rooms = roomsById,
+                                subjectAliases = SubjectColorsPrefs.getAliases(getApplication()),
+                            )
+                            if (detected.isNotEmpty()) {
+                                withContext(Dispatchers.IO) {
+                                    ChangeHistory.record(getApplication(), AccountPrefs.accountId(account), detected)
+                                }
+                            }
+                        }
+                    }
 
                     addKnownSubjects(getApplication(), subjectNamesOf(weekCache[claimed] ?: emptyList(), subjectsById))
                     mergeTimetableElements()
@@ -671,6 +771,8 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                     publishWeeks()
                     lastFetch = System.currentTimeMillis()
                     weekFetchedAt = weekFetchedAt + (claimed to lastFetch)
+                    importAtFetch[claimed] = importBefore
+                    fullFetchAt[claimed] = lastFetch
                     persistCache()
                     success = true
 
@@ -709,12 +811,18 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
         AccountStore.ensureLoaded(getApplication())
 
-        val stored = AccountPrefs.getActive()
+        val stored = boundAccount()
             ?: throw UntisException.BadCredentials
 
         auth = stored
 
         return stored
+    }
+
+    private fun boundAccount(): AuthData? {
+        val id = boundAccountId ?: return AccountPrefs.getActive()
+
+        return AccountStore.snapshot.firstOrNull { AccountPrefs.accountId(it) == id }
     }
 
     private suspend fun withPassword(): String {
@@ -921,6 +1029,9 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         lastFetch = data.lastFetch
         viewModelScope.launch(Dispatchers.IO) {
             WearSync.push(getApplication(), data, currentAuth)
+        }
+        if (AccountStore.activeId.value == AccountPrefs.accountId(currentAuth)) {
+            sh.lsx.untisx.data.widget.WidgetUpdater.updateAll(getApplication())
         }
     }
 }

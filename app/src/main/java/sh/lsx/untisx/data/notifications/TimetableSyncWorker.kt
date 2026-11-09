@@ -7,6 +7,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.TimetableCache
+import sh.lsx.untisx.data.history.ChangeHistory
 import kotlinx.coroutines.CancellationException
 import sh.lsx.untisx.data.api.UntisClient
 import sh.lsx.untisx.data.api.UntisException
@@ -37,7 +38,9 @@ class TimetableSyncWorker(
         val changesEnabled = NotificationPrefs.areChangesEnabled(context)
         val newsEnabled = NotificationPrefs.areAnyNewsEnabled(context)
 
-        if (!NotificationPrefs.isEnabled(context) || (!changesEnabled && !newsEnabled)) {
+        val absenceAlerts = sh.lsx.untisx.data.absences.AbsenceAlerts.enabled(context)
+
+        if (!NotificationPrefs.isEnabled(context) || (!changesEnabled && !newsEnabled && !absenceAlerts)) {
             return Result.success()
         }
 
@@ -69,6 +72,10 @@ class TimetableSyncWorker(
 
             if (newsEnabled) {
                 syncNews(context, fresh, accountId, rooms)
+            }
+
+            if (absenceAlerts) {
+                sh.lsx.untisx.data.absences.AbsenceAlerts.check(context, fresh, accountId)
             }
 
             NotificationPrefs.setLastSyncAt(context, System.currentTimeMillis())
@@ -143,15 +150,23 @@ class TimetableSyncWorker(
             val previous = baseline?.weeks?.get(key)
 
             if (previous != null) {
-                changes += ScheduleChangeDetector.detect(
+                // everything goes into the change history; only the chosen kinds are notified
+                val detected = ScheduleChangeDetector.detect(
                     previous = if (boost) previous.filter { it.date == today.toUntisDate() } else previous,
                     fresh = fetched.entries,
                     subjects = subjects,
                     teachers = teachers,
                     rooms = rooms,
                     subjectAliases = SubjectColorsPrefs.getAliases(context),
-                    filter = filter,
                 )
+                ChangeHistory.record(context, accountId, detected)
+                changes += detected.filter {
+                    when (it.type) {
+                        ChangeType.CANCELLED -> filter.cancelled
+                        ChangeType.ROOM -> filter.room
+                        ChangeType.TEACHER -> filter.teacher
+                    }
+                }
             }
 
             observed[key] = if (boost) previous.orEmpty().filter { it.date != today.toUntisDate() } + fetched.entries else fetched.entries

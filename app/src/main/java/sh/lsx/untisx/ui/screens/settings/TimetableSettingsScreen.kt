@@ -269,6 +269,13 @@ fun TimetableSettingsScreen(
                 onCheckedChange = { onLessonOptionsChange(lessonOptions.copy(showExamBadge = it)) },
             )
 
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_show_free_periods),
+                description = stringResource(R.string.settings_show_free_periods_desc),
+                checked = lessonOptions.showFreePeriods,
+                onCheckedChange = { onLessonOptionsChange(lessonOptions.copy(showFreePeriods = it)) },
+            )
+
             SettingsColorRow(
                 label = stringResource(R.string.settings_exam_color),
                 color = Color(examColor ?: MaterialTheme.colorScheme.error.toArgb()),

@@ -75,6 +75,7 @@ fun StatsScreen(
     upToDate: Boolean,
     onLoadHistory: () -> Unit,
     modifier: Modifier = Modifier,
+    onSubjectClick: ((Int) -> Unit)? = null,
 ) {
     val today = LocalDate.now()
     val startDate = schoolYear?.startDate ?: yearStats?.startDate
@@ -324,6 +325,7 @@ fun StatsScreen(
                         nameFor = { subjectName(it, subjectsById) },
                         locale = locale,
                         olderDaysMissing = olderDaysMissing,
+                        onSubjectClick = onSubjectClick,
                     )
                 }
             } else if (subjects.isNotEmpty()) {

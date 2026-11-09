@@ -49,6 +49,7 @@ class UntisXApp : Application() {
         if (url.isNullOrBlank()) return
 
         UntisClient.useLocalTestServer(url)
+        sh.lsx.untisx.data.update.AppUpdater.releaseApi = "$url/github/latest"
         Log.w("UntisXApp", "Using local test server $url")
     }
 

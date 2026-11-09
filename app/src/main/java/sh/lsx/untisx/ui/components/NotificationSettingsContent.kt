@@ -445,6 +445,18 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
                     reschedule()
                 },
             )
+
+            var absenceAlerts by remember { mutableStateOf(sh.lsx.untisx.data.absences.AbsenceAlerts.enabled(context)) }
+            SettingsSwitchRow(
+                title = stringResource(R.string.absence_alert_setting),
+                description = stringResource(R.string.absence_alert_setting_desc),
+                checked = absenceAlerts,
+                onCheckedChange = {
+                    absenceAlerts = it
+                    sh.lsx.untisx.data.absences.AbsenceAlerts.setEnabled(context, it)
+                    reschedule()
+                },
+            )
         }
 
         SettingsSectionCard(
@@ -501,6 +513,8 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
                 },
             )
         }
+
+        PlannerSettingsCards()
     }
 }
 

@@ -14,6 +14,7 @@ object AppearancePrefs {
     const val KEY_SHOW_CHANGES = "show_changes"
     const val KEY_HIDE_CANCELLED = "hide_cancelled"
     const val KEY_SHOW_EXAM_BADGE = "show_exam_badge"
+    const val KEY_SHOW_FREE_PERIODS = "show_free_periods"
 
     const val DEFAULT_CANCELLED_DESATURATION = 1.0f
     const val DEFAULT_CANCELLED_BRIGHTNESS = 1.0f
@@ -29,6 +30,7 @@ object AppearancePrefs {
         KEY_SHOW_CHANGES,
         KEY_HIDE_CANCELLED,
         KEY_SHOW_EXAM_BADGE,
+        KEY_SHOW_FREE_PERIODS,
     )
 
     private fun prefs(context: Context) =
@@ -98,5 +100,12 @@ object AppearancePrefs {
 
     fun setShowExamBadge(context: Context, value: Boolean) {
         prefs(context).edit { putBoolean(KEY_SHOW_EXAM_BADGE, value) }
+    }
+
+    fun showFreePeriods(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_SHOW_FREE_PERIODS, true)
+
+    fun setShowFreePeriods(context: Context, value: Boolean) {
+        prefs(context).edit { putBoolean(KEY_SHOW_FREE_PERIODS, value) }
     }
 }

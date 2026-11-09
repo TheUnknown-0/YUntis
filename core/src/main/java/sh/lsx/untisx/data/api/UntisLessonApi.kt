@@ -59,7 +59,40 @@ internal object UntisLessonApi {
         entryId: Int,
     ): UntisClient.LessonDetail? =
         fetchPeriodNotes(auth, password, entryId)
-            ?.let { UntisClient.LessonDetail(info = null, substitution = null, topic = it.topic, notes = it.notes) }
+            ?.let {
+                UntisClient.LessonDetail(
+                    info = null,
+                    substitution = null,
+                    topic = it.topic,
+                    notes = it.notes,
+                    homeworks = it.homeworks,
+                    attendanceChecked = it.attendanceChecked,
+                    absent = it.absent,
+                )
+            }
+
+    private fun text(element: JsonElement?, vararg keys: String): String? {
+        val obj = runCatching { element?.jsonObject }.getOrNull() ?: return null
+        return keys.firstNotNullOfOrNull { key -> obj[key]?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() } }
+            ?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun array(element: JsonElement?, vararg keys: String) = runCatching {
+        val obj = element?.jsonObject ?: return@runCatching emptyList()
+        keys.firstNotNullOfOrNull { obj[it]?.let { value -> runCatching { value.jsonArray }.getOrNull() } }.orEmpty()
+    }.getOrDefault(emptyList())
+
+    /** Teachers or rooms with a status (REGULAR, SUBSTITUTED/ADDED, REMOVED): what replaced what. */
+    internal fun swapsOf(entry: JsonElement, key: String, kind: String): List<UntisClient.Swap> {
+        val items = array(entry, key).mapNotNull { item ->
+            val name = text(item, "displayName", "longName", "shortName", "name") ?: return@mapNotNull null
+            name to (text(item, "status")?.uppercase() ?: "REGULAR")
+        }
+        val removed = items.filter { it.second == "REMOVED" }.map { it.first }
+        val added = items.filter { it.second == "SUBSTITUTED" || it.second == "ADDED" || it.second == "CHANGED" }.map { it.first }
+        if (removed.isEmpty() && added.isEmpty()) return emptyList()
+        return listOf(UntisClient.Swap(kind, added.joinToString(", "), removed.joinToString(", ")))
+    }
 
     private fun parseLessonDetail(body: String, entryId: Int): UntisClient.LessonDetail? {
         val entries = runCatching {
@@ -80,11 +113,20 @@ internal object UntisLessonApi {
             .map { it.trim() }
             .filter { it.isNotBlank() }
 
+        val homeworks = array(entry, "homeworks", "homeWorks").mapNotNull { text(it, "text", "remark") }
+        val exam = entry["exam"]?.let { exam ->
+            listOfNotNull(text(exam, "examType", "type"), text(exam, "name"), text(exam, "text"))
+                .distinct().joinToString(" · ").takeIf { it.isNotBlank() }
+        }
+
         return UntisClient.LessonDetail(
             info = entry["lessonInfo"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() },
             substitution = entry["substText"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() },
             topic = entry["teachingContent"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() },
             notes = notes,
+            homeworks = homeworks,
+            swaps = swapsOf(entry, "teachers", "teacher") + swapsOf(entry, "rooms", "room"),
+            exam = exam,
         )
     }
 
@@ -121,8 +163,12 @@ internal object UntisLessonApi {
             }
         }.getOrDefault(emptyList())
 
-        if (topic == null && notes.isEmpty()) return null
+        val homeworks = array(data, "homeWorks", "homeworks").mapNotNull { text(it, "text", "remark") }
+        val checked = runCatching { data["absenceChecked"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() }.getOrNull()
+        val absent = array(data, "absences").isNotEmpty()
 
-        return UntisClient.PeriodNotes(topic = topic, notes = notes)
+        if (topic == null && notes.isEmpty() && homeworks.isEmpty() && checked == null && !absent) return null
+
+        return UntisClient.PeriodNotes(topic = topic, notes = notes, homeworks = homeworks, attendanceChecked = checked, absent = absent)
     }
 }

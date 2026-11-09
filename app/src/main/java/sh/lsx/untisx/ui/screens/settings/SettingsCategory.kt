@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.ui.graphics.vector.ImageVector
 import sh.lsx.untisx.R
@@ -22,4 +23,5 @@ enum class SettingsCategory(
         Icons.Outlined.Notifications,
     ),
     TIMETABLE(R.string.timetable, R.string.settings_timetable_desc, Icons.Outlined.DateRange),
+    CALENDAR(R.string.settings_calendar, R.string.settings_calendar_desc, Icons.Outlined.Share),
 }

@@ -28,10 +28,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -148,6 +150,7 @@ fun TimetableScreen(
     focusDate: Int = 0,
     focusNonce: Int = 0,
     onFocusConsumed: () -> Unit = {},
+    compare: CompareSource? = null,
     modifier: Modifier = Modifier,
 ) {
     val error = vm.error
@@ -177,12 +180,18 @@ fun TimetableScreen(
     var highlightedDate by remember { mutableStateOf(0) }
 
     // day view: the shown weekday (1 = Monday), or null for the whole week
-    var focusedDay by rememberSaveable { mutableStateOf<Int?>(null) }
+    // kept in the view model so returning from the lesson details shows the same day again
+    var focusedDay by vm::focusedDay
 
-    BackHandler(enabled = focusedDay != null) { focusedDay = null }
+    // comparing two accounts always uses the day view, starting with today (Monday on weekends)
+    val activeDay = focusedDay ?: if (compare != null) LocalDate.now().dayOfWeek.value.takeIf { it <= 5 } ?: 1 else null
+
+    BackHandler(enabled = focusedDay != null || compare != null) {
+        if (compare != null) compare.onExit() else focusedDay = null
+    }
 
     fun stepDay(direction: Int) {
-        val current = focusedDay ?: return
+        val current = activeDay ?: return
         val next = current + direction
 
         when {
@@ -234,6 +243,10 @@ fun TimetableScreen(
         vm.ensureWeekPage(pagerState.settledPage)
     }
 
+    LaunchedEffect(pagerState.settledPage, compare?.vm) {
+        compare?.vm?.ensureWeekPage(pagerState.settledPage)
+    }
+
     LifecycleResumeEffect(pagerState) {
         val visibleMonday = vm.mondayForPage(pagerState.settledPage)
         val previousAnchor = vm.anchorMonday
@@ -250,6 +263,7 @@ fun TimetableScreen(
         val refreshJob = scope.launch {
             while (true) {
                 vm.ensureWeekPage(pagerState.settledPage)
+                compare?.vm?.ensureWeekPage(pagerState.settledPage)
                 delay(60_000)
             }
         }
@@ -276,10 +290,19 @@ fun TimetableScreen(
         val slots = remember(vm.timegrid) { hourMarkersFrom(vm.timegrid) }
         val grid = remember(slots) { gridMetricsFrom(slots) }
 
+        if (compare != null) {
+            CompareHeader(compare, modifier = Modifier.align(Alignment.TopStart))
+        }
+
         PullToRefreshBox(
-            isRefreshing = refreshing,
-            onRefresh = { vm.refreshVisibleWeek(visibleMonday) },
-            modifier = Modifier.fillMaxSize(),
+            isRefreshing = refreshing || compare?.vm?.refreshing == true,
+            onRefresh = {
+                vm.refreshVisibleWeek(visibleMonday)
+                compare?.vm?.refreshVisibleWeek(visibleMonday)
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = if (compare != null) COMPARE_HEADER_HEIGHT else 0.dp),
         ) {
             Row(
                 modifier = Modifier
@@ -299,7 +322,7 @@ fun TimetableScreen(
                 HorizontalPager(
                     state = pagerState,
                     // in the day view a swipe moves by one day instead of one week
-                    userScrollEnabled = focusedDay == null,
+                    userScrollEnabled = activeDay == null,
                     modifier = Modifier
                         .weight(1f)
                         .height(grid.height + HEADER_HEIGHT),
@@ -335,9 +358,27 @@ fun TimetableScreen(
                         onEventClick = eventClick,
                         // own exams belong to the own timetable, not to another class
                         exams = if (vm.viewTarget == null) vm.exams else emptyList(),
-                        focusedDay = focusedDay,
-                        onDayHeaderClick = { date -> focusedDay = if (focusedDay == null) date.dayOfWeek.value else null },
+                        focusedDay = activeDay,
+                        onDayHeaderClick = { date ->
+                            if (compare == null) focusedDay = if (focusedDay == null) date.dayOfWeek.value else null
+                        },
                         onSwipeDay = ::stepDay,
+                        compare = compare?.let { source ->
+                            val other = source.vm
+                            val otherKey = other.mondayForPage(page).toUntisDate()
+
+                            CompareWeek(
+                                entries = other.weeks[otherKey],
+                                loading = otherKey in other.loadingWeeks,
+                                restrictedDays = other.restrictedDays,
+                                subjectsById = other.subjectsById,
+                                teachersById = other.teachersById,
+                                roomsById = other.roomsById,
+                                holidays = other.holidays,
+                                exams = other.exams,
+                                onLessonClick = if (selectingLesson) { _ -> } else source.onLessonClick,
+                            )
+                        },
                     )
                 }
             }
@@ -374,6 +415,7 @@ fun TimetableScreen(
         if (showLastRefreshed && vm.weeks.isNotEmpty()) {
             LastRefreshedLabel(
                 lastFetch = vm.weekFetchedAt[visibleMonday.toUntisDate()] ?: 0L,
+                schoolImport = vm.schoolImportTime,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(start = 52.dp, bottom = 24.dp),
@@ -413,7 +455,21 @@ private fun WeekPage(
     focusedDay: Int? = null,
     onDayHeaderClick: (LocalDate) -> Unit = {},
     onSwipeDay: (Int) -> Unit = {},
+    compare: CompareWeek? = null,
 ) {
+    val compareDisplays = compare?.let { other ->
+        remember(other.entries, other.exams, other.subjectsById, other.teachersById, other.roomsById, subjectAliases) {
+            lessonDisplays(
+                withExamBlocks(other.entries.orEmpty(), other.exams, other.subjectsById),
+                other.exams,
+                other.subjectsById,
+                other.teachersById,
+                other.roomsById,
+                subjectAliases,
+            )
+        }
+    }
+
     Crossfade(
         targetState = loading && entries == null,
         animationSpec = motionEffects(),
@@ -432,31 +488,7 @@ private fun WeekPage(
             }
 
             val displays = remember(safeEntries, subjectsById, teachersById, roomsById, exams, subjectAliases) {
-                safeEntries.map { entry ->
-                    val subject = resolveSubject(entry, subjectsById)
-
-                    LessonDisplay(
-                        entry = entry,
-                        subject = subject,
-                        label = subjectShortLabel(subjectAliases, subject),
-                        rooms = resolveNames(entry.room, roomsById),
-                        teachers = resolveNames(entry.teacher, teachersById),
-                        origRooms = resolveOriginals(entry.room, roomsById),
-                        origTeachers = resolveOriginals(entry.teacher, teachersById),
-                        exam = ExamsMatcher.best(entry, exams) ?: entry.exam?.let { periodExam ->
-                            ExamInfo(
-                                id = periodExam.id,
-                                examType = periodExam.examtype.orEmpty(),
-                                name = periodExam.name.orEmpty(),
-                                text = periodExam.text.orEmpty(),
-                                date = entry.date,
-                                startTime = entry.startTime,
-                                endTime = entry.endTime,
-                                subjectId = entry.subject.firstOrNull()?.id ?: 0,
-                            )
-                        },
-                    )
-                }
+                lessonDisplays(safeEntries, exams, subjectsById, teachersById, roomsById, subjectAliases)
             }
 
             val weekDays = remember(displays, weekStart) {
@@ -531,8 +563,118 @@ private fun WeekPage(
                     notebookBadges = notebookBadges,
                     onLessonClick = onLessonClick,
                     onEventClick = onEventClick,
+                    compare = compareDisplays?.let { other ->
+                        CompareColumns(
+                            displays = other,
+                            holidays = compare.holidays,
+                            restrictedDays = compare.restrictedDays,
+                            loading = compare.loading && compare.entries == null,
+                            onLessonClick = compare.onLessonClick,
+                        )
+                    },
                 )
             }
+        }
+    }
+}
+
+private fun lessonDisplays(
+    entries: List<TimetableEntry>,
+    exams: List<ExamInfo>,
+    subjectsById: Map<Int, MasterDataItem>,
+    teachersById: Map<Int, MasterDataItem>,
+    roomsById: Map<Int, MasterDataItem>,
+    subjectAliases: Map<String, SubjectAlias>,
+): List<LessonDisplay> = entries.map { entry ->
+    val subject = resolveSubject(entry, subjectsById)
+
+    LessonDisplay(
+        entry = entry,
+        subject = subject,
+        label = subjectShortLabel(subjectAliases, subject),
+        rooms = resolveNames(entry.room, roomsById),
+        teachers = resolveNames(entry.teacher, teachersById),
+        origRooms = resolveOriginals(entry.room, roomsById),
+        origTeachers = resolveOriginals(entry.teacher, teachersById),
+        exam = ExamsMatcher.best(entry, exams) ?: entry.exam?.let { periodExam ->
+            ExamInfo(
+                id = periodExam.id,
+                examType = periodExam.examtype.orEmpty(),
+                name = periodExam.name.orEmpty(),
+                text = periodExam.text.orEmpty(),
+                date = entry.date,
+                startTime = entry.startTime,
+                endTime = entry.endTime,
+                subjectId = entry.subject.firstOrNull()?.id ?: 0,
+            )
+        },
+    )
+}
+
+/** The other account's week while comparing. */
+private class CompareWeek(
+    val entries: List<TimetableEntry>?,
+    val loading: Boolean,
+    val restrictedDays: Set<Int>,
+    val subjectsById: Map<Int, MasterDataItem>,
+    val teachersById: Map<Int, MasterDataItem>,
+    val roomsById: Map<Int, MasterDataItem>,
+    val holidays: List<Holiday>,
+    val exams: List<ExamInfo>,
+    val onLessonClick: (TimetableEntry) -> Unit,
+)
+
+/** What [WeekGrid] needs to draw the other account's column next to each day. */
+private class CompareColumns(
+    val displays: List<LessonDisplay>,
+    val holidays: List<Holiday>,
+    val restrictedDays: Set<Int>,
+    val loading: Boolean,
+    val onLessonClick: (TimetableEntry) -> Unit,
+)
+
+private val COMPARE_HEADER_HEIGHT = 36.dp
+
+@Composable
+private fun CompareHeader(compare: CompareSource, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(COMPARE_HEADER_HEIGHT),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.width(GUTTER_WIDTH), contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = stringResource(R.string.compare_exit),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .tapHaptic(compare.onExit)
+                    .padding(6.dp),
+            )
+        }
+
+        listOf(
+            compare.ownLabel to MaterialTheme.colorScheme.primary,
+            compare.otherLabel to MaterialTheme.colorScheme.tertiary,
+        ).forEach { (label, color) ->
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = color,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 4.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(color.copy(alpha = 0.12f))
+                    .padding(vertical = 4.dp),
+            )
         }
     }
 }
@@ -677,15 +819,22 @@ private fun WeekGrid(
     notebookBadges: Map<LessonKey, NotebookLessonSummary>,
     onLessonClick: (TimetableEntry) -> Unit,
     onEventClick: (TimetableEntry) -> Unit,
+    compare: CompareColumns? = null,
 ) {
     val today = rememberToday()
     val byDate = remember(displays) { displays.groupBy { it.entry.date } }
+    val compareByDate = remember(compare?.displays) { compare?.displays?.groupBy { it.entry.date } }
     val highlightColor = MaterialTheme.colorScheme.primary
 
-    Row(
-        modifier = Modifier.fillMaxSize(),
+    @Composable
+    fun Day(
+        date: LocalDate,
+        byDate: Map<Int, List<LessonDisplay>>,
+        holidays: List<Holiday>,
+        restrictedDays: Set<Int>,
+        onLessonClick: (TimetableEntry) -> Unit,
+        modifier: Modifier,
     ) {
-        weekDays.forEach { date ->
             val dateInt = date.toUntisDate()
             val dayLessons = byDate[dateInt].orEmpty()
             val isWeekday = date.dayOfWeek.value <= 5
@@ -719,11 +868,28 @@ private fun WeekGrid(
                 notebookBadges = notebookBadges,
                 onLessonClick = onLessonClick,
                 onEventClick = onEventClick,
-                modifier = Modifier.weight(1f).drawWithContent {
+                modifier = modifier.drawWithContent {
                     drawContent()
                     if (dateInt == highlightedDate) drawRect(highlightColor.copy(alpha = highlightAlpha()))
                 },
             )
+    }
+
+    Row(
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        weekDays.forEach { date ->
+            Day(date, byDate, holidays, restrictedDays, onLessonClick, Modifier.weight(1f))
+
+            if (compare != null && compareByDate != null) {
+                Box(modifier = Modifier.weight(1f)) {
+                    Day(date, compareByDate, compare.holidays, compare.restrictedDays, compare.onLessonClick, Modifier.fillMaxWidth())
+
+                    if (compare.loading) {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp))
+                    }
+                }
+            }
         }
     }
 }
@@ -891,6 +1057,28 @@ private fun DayColumn(
             }
         }
 
+        val gaps = remember(lessons, lessonOptions.showFreePeriods) {
+            if (lessonOptions.showFreePeriods) freeGaps(lessons.map { it.entry }) else emptyList()
+        }
+        val freeColor = MaterialTheme.colorScheme.tertiary
+
+        gaps.forEach { gap ->
+            val top = (minutesOf(gap.start) - dayStartMinutes).coerceAtLeast(0)
+            val bottom = (minutesOf(gap.end) - dayStartMinutes).coerceAtMost(gridEndMinutes - dayStartMinutes)
+
+            if (bottom > top) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = MINUTE_HEIGHT * top)
+                        .height(MINUTE_HEIGHT * (bottom - top))
+                        .padding(horizontal = 2.dp, vertical = 1.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(freeColor.copy(alpha = 0.08f)),
+                )
+            }
+        }
+
         var openStack by remember { mutableStateOf<LessonStack?>(null) }
         val stacks = remember(lessons) { stackParallelLessons(lessons) }
 
@@ -973,6 +1161,27 @@ private fun DayColumn(
             }
         }
 
+        gaps.forEach { gap ->
+            val top = (minutesOf(gap.start) - dayStartMinutes).coerceAtLeast(0)
+            val label = stringResource(R.string.timetable_free, freeDurationText(gap.minutes))
+
+            Text(
+                text = freeDurationText(gap.minutes),
+                fontSize = 9.sp,
+                lineHeight = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onTertiary,
+                maxLines = 1,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = MINUTE_HEIGHT * top + 1.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(freeColor)
+                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                    .semantics { contentDescription = label },
+            )
+        }
+
         if (isPast || isToday) {
             val dimEnd = when {
                 isPast -> gridEndMinutes
@@ -1020,6 +1229,7 @@ private fun DayColumn(
 private fun LastRefreshedLabel(
     lastFetch: Long,
     modifier: Modifier = Modifier,
+    schoolImport: Long = 0L,
 ) {
     if (lastFetch <= 0L) return
 
@@ -1033,7 +1243,8 @@ private fun LastRefreshedLabel(
     }
 
     Text(
-        text = stringResource(R.string.timetable_last_refreshed, relativeTimeText(lastFetch, now)),
+        text = stringResource(R.string.timetable_last_refreshed, relativeTimeText(lastFetch, now)) +
+            if (schoolImport > 0L) " · " + stringResource(R.string.timetable_school_import, importTimeText(schoolImport)) else "",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier
@@ -1041,6 +1252,14 @@ private fun LastRefreshedLabel(
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
             .padding(horizontal = 12.dp, vertical = 5.dp),
     )
+}
+
+/** "07:12" for today, "Mo., 07:12" for an earlier day. */
+@Composable
+private fun importTimeText(millis: Long): String {
+    val time = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.systemDefault())
+    val clock = time.toLocalTime().format(rememberTimeFormat())
+    return if (time.toLocalDate() == LocalDate.now()) clock else rememberDateFormat("EEE").format(time.toLocalDate()) + ", " + clock
 }
 
 @Composable

@@ -124,7 +124,7 @@ private fun appVersion(context: Context): String = runCatching {
 }.getOrNull().orEmpty()
 
 @Composable
-fun ProfileScreen(modifier: Modifier = Modifier) {
+fun ProfileScreen(modifier: Modifier = Modifier, startAdding: Boolean = false, onOpenRights: () -> Unit = {}) {
     val context = LocalContext.current
     val resources by rememberUpdatedState(LocalResources.current)
     val scope = rememberCoroutineScope()
@@ -132,7 +132,7 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
     val accounts by AccountStore.accounts.collectAsStateWithLifecycle()
     val activeId by AccountStore.activeId.collectAsStateWithLifecycle()
 
-    var adding by remember { mutableStateOf(false) }
+    var adding by remember { mutableStateOf(startAdding) }
     var pendingRemoval by remember { mutableStateOf<AuthData?>(null) }
     var pendingIsLogout by remember { mutableStateOf(false) }
     var removalInspection by remember { mutableStateOf<RemovalInspection?>(null) }
@@ -378,6 +378,18 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                 }) {
                     Text(stringResource(R.string.profile_logout))
                 }
+            }
+        }
+
+        ProfileCard(stringResource(R.string.rights_title)) {
+            Text(
+                text = stringResource(R.string.rights_profile_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = Haptics.haptic { onOpenRights() }) {
+                Text(stringResource(R.string.rights_open))
             }
         }
 

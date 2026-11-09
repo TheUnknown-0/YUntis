@@ -5,36 +5,42 @@ import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
 
+/** Longest break between two lessons of the same course that still shows them as one block. */
+internal const val MERGE_MAX_BREAK_MINUTES = 5
+
+/**
+ * Joins a double lesson into one block: same subject, teacher, room, class and status on the same
+ * day, with at most [MERGE_MAX_BREAK_MINUTES] in between. Parallel courses in the same slot do not
+ * get in the way, because each lesson is matched against the latest block of its own course.
+ */
 internal fun mergeConsecutiveLessons(entries: List<TimetableEntry>): List<TimetableEntry> {
     val sorted = entries.sortedWith(
         compareBy({ it.date }, { it.startTime }, { it.endTime }),
     )
 
     val merged = ArrayList<TimetableEntry>(sorted.size)
+    val latestOfCourse = HashMap<List<Any?>, Int>()
+
+    fun minutes(time: Int) = time / 100 * 60 + time % 100
 
     for (entry in sorted) {
-        val last = merged.lastOrNull()
+        val key = listOf(entry.date, entry.code, entry.subject, entry.teacher, entry.klasse, entry.room)
+        val index = if (entry.subject.isEmpty()) null else latestOfCourse[key]
+        val last = index?.let { merged[it] }
+        val gap = last?.let { minutes(entry.startTime) - minutes(it.endTime) }
 
-        if (
-            last != null &&
-            last.date == entry.date &&
-            last.code == entry.code &&
-            last.subject == entry.subject &&
-            last.teacher == entry.teacher &&
-            last.klasse == entry.klasse &&
-            last.room == entry.room &&
-            last.endTime == entry.startTime
-        ) {
+        if (last != null && gap != null && gap in 0..MERGE_MAX_BREAK_MINUTES) {
             val notes = listOfNotNull(last.lstext, entry.lstext)
                 .distinct()
                 .joinToString(" | ")
 
-            merged[merged.size - 1] = last.copy(
+            merged[index] = last.copy(
                 endTime = entry.endTime,
                 lstext = notes.ifBlank { null },
             )
         } else {
             merged.add(entry)
+            latestOfCourse[key] = merged.lastIndex
         }
     }
 
