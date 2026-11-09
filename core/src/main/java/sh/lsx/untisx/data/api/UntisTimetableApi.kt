@@ -115,8 +115,17 @@ internal object UntisTimetableApi {
 
         val body = UntisRpc.authenticatedGet(auth, password, url) ?: return@withContext null
 
+        val parsed = runCatching { UntisRpc.json.parseToJsonElement(body) }.getOrNull()
+
+        // the school may release days later on this API ("NOT_ALLOWED") while another API has them
+        val refused = refusedDaysV1(parsed)
+        if (refused.isNotEmpty()) {
+            UntisRpc.log("timetable entries refused for $refused -> trying another API")
+            return@withContext null
+        }
+
         runCatching {
-            parseTimetableEntriesV1(UntisRpc.json.parseToJsonElement(body))
+            parseTimetableEntriesV1(requireNotNull(parsed))
         }.onFailure {
             UntisRpc.warn("timetable entries returned an unparseable response")
         }.getOrNull()
@@ -268,6 +277,19 @@ internal object UntisTimetableApi {
         session.klasseId != 0 -> "CLASS" to session.klasseId
         else -> "STUDENT" to session.personId
     }
+
+    /** Dates whose day the server refused to show ("NOT_ALLOWED" and similar). */
+    internal fun refusedDaysV1(result: JsonElement?): List<String> =
+        (runCatching { result?.jsonObject?.get("days") as? JsonArray }.getOrNull()).orEmpty().mapNotNull { day ->
+            val obj = runCatching { day.jsonObject }.getOrNull() ?: return@mapNotNull null
+            val status = (obj["status"] as? JsonPrimitive)?.contentOrNull.orEmpty().uppercase()
+
+            if ("NOT_ALLOWED" in status || "FORBIDDEN" in status || "NO_RIGHT" in status) {
+                (obj["date"] as? JsonPrimitive)?.contentOrNull ?: "?"
+            } else {
+                null
+            }
+        }
 
     private fun parseTimetableEntriesV1(result: JsonElement): List<TimetableEntry> {
         val days = requireNotNull(result.jsonObject["days"] as? JsonArray) { "Missing timetable days" }

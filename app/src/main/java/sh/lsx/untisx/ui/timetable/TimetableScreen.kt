@@ -91,6 +91,10 @@ import sh.lsx.untisx.ui.util.motionEffects
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.util.rememberTimeFormat
 import sh.lsx.untisx.ui.util.tapHaptic
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.input.pointer.pointerInput
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -171,6 +175,28 @@ fun TimetableScreen(
     )
     val scope = rememberCoroutineScope()
     var highlightedDate by remember { mutableStateOf(0) }
+
+    // day view: the shown weekday (1 = Monday), or null for the whole week
+    var focusedDay by rememberSaveable { mutableStateOf<Int?>(null) }
+
+    BackHandler(enabled = focusedDay != null) { focusedDay = null }
+
+    fun stepDay(direction: Int) {
+        val current = focusedDay ?: return
+        val next = current + direction
+
+        when {
+            next in 1..5 -> focusedDay = next
+            direction > 0 -> {
+                focusedDay = 1
+                scope.launch { pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(TimetableViewModel.WEEK_SPAN - 1)) }
+            }
+            else -> {
+                focusedDay = 5
+                scope.launch { pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0)) }
+            }
+        }
+    }
     val highlight = remember { Animatable(0f) }
 
     LaunchedEffect(focusNonce) {
@@ -272,6 +298,8 @@ fun TimetableScreen(
 
                 HorizontalPager(
                     state = pagerState,
+                    // in the day view a swipe moves by one day instead of one week
+                    userScrollEnabled = focusedDay == null,
                     modifier = Modifier
                         .weight(1f)
                         .height(grid.height + HEADER_HEIGHT),
@@ -307,6 +335,9 @@ fun TimetableScreen(
                         onEventClick = eventClick,
                         // own exams belong to the own timetable, not to another class
                         exams = if (vm.viewTarget == null) vm.exams else emptyList(),
+                        focusedDay = focusedDay,
+                        onDayHeaderClick = { date -> focusedDay = if (focusedDay == null) date.dayOfWeek.value else null },
+                        onSwipeDay = ::stepDay,
                     )
                 }
             }
@@ -351,6 +382,9 @@ private fun WeekPage(
     onLessonClick: (TimetableEntry) -> Unit,
     onEventClick: (TimetableEntry) -> Unit,
     exams: List<ExamInfo>,
+    focusedDay: Int? = null,
+    onDayHeaderClick: (LocalDate) -> Unit = {},
+    onSwipeDay: (Int) -> Unit = {},
 ) {
     Crossfade(
         targetState = loading && entries == null,
@@ -405,7 +439,33 @@ private fun WeekPage(
                 }
             }
 
-            Column(modifier = Modifier.fillMaxSize()) {
+            val shownDays = if (focusedDay != null) {
+                listOf(weekStart.plusDays(focusedDay - 1L))
+            } else {
+                weekDays
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (focusedDay != null) {
+                            Modifier.pointerInput(Unit) {
+                                var dragged = 0f
+                                detectHorizontalDragGestures(
+                                    onDragStart = { dragged = 0f },
+                                    onDragEnd = {
+                                        val threshold = 64.dp.toPx()
+                                        if (dragged <= -threshold) onSwipeDay(1)
+                                        if (dragged >= threshold) onSwipeDay(-1)
+                                    },
+                                ) { _, amount -> dragged += amount }
+                            }
+                        } else {
+                            Modifier
+                        },
+                    ),
+            ) {
                 val allDayEvents = remember(displays) {
                     displays
                         .filter { it.entry.isEvent && it.entry.startTime == 0 && it.entry.endTime == 0 }
@@ -414,16 +474,18 @@ private fun WeekPage(
                 }
 
                 DayHeadersRow(
-                    weekDays = weekDays,
+                    weekDays = shownDays,
                     allDayEvents = allDayEvents,
                     onEventClick = onEventClick,
+                    fullNames = focusedDay != null,
+                    onDayClick = onDayHeaderClick,
                     modifier = Modifier.height(HEADER_HEIGHT),
                 )
 
                 WeekGrid(
                     highlightedDate = highlightedDate,
                     highlightAlpha = highlightAlpha,
-                    weekDays = weekDays,
+                    weekDays = shownDays,
                     displays = displays,
                     holidays = holidays,
                     restrictedDays = restrictedDays,
@@ -468,6 +530,8 @@ private fun DayHeadersRow(
     allDayEvents: Map<Int, List<TimetableEntry>>,
     onEventClick: (TimetableEntry) -> Unit,
     modifier: Modifier = Modifier,
+    fullNames: Boolean = false,
+    onDayClick: (LocalDate) -> Unit = {},
 ) {
     val today = rememberToday()
 
@@ -482,9 +546,12 @@ private fun DayHeadersRow(
                 isToday = date == today,
                 allDayEvents = allDayEvents[date.toUntisDate()].orEmpty(),
                 onEventClick = onEventClick,
+                fullName = fullNames,
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight(),
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(8.dp))
+                    .tapHaptic { onDayClick(date) },
             )
         }
     }
@@ -497,8 +564,9 @@ private fun DayHeader(
     allDayEvents: List<TimetableEntry>,
     onEventClick: (TimetableEntry) -> Unit,
     modifier: Modifier = Modifier,
+    fullName: Boolean = false,
 ) {
-    val dateFormat = rememberDateFormat("dMMM")
+    val dateFormat = rememberDateFormat(if (fullName) "dMMMM" else "dMMM")
 
     Column(
         modifier = modifier,
@@ -507,7 +575,7 @@ private fun DayHeader(
     ) {
         Text(
             text = date.dayOfWeek.getDisplayName(
-                TextStyle.SHORT,
+                if (fullName) TextStyle.FULL else TextStyle.SHORT,
                 LocalConfiguration.current.locales[0],
             ),
             style = MaterialTheme.typography.titleMedium,
