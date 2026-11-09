@@ -19,6 +19,7 @@ import sh.lsx.untisx.data.model.AuthResult
 import sh.lsx.untisx.data.model.PeriodExam
 import sh.lsx.untisx.data.model.TimetableElement
 import sh.lsx.untisx.data.model.TimetableEntry
+import sh.lsx.untisx.data.model.TimetableTarget
 import sh.lsx.untisx.data.model.TimegridDay
 import sh.lsx.untisx.data.prefs.AuthData
 import java.time.LocalDate
@@ -30,13 +31,17 @@ internal object UntisTimetableApi {
         auth: AuthData,
         startDate: Int,
         endDate: Int,
+        target: TimetableTarget? = null,
     ): List<TimetableEntry> = withContext(Dispatchers.IO) {
         val session = auth.session
 
         val elementId: Int
         val elementType: Int
 
-        if (session.personType == 5 && session.personId != 0) {
+        if (target != null) {
+            elementId = target.id
+            elementType = target.type
+        } else if (session.personType == 5 && session.personId != 0) {
             elementId = session.personId
             elementType = 5
         } else if (session.klasseId != 0) {
@@ -70,8 +75,10 @@ internal object UntisTimetableApi {
         password: String,
         from: LocalDate,
         to: LocalDate,
+        target: TimetableTarget? = null,
     ): List<TimetableEntry> = withContext(Dispatchers.IO) {
-        val (elementId, elementType) = UntisRpc.internalElement(auth.session)
+        val (elementId, elementType) = target?.let { it.id to internalTypeName(it.type) }
+            ?: UntisRpc.internalElement(auth.session)
 
         val result = UntisRpc.internalRpc(auth, password, "getTimetable2017") { credentials ->
             buildJsonArray {
@@ -96,13 +103,15 @@ internal object UntisTimetableApi {
         password: String,
         from: LocalDate,
         to: LocalDate,
+        target: TimetableTarget? = null,
     ): List<TimetableEntry>? = withContext(Dispatchers.IO) {
-        val (resourceType, resourceId) = restResource(auth.session)
+        val (resourceType, resourceId) = target?.let { internalTypeName(it.type) to it.id } ?: restResource(auth.session)
+        val timetableType = if (target == null) "MY_TIMETABLE" else "STANDARD"
 
         val url = UntisRpc.webuntisUrl(auth.server, "api/rest/view/v1/timetable/entries") +
             "?start=${from.format(DateTimeFormatter.ISO_LOCAL_DATE)}" +
             "&end=${to.format(DateTimeFormatter.ISO_LOCAL_DATE)}" +
-            "&resourceType=$resourceType&resources=$resourceId&timetableType=MY_TIMETABLE"
+            "&resourceType=$resourceType&resources=$resourceId&timetableType=$timetableType"
 
         val body = UntisRpc.authenticatedGet(auth, password, url) ?: return@withContext null
 
@@ -111,6 +120,115 @@ internal object UntisTimetableApi {
         }.onFailure {
             UntisRpc.warn("timetable entries returned an unparseable response")
         }.getOrNull()
+    }
+
+    /**
+     * Week of another class or student through the endpoint the WebUntis web page uses.
+     * Works for accounts that may view class timetables in the browser even when the
+     * app APIs refuse them. Returns null when the server refuses the request.
+     */
+    suspend fun fetchWebWeek(
+        auth: AuthData,
+        monday: LocalDate,
+        target: TimetableTarget,
+    ): List<TimetableEntry>? = withContext(Dispatchers.IO) {
+        val url = UntisRpc.webuntisUrl(auth.server, "api/public/timetable/weekly/data") +
+            "?elementType=${target.type}&elementId=${target.id}" +
+            "&date=${monday.format(DateTimeFormatter.ISO_LOCAL_DATE)}&formatId=1"
+
+        val body = UntisRpc.webGet(auth, url) ?: return@withContext null
+
+        runCatching { parseWebWeek(UntisRpc.json.parseToJsonElement(body), target.id) }
+            .onFailure { UntisRpc.warn("web week returned an unparseable response") }
+            .getOrNull()
+            ?.also { UntisRpc.log("web week -> ${it.size} periods") }
+    }
+
+    /** Parses `data.result.data` of the web endpoint. Null if the answer holds no timetable. */
+    internal fun parseWebWeek(root: JsonElement, elementId: Int): List<TimetableEntry>? {
+        val data = runCatching {
+            root.jsonObject["data"]?.jsonObject?.get("result")?.jsonObject?.get("data")?.jsonObject
+        }.getOrNull() ?: return null
+
+        val names = HashMap<Pair<Int, Int>, JsonObject>()
+        (data["elements"] as? JsonArray).orEmpty().forEach { element ->
+            val obj = runCatching { element.jsonObject }.getOrNull() ?: return@forEach
+            val type = obj["type"]?.jsonPrimitive?.intOrNull ?: return@forEach
+            val id = obj["id"]?.jsonPrimitive?.intOrNull ?: return@forEach
+            names[type to id] = obj
+        }
+
+        val periodsByElement = runCatching { data["elementPeriods"]?.jsonObject }.getOrNull()
+            ?: return emptyList()
+        val periods = (periodsByElement[elementId.toString()] as? JsonArray)
+            ?: periodsByElement.values.firstOrNull() as? JsonArray
+            ?: return emptyList()
+
+        return periods.mapNotNull { period ->
+            runCatching { parseWebPeriod(period.jsonObject, names) }.getOrNull()
+        }.filter { it.date != 0 }
+    }
+
+    private fun parseWebPeriod(period: JsonObject, names: Map<Pair<Int, Int>, JsonObject>): TimetableEntry {
+        fun text(key: String) = (period[key] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf(String::isNotBlank)
+        fun nameOf(type: Int, id: Int, key: String) =
+            (names[type to id]?.get(key) as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf(String::isNotBlank)
+
+        val elements = (period["elements"] as? JsonArray).orEmpty().mapNotNull { element ->
+            val obj = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
+            val type = obj["type"]?.jsonPrimitive?.intOrNull ?: return@mapNotNull null
+            val id = obj["id"]?.jsonPrimitive?.intOrNull ?: 0
+            val orgId = obj["orgId"]?.jsonPrimitive?.intOrNull?.takeIf { it > 0 && it != id }
+
+            type to TimetableElement(
+                id = id,
+                name = nameOf(type, id, "name").orEmpty(),
+                longName = nameOf(type, id, "longName"),
+                orgId = orgId,
+                orgName = orgId?.let { nameOf(type, it, "name") },
+            )
+        }
+
+        val state = text("cellState").orEmpty().uppercase()
+        val flags = runCatching { period["is"]?.jsonObject }.getOrNull()
+        fun flag(key: String) = (flags?.get(key) as? JsonPrimitive)?.contentOrNull == "true"
+
+        val cancelled = state == "CANCEL" || flag("cancelled")
+        val irregular = !cancelled && (
+            state in setOf("SUBSTITUTION", "ROOMSUBSTITUTION", "ADDITIONAL", "SHIFT") ||
+                flag("substitution") || flag("roomSubstitution") || flag("additional") || flag("shift")
+            )
+
+        val id = period["id"]?.jsonPrimitive?.intOrNull ?: 0
+        val periodText = text("periodText")
+        val lessonText = text("lessonText")
+        val substText = text("substText")
+        val info = text("periodInfo")
+
+        return TimetableEntry(
+            id = id,
+            date = period["date"]?.jsonPrimitive?.intOrNull ?: 0,
+            startTime = period["startTime"]?.jsonPrimitive?.intOrNull ?: 0,
+            endTime = period["endTime"]?.jsonPrimitive?.intOrNull ?: 0,
+            klasse = elements.filter { it.first == 1 }.map { it.second },
+            teacher = elements.filter { it.first == 2 }.map { it.second },
+            subject = elements.filter { it.first == 3 }.map { it.second },
+            room = elements.filter { it.first == 4 }.map { it.second },
+            code = when {
+                cancelled -> "cancelled"
+                irregular -> "irregular"
+                else -> null
+            },
+            lstext = substText ?: lessonText,
+            info = info ?: periodText,
+            substText = substText,
+            lessonText = lessonText,
+            exam = if (state == "EXAM" || flag("exam")) {
+                PeriodExam(id = id, name = periodText, text = info)
+            } else {
+                null
+            },
+        )
     }
 
     suspend fun fetchTimegridFromInternalRpc(auth: AuthData): List<TimegridDay> = withContext(Dispatchers.IO) {
@@ -254,6 +372,8 @@ internal object UntisTimetableApi {
             exam = exam,
             layoutStartPosition = layoutStart,
             layoutWidth = layoutWidth,
+            backColor = colorField(obj, "backColor", "color", "backgroundColor"),
+            foreColor = colorField(obj, "foreColor", "textColor", "foregroundColor"),
         )
     }
 
@@ -318,7 +438,21 @@ internal object UntisTimetableApi {
             substText = substitution,
             lessonText = lessonText,
             exam = exam,
+            backColor = colorField(period, "backColor"),
+            foreColor = colorField(period, "foreColor"),
         )
+    }
+
+    private fun colorField(obj: JsonObject, vararg keys: String): String? = keys.firstNotNullOfOrNull { key ->
+        (obj[key] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf(String::isNotBlank)
+    }
+
+    private fun internalTypeName(type: Int): String = when (type) {
+        TimetableTarget.CLASS -> "CLASS"
+        2 -> "TEACHER"
+        3 -> "SUBJECT"
+        4 -> "ROOM"
+        else -> "STUDENT"
     }
 
     private fun internElementTypeId(name: String?): Int? = when (name?.uppercase()) {

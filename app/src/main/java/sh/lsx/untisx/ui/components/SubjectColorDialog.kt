@@ -1,6 +1,17 @@
 package sh.lsx.untisx.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import sh.lsx.untisx.data.SubjectColorResolver
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +49,8 @@ fun SubjectColorDialog(
     defaultTextColor: Int,
     onApply: (cardColor: Int?, textColor: Int?) -> Unit,
     onDismiss: () -> Unit,
+    schoolColor: Int? = null,
+    lockedBySchool: Boolean = false,
 ) {
     val cardEditor = remember(subject) { ColorEditorState(cardColor ?: defaultCardColor) }
     val textEditor = remember(subject) { ColorEditorState(textColor ?: defaultTextColor) }
@@ -45,13 +58,18 @@ fun SubjectColorDialog(
     var textUseDefault by remember(subject) { mutableStateOf(textColor == null) }
     var editText by remember(subject) { mutableStateOf(false) }
 
-    val effectiveCard = if (cardUseDefault) defaultCardColor else cardEditor.color
+    val effectiveCard = when {
+        lockedBySchool && schoolColor != null -> schoolColor
+        cardUseDefault -> defaultCardColor
+        else -> cardEditor.color
+    }
     val effectiveText = if (textUseDefault) defaultTextColor else textEditor.color
     val custom = !cardUseDefault || !textUseDefault
     val lowContrast = custom && contrastRatio(Color(effectiveCard), Color(effectiveText)) < 3f
 
     val editor = if (editText) textEditor else cardEditor
     val editorUseDefault = if (editText) textUseDefault else cardUseDefault
+    val editorLocked = !editText && lockedBySchool
     val applyEnabled = (cardUseDefault || cardEditor.hexValid) &&
         (textUseDefault || textEditor.hexValid)
 
@@ -92,14 +110,44 @@ fun SubjectColorDialog(
 
                 Spacer(Modifier.height(12.dp))
 
-                Row(
+                if (editorLocked) {
+                    Text(
+                        text = stringResource(R.string.color_picker_locked_by_school),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                if (!editText && !editorLocked) {
+                    if (schoolColor != null) {
+                        Text(
+                            text = stringResource(R.string.color_picker_school_fallback),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    QuickSwatches(
+                        selected = if (cardUseDefault) null else cardEditor.color,
+                        onPick = { argb ->
+                            cardUseDefault = false
+                            cardEditor.select(argb)
+                        },
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                if (!editorLocked) Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = stringResource(
                             if (editText) R.string.color_picker_use_default_text
-                            else R.string.color_picker_use_default,
+                            else R.string.color_picker_no_own_color,
                         ),
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.weight(1f),
@@ -115,14 +163,18 @@ fun SubjectColorDialog(
 
                 Spacer(Modifier.height(12.dp))
 
-                ColorEditor(state = editor, enabled = !editorUseDefault)
+                if (!editorLocked) ColorEditor(state = editor, enabled = !editorUseDefault)
             }
         },
         confirmButton = {
             TextButton(
                 onClick = Haptics.haptic {
                     onApply(
-                        if (cardUseDefault) null else cardEditor.color,
+                        when {
+                            lockedBySchool -> cardColor
+                            cardUseDefault -> null
+                            else -> cardEditor.color
+                        },
                         if (textUseDefault) null else textEditor.color,
                     )
                 },
@@ -137,4 +189,33 @@ fun SubjectColorDialog(
             }
         },
     )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun QuickSwatches(
+    selected: Int?,
+    onPick: (Int) -> Unit,
+) {
+    val outline = MaterialTheme.colorScheme.outlineVariant
+    val ring = MaterialTheme.colorScheme.onSurface
+
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SubjectColorResolver.AUTO_PALETTE.forEach { argb ->
+            val isSelected = selected == argb
+
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(Color(argb))
+                    .border(if (isSelected) 3.dp else 1.dp, if (isSelected) ring else outline, CircleShape)
+                    .clickable(onClick = Haptics.haptic { onPick(argb) }),
+            )
+        }
+    }
 }

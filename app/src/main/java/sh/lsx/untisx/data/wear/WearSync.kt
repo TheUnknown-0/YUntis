@@ -22,6 +22,7 @@ import kotlinx.coroutines.withContext
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.TimetableCache
 import sh.lsx.untisx.data.ExamsStore
+import sh.lsx.untisx.data.OwnExamsStore
 import java.security.MessageDigest
 import sh.lsx.untisx.data.prefs.AccountPrefs
 import sh.lsx.untisx.data.prefs.AccountStore
@@ -72,11 +73,13 @@ object WearSync {
                         accountId = accountId.orEmpty(),
                         displayName = auth?.displayName.orEmpty(),
                         server = auth?.server.orEmpty(),
-                        subjectColors = if (auth == null) emptyMap() else SubjectColorsPrefs.getColors(context),
+                        subjectColors = if (auth == null) emptyMap() else SubjectColorsPrefs.effectiveColors(context),
                         subjectAliases = if (auth == null) emptyMap() else SubjectColorsPrefs.getAliases(context),
                         defaultColor = SubjectColorsPrefs.getDefaultColor(context),
                         sentAt = sentAt,
-                        exams = accountId?.let { ExamsStore.load(context, it)?.exams }.orEmpty(),
+                        exams = accountId?.let {
+                            ExamsStore.load(context, it)?.exams.orEmpty() + OwnExamsStore.load(context, it)
+                        }.orEmpty(),
                         requestId = requestId,
                         refreshResult = refreshResult,
                     )

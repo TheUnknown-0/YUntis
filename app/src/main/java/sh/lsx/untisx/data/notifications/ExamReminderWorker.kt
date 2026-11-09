@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.CancellationException
+import sh.lsx.untisx.data.OwnExamsStore
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.TimetableCache
 import sh.lsx.untisx.data.subjectLongLabel
@@ -49,7 +50,9 @@ class ExamReminderWorker(
             val daysBefore = NotificationPrefs.examReminderDaysBefore(context)
             val target = today.plusDays(daysBefore.toLong())
 
-            val exams = UntisClient.fetchExams(auth, password, today.minusDays(1), target.plusDays(1))
+            // own exams count like the school's exams
+            val exams = UntisClient.fetchExams(auth, password, today.minusDays(1), target.plusDays(1)) +
+                OwnExamsStore.load(context, accountId)
             val due = exams.filter { it.date == target.toUntisDate() }
 
             if (due.isEmpty()) return Result.success()
@@ -70,7 +73,7 @@ class ExamReminderWorker(
                     exam = exam,
                     subject = subjectLongLabel(
                         subjectAliases,
-                        subjects[exam.subjectId]?.name?.takeIf { it.isNotBlank() }.orEmpty(),
+                        subjects[exam.subjectId]?.name?.takeIf { it.isNotBlank() } ?: exam.subjectName,
                     ),
                     rooms = exam.roomIds
                         .mapNotNull { id -> rooms[id]?.name?.takeIf { it.isNotBlank() } }

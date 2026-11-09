@@ -64,6 +64,8 @@ data class TimetableSettingsBackup(
     val cancelledStrike: Boolean? = null,
     val strikeColor: String? = null,
     val examColor: String? = null,
+    val preferSchoolColors: Boolean? = null,
+    val autoSubjectColors: Boolean? = null,
     val cancelledDesaturation: Float? = null,
     val cancelledBrightness: Float? = null,
     val pastDim: Float? = null,
@@ -190,6 +192,8 @@ object SettingsBackupManager {
                 cancelledStrike = SubjectColorsPrefs.isCancelledStrike(context),
                 strikeColor = SubjectColorsPrefs.getStrikeColor(context)?.let(::colorToHex),
                 examColor = SubjectColorsPrefs.getExamColor(context)?.let(::colorToHex),
+                preferSchoolColors = SubjectColorsPrefs.preferSchoolColors(context),
+                autoSubjectColors = SubjectColorsPrefs.autoColors(context),
                 cancelledDesaturation = AppearancePrefs.getCancelledDesaturation(context),
                 cancelledBrightness = AppearancePrefs.getCancelledBrightness(context),
                 pastDim = AppearancePrefs.getPastDim(context),
@@ -324,6 +328,8 @@ object SettingsBackupManager {
             timetable.cancelledStrike?.let { SubjectColorsPrefs.setCancelledStrike(context, it) }
             timetable.strikeColor?.let(::hexToColor)?.let { SubjectColorsPrefs.setStrikeColor(context, it) }
             timetable.examColor?.let(::hexToColor)?.let { SubjectColorsPrefs.setExamColor(context, it) }
+            timetable.preferSchoolColors?.let { SubjectColorsPrefs.setPreferSchoolColors(context, it) }
+            timetable.autoSubjectColors?.let { SubjectColorsPrefs.setAutoColors(context, it) }
             timetable.cancelledDesaturation?.let { AppearancePrefs.setCancelledDesaturation(context, it) }
             timetable.cancelledBrightness?.let { AppearancePrefs.setCancelledBrightness(context, it) }
             timetable.pastDim?.let { AppearancePrefs.setPastDim(context, it) }

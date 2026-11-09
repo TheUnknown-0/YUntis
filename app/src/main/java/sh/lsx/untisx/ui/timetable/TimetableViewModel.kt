@@ -24,6 +24,7 @@ import sh.lsx.untisx.R
 import sh.lsx.untisx.data.AppClock
 import sh.lsx.untisx.data.ExamsMatcher
 import sh.lsx.untisx.data.ExamsStore
+import sh.lsx.untisx.data.OwnExamsStore
 import sh.lsx.untisx.data.SchoolYearStats
 import sh.lsx.untisx.data.SubjectColorsPrefs
 import sh.lsx.untisx.data.TimetableCache
@@ -36,6 +37,7 @@ import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.SchoolYear
 import sh.lsx.untisx.data.model.TimegridDay
 import sh.lsx.untisx.data.model.TimetableEntry
+import sh.lsx.untisx.data.model.TimetableTarget
 import sh.lsx.untisx.data.model.toUntisDate
 import sh.lsx.untisx.data.model.toUntisLocalDate
 import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
@@ -108,8 +110,14 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var lessonNotes by mutableStateOf<NotesState?>(null)
         private set
-    var exams by mutableStateOf<List<ExamInfo>>(emptyList())
+    private var serverExams by mutableStateOf<List<ExamInfo>>(emptyList())
+
+    /** Exams the user added in the app. */
+    var ownExams by mutableStateOf<List<ExamInfo>>(emptyList())
         private set
+
+    /** School exams and own exams together; own ones are marked with [ExamInfo.own]. */
+    val exams: List<ExamInfo> get() = serverExams + ownExams
 
     var lastFetch by mutableLongStateOf(0L)
         private set
@@ -191,12 +199,16 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
             account?.let { statsLoader.load(AccountPrefs.accountId(it)) }
 
+            ownExams = account?.let {
+                withContext(Dispatchers.IO) { OwnExamsStore.load(getApplication(), AccountPrefs.accountId(it)) }
+            }.orEmpty()
+
             val cachedExams = account?.let {
                 withContext(Dispatchers.IO) { ExamsStore.load(getApplication(), AccountPrefs.accountId(it)) }
             }
 
             if (cachedExams != null) {
-                exams = cachedExams.exams
+                serverExams = cachedExams.exams
                 examsFetchedAt = cachedExams.fetchedAt
             }
 
@@ -224,6 +236,118 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         val today = AppClock.today().toVisibleWeekStart()
 
         if (today != anchorMonday) anchorMonday = today
+    }
+
+    /** Timetable shown instead of the own one, or null for the own timetable. */
+    var viewTarget by mutableStateOf<TimetableTarget?>(null)
+        private set
+    var targetClasses by mutableStateOf<List<TimetableTarget>>(emptyList())
+        private set
+    var targetStudents by mutableStateOf<List<TimetableTarget>>(emptyList())
+        private set
+    var targetsLoading by mutableStateOf(false)
+        private set
+    var targetsLoaded by mutableStateOf(false)
+        private set
+
+    private var savedOwnWeeks: HashMap<Int, List<TimetableEntry>>? = null
+    private var savedOwnRestricted: Set<Int> = emptySet()
+    private val targetFetchedAt = HashMap<Int, Long>()
+
+    /** The account's own class, offered first in the picker. */
+    val ownClassId: Int get() = auth?.session?.klasseId ?: 0
+
+    fun showTarget(target: TimetableTarget?) {
+        if (target == viewTarget) return
+
+        if (viewTarget == null) {
+            savedOwnWeeks = HashMap(weekCache)
+            savedOwnRestricted = restrictedDays
+        }
+
+        weekCache.clear()
+        if (target == null) {
+            savedOwnWeeks?.let { weekCache.putAll(it) }
+            restrictedDays = savedOwnRestricted
+            savedOwnWeeks = null
+        } else {
+            restrictedDays = emptySet()
+        }
+
+        targetFetchedAt.clear()
+        weekAttemptAt.clear()
+        loadingWeeks = emptySet()
+        synchronized(failedWeeks) { failedWeeks.clear() }
+        error = null
+        viewTarget = target
+        publishWeeks()
+        ensureWeekPage(lastPage)
+    }
+
+    /** Compares names so that numbers sort by value: "7A" before "10A". */
+    private fun naturalCompare(a: String, b: String): Int {
+        val chunk = Regex("""\d+|\D+""")
+        val left = chunk.findAll(a.lowercase()).map { it.value }.toList()
+        val right = chunk.findAll(b.lowercase()).map { it.value }.toList()
+
+        for (i in 0 until minOf(left.size, right.size)) {
+            val x = left[i]
+            val y = right[i]
+            val result = if (x[0].isDigit() && y[0].isDigit()) {
+                compareValuesBy(x, y, { it.trimStart('0').length }, { it.trimStart('0') })
+            } else {
+                x.compareTo(y)
+            }
+            if (result != 0) return result
+        }
+
+        return left.size - right.size
+    }
+
+    /** Loads the classes and students the school shows to this account. */
+    fun loadTargets(force: Boolean = false) {
+        if (targetsLoading || (targetsLoaded && !force)) return
+        targetsLoading = true
+
+        backgroundScope.launch {
+            try {
+                val account = requireAuth()
+
+                suspend fun list(load: suspend (AuthData) -> List<MasterDataItem>): List<MasterDataItem> = try {
+                    val (items, fresh) = SessionManager.withValidSession(getApplication(), account) { load(it) }
+                    if (fresh != null) persistSession(fresh)
+                    items
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.d(TAG, "target list failed: ${e.javaClass.simpleName}")
+                    emptyList()
+                }
+
+                val own = account.session.klasseId
+                targetClasses = list { UntisClient.getKlassen(it) }
+                    .filter { it.id > 0 && it.name.isNotBlank() }
+                    .sortedWith(compareBy<MasterDataItem> { it.id != own }.thenComparator { a, b -> naturalCompare(a.name, b.name) })
+                    .map { TimetableTarget(TimetableTarget.CLASS, it.id, it.name, it.longName) }
+                targetStudents = list { UntisClient.getStudents(it) }
+                    .filter { it.id > 0 && it.id != account.session.personId }
+                    .sortedBy { it.longName.lowercase() }
+                    .map {
+                        TimetableTarget(
+                            TimetableTarget.STUDENT,
+                            it.id,
+                            listOf(it.foreName, it.longName).filter(String::isNotBlank).joinToString(" ").ifBlank { it.name },
+                        )
+                    }
+                targetsLoaded = true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.d(TAG, "targets failed: ${e.javaClass.simpleName}")
+            } finally {
+                targetsLoading = false
+            }
+        }
     }
 
     fun ensureWeekPage(page: Int) {
@@ -307,6 +431,26 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     fun examFor(entry: TimetableEntry): ExamInfo? = ExamsMatcher.best(entry, exams)
 
+    fun saveOwnExam(exam: ExamInfo) {
+        val account = auth ?: return
+        viewModelScope.launch {
+            ownExams = withContext(Dispatchers.IO) {
+                OwnExamsStore.upsert(getApplication(), AccountPrefs.accountId(account), exam)
+            }
+            persistCache()
+        }
+    }
+
+    fun deleteOwnExam(id: Int) {
+        val account = auth ?: return
+        viewModelScope.launch {
+            ownExams = withContext(Dispatchers.IO) {
+                OwnExamsStore.delete(getApplication(), AccountPrefs.accountId(account), id)
+            }
+            persistCache()
+        }
+    }
+
     fun loadHistoricalStats() = statsLoader.loadHistorical()
 
     private suspend fun refreshExams(force: Boolean) = examsLock.withLock {
@@ -324,7 +468,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 today.plusMonths(EXAMS_AHEAD_MONTHS),
             )
 
-            exams = fetched
+            serverExams = fetched
             examsFetchedAt = System.currentTimeMillis()
 
             withContext(Dispatchers.IO) {
@@ -393,8 +537,8 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
 
-        weeks = weekCache.toMap()
         subjectsById = cached.subjects.associateBy { it.id }
+        publishWeeks()
         teachersById = cached.teachers.associateBy { it.id }
         roomsById = cached.rooms.associateBy { it.id }
         holidays = cached.holidays
@@ -412,7 +556,8 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             val key = monday.toUntisDate()
 
             val now = System.currentTimeMillis()
-            if (!force && weekCache.containsKey(key) && now - (weekFetchedAt[key] ?: 0L) < 5 * 60_000L) {
+            val fetchedAt = if (viewTarget == null) weekFetchedAt[key] else targetFetchedAt[key]
+            if (!force && weekCache.containsKey(key) && now - (fetchedAt ?: 0L) < 5 * 60_000L) {
                 onDone?.invoke(true)
                 return@launch
             }
@@ -431,7 +576,8 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             var success = false
 
             try {
-                val (entries, fresh, allRefused, refusedDays) = fetch.fetchWeek(claimed, monday, anchorMonday)
+                val forTarget = viewTarget
+                val (entries, fresh, allRefused, refusedDays) = fetch.fetchWeek(claimed, monday, anchorMonday, forTarget)
 
                 Log.d(
                     TAG,
@@ -440,61 +586,76 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                         " refused=$refusedDays allRefused=$allRefused",
                 )
 
-                if (fresh != null) persistSession(fresh)
-                auth?.let { SyncSchedule.rememberStarts(getApplication(), AccountPrefs.accountId(it), entries) }
-
-                try {
-                    auth?.let { statsLoader.recordWeek(monday, entries, refusedDays, it) }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.d(TAG, "stats week record failed: ${e.javaClass.simpleName}")
-                }
-
-                weekCache[claimed] = entries
-                    .let(::mergeConsecutiveLessons)
-                    .sortedWith(compareBy({ it.date }, { it.startTime }))
-
-                addKnownSubjects(getApplication(), subjectNamesOf(weekCache[claimed] ?: emptyList(), subjectsById))
-                mergeTimetableElements()
-
-                synchronized(failedWeeks) { failedWeeks.remove(claimed) }
-
-                val weekDayDates = (0 until 5).map { monday.plusDays(it.toLong()).toUntisDate() }
-
-                restrictedDays = if (allRefused && entries.isEmpty()) {
-                    restrictedDays + weekDayDates
+                if (forTarget != null) {
+                    // another class or student: only shown, never cached, counted or used for notifications
+                    if (fresh != null) persistSession(fresh)
+                    if (forTarget == viewTarget) {
+                        weekCache[claimed] = entries
+                            .let(::mergeConsecutiveLessons)
+                            .sortedWith(compareBy({ it.date }, { it.startTime }))
+                        mergeTimetableElements()
+                        synchronized(failedWeeks) { failedWeeks.remove(claimed) }
+                        targetFetchedAt[claimed] = System.currentTimeMillis()
+                        publishWeeks()
+                        success = true
+                    }
                 } else {
-                    val lessonDates = entries.map { it.date }.toSet()
-                    val todayDate = AppClock.today().toUntisDate()
+                    if (fresh != null) persistSession(fresh)
+                    auth?.let { SyncSchedule.rememberStarts(getApplication(), AccountPrefs.accountId(it), entries) }
 
-                    val unseen = if (claimed >= anchorMonday.toUntisDate() && holidays.isNotEmpty()) {
-                        weekDayDates.filter { date ->
-                            date > todayDate &&
-                                date !in lessonDates &&
-                                holidays.none { h -> date >= h.startDate && date <= h.endDate }
-                        }
-                    } else {
-                        emptyList()
+                    try {
+                        auth?.let { statsLoader.recordWeek(monday, entries, refusedDays, it) }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.d(TAG, "stats week record failed: ${e.javaClass.simpleName}")
                     }
 
-                    (restrictedDays - weekDayDates.toSet()) + refusedDays.toSet() + unseen.toSet()
+                    weekCache[claimed] = entries
+                        .let(::mergeConsecutiveLessons)
+                        .sortedWith(compareBy({ it.date }, { it.startTime }))
+
+                    addKnownSubjects(getApplication(), subjectNamesOf(weekCache[claimed] ?: emptyList(), subjectsById))
+                    mergeTimetableElements()
+
+                    synchronized(failedWeeks) { failedWeeks.remove(claimed) }
+
+                    val weekDayDates = (0 until 5).map { monday.plusDays(it.toLong()).toUntisDate() }
+
+                    restrictedDays = if (allRefused && entries.isEmpty()) {
+                        restrictedDays + weekDayDates
+                    } else {
+                        val lessonDates = entries.map { it.date }.toSet()
+                        val todayDate = AppClock.today().toUntisDate()
+
+                        val unseen = if (claimed >= anchorMonday.toUntisDate() && holidays.isNotEmpty()) {
+                            weekDayDates.filter { date ->
+                                date > todayDate &&
+                                    date !in lessonDates &&
+                                    holidays.none { h -> date >= h.startDate && date <= h.endDate }
+                            }
+                        } else {
+                            emptyList()
+                        }
+
+                        (restrictedDays - weekDayDates.toSet()) + refusedDays.toSet() + unseen.toSet()
+                    }
+
+                    publishWeeks()
+                    lastFetch = System.currentTimeMillis()
+                    weekFetchedAt = weekFetchedAt + (claimed to lastFetch)
+                    persistCache()
+                    success = true
+
+                    if (claimed == anchorMonday.toUntisDate()) info = null
+
+                    if (!staticDataLoaded) {
+                        staticDataLoaded = true
+                        loadStaticData()
+                    }
+
+                    backgroundScope.launch { refreshExams(force = false) }
                 }
-
-                publishWeeks()
-                lastFetch = System.currentTimeMillis()
-                weekFetchedAt = weekFetchedAt + (claimed to lastFetch)
-                persistCache()
-                success = true
-
-                if (claimed == anchorMonday.toUntisDate()) info = null
-
-                if (!staticDataLoaded) {
-                    staticDataLoaded = true
-                    loadStaticData()
-                }
-
-                backgroundScope.launch { refreshExams(force = false) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -568,7 +729,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             mergeTimetableElements()
             persistCache()
 
-            weekCache[anchorMonday.toUntisDate()]?.takeIf { it.isNotEmpty() }?.let { entries ->
+            weekCache[anchorMonday.toUntisDate()]?.takeIf { it.isNotEmpty() && viewTarget == null }?.let { entries ->
                 runCatching {
                     auth?.let { statsLoader.recordWeek(anchorMonday, entries, emptyList(), it) }
                 }
@@ -670,12 +831,27 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun publishWeeks() {
         weeks = weekCache.toMap()
+        if (viewTarget == null) learnSchoolColors()
+    }
+
+    private fun learnSchoolColors() {
+        val entries = weekCache.values.flatten()
+
+        // Names are only known once master data is there; record them right away so
+        // colors and the subject list do not wait for the next week fetch.
+        addKnownSubjects(getApplication(), subjectNamesOf(entries, subjectsById))
+
+        val relevant = SubjectColorsPrefs.getKnown(getApplication()).toSet()
+        if (relevant.isEmpty()) return
+        val (back, fore) = schoolColorsOf(entries, subjectsById, relevant)
+
+        SubjectColorsPrefs.setSchoolColors(getApplication(), back, fore)
     }
 
     private suspend fun persistCache() = persistLock.withLock {
         val currentAuth = auth ?: return@withLock
 
-        val weeksSnapshot = weekCache.toMap()
+        val weeksSnapshot = (savedOwnWeeks ?: weekCache).toMap()
         val subjectsSnapshot = subjectsById.values.toList()
         val teachersSnapshot = teachersById.values.toList()
         val roomsSnapshot = roomsById.values.toList()

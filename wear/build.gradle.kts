@@ -42,7 +42,10 @@ android {
             signingConfig = if (useReleaseSigning) {
                 signingConfigs.getByName("release")
             } else {
-                if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
+                // -PallowDebugSigning=true answers the question below for builds without a console
+                val allowDebugSigning = project.findProperty("allowDebugSigning") == "true"
+
+                if (!allowDebugSigning && gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
                     val answer = System.console()?.readLine(
                         "WARNING: untisx.keystore missing - this release will be signed with the DEBUG key. Continue? [y/N] "
                     )

@@ -2,6 +2,16 @@ package sh.lsx.untisx.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import sh.lsx.untisx.ui.components.OwnExamColor
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,12 +23,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -76,6 +84,8 @@ fun EventsScreen(
     subjectsById: Map<Int, MasterDataItem> = emptyMap(),
     subjectAliases: Map<String, SubjectAlias> = emptyMap(),
     teachersById: Map<Int, MasterDataItem> = emptyMap(),
+    onAddExam: (() -> Unit)? = null,
+    onEditOwnExam: (ExamInfo) -> Unit = {},
 ) {
     val today = rememberToday()
     var appeared by remember { mutableStateOf(false) }
@@ -126,7 +136,7 @@ fun EventsScreen(
             else -> {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (messages.isNotEmpty()) {
@@ -194,7 +204,7 @@ fun EventsScreen(
                                 key = { index, exam -> "exam-${exam.id}-${exam.date}-${exam.startTime}:$index" },
                             ) { index, exam ->
                                 ExamCard(
-                                    onClick = { onExamClick(exam.date) },
+                                    onClick = { if (exam.own) onEditOwnExam(exam) else onExamClick(exam.date) },
                                     exam = exam,
                                     subjectsById = subjectsById,
                                     subjectAliases = subjectAliases,
@@ -229,6 +239,19 @@ fun EventsScreen(
                     }
                 }
             }
+        }
+
+        onAddExam?.let { add ->
+            ExtendedFloatingActionButton(
+                onClick = add,
+                icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
+                text = { Text(stringResource(R.string.own_exam_add)) },
+                containerColor = OwnExamColor,
+                contentColor = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp),
+            )
         }
     }
 }
@@ -393,7 +416,8 @@ private fun ExamCard(
 ) {
     val type = exam.examType.takeIf { it.isNotBlank() } ?: stringResource(R.string.lesson_exam)
     val timeFormat = rememberTimeFormat()
-    val subject = subjectsById[exam.subjectId]?.name?.takeIf { it.isNotBlank() }?.let { subjectLongLabel(subjectAliases, it) }
+    val subject = (subjectsById[exam.subjectId]?.name?.takeIf { it.isNotBlank() } ?: exam.subjectName.takeIf { it.isNotBlank() })
+        ?.let { subjectLongLabel(subjectAliases, it) }
     val rooms = exam.roomIds.mapNotNull { roomsById[it]?.name?.takeIf { name -> name.isNotBlank() } }.distinct()
     val teachers = exam.teacherIds.mapNotNull { teachersById[it]?.name?.takeIf { name -> name.isNotBlank() } }.distinct()
     val timed = exam.startTime != 0 || exam.endTime != 0
@@ -401,11 +425,18 @@ private fun ExamCard(
     AppCard(
         modifier = modifier.fillMaxWidth().tapHaptic(onClick),
         shape = appCardShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = CardDefaults.cardColors(
+            containerColor = if (exam.own) {
+                OwnExamColor.copy(alpha = 0.14f).compositeOver(MaterialTheme.colorScheme.surfaceContainer)
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            },
+        ),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(if (exam.own) Modifier.drawBehind { drawRect(OwnExamColor, size = size.copy(width = 6.dp.toPx())) } else Modifier)
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -419,6 +450,18 @@ private fun ExamCard(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+
+                if (exam.own) {
+                    Text(
+                        text = stringResource(R.string.own_exam_badge),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier
+                            .background(OwnExamColor, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
 
                 if (exam.name.isNotBlank()) {
                     Text(

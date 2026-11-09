@@ -164,3 +164,43 @@ internal fun mergeEventSpans(entries: List<TimetableEntry>): List<EventSpan> {
 
     return spans
 }
+
+/** One card in a day column. [hidden] lessons run at the same time and are listed when the card is tapped. */
+internal data class LessonStack(
+    val shown: LessonDisplay,
+    val hidden: List<LessonDisplay> = emptyList(),
+) {
+    val all: List<LessonDisplay> get() = listOf(shown) + hidden
+}
+
+private fun TimetableEntry.hasServerLayout(): Boolean = layoutStartPosition != 0 || layoutWidth < 1000
+
+private fun overlaps(a: TimetableEntry, b: TimetableEntry): Boolean =
+    minutesOf(a.startTime) < minutesOf(b.endTime) && minutesOf(b.startTime) < minutesOf(a.endTime)
+
+/**
+ * Puts lessons that run at the same time into one card, so parallel courses (for example
+ * in a class timetable of the upper school) do not hide each other. Lessons with a layout
+ * from the server keep it. The shown lesson is the earliest, preferring held over cancelled
+ * and longer over shorter lessons.
+ */
+internal fun stackParallelLessons(lessons: List<LessonDisplay>): List<LessonStack> {
+    val (laidOut, free) = lessons.partition { it.entry.hasServerLayout() }
+
+    val ordered = free.sortedWith(
+        compareBy<LessonDisplay>(
+            { minutesOf(it.entry.startTime) },
+            { it.entry.cancelled },
+            { -(minutesOf(it.entry.endTime) - minutesOf(it.entry.startTime)) },
+            { it.label.lowercase() },
+        ),
+    )
+
+    val stacks = ArrayList<Pair<LessonDisplay, MutableList<LessonDisplay>>>()
+    for (lesson in ordered) {
+        val host = stacks.firstOrNull { overlaps(it.first.entry, lesson.entry) }
+        if (host != null) host.second += lesson else stacks += lesson to mutableListOf()
+    }
+
+    return laidOut.map { LessonStack(it) } + stacks.map { (shown, hidden) -> LessonStack(shown, hidden) }
+}

@@ -9,7 +9,6 @@
     <string name="remove">Remove</string>
     <string name="apply">Apply</string>
     <string name="reset">Reset</string>
-    <string name="install">Install</string>
     <string name="close">Close</string>
     <string name="menu">Menu</string>
     <string name="profile">Profile</string>
@@ -106,7 +105,7 @@
     <string name="settings_rescan_subjects">Rescan subjects</string>
     <string name="settings_custom">custom</string>
     <string name="settings_strike_cancelled">Strike through cancelled</string>
-    <string name="settings_strike_cancelled_desc">Cut a red line through cancelled lessons</string>
+    <string name="settings_strike_cancelled_desc">Cancelled lessons are struck through, outlined and tinted</string>
     <string name="settings_cards">Cards</string>
     <string name="settings_show_teacher">Show teachers</string>
     <string name="settings_show_room">Show rooms</string>
@@ -114,7 +113,7 @@
     <string name="settings_show_changes_desc">Show substitutions as “old → new”</string>
     <string name="settings_hide_cancelled">Hide cancelled lessons</string>
     <string name="settings_show_exam_badge">Show exam badge</string>
-    <string name="settings_strike_color">Strike-through color</string>
+    <string name="settings_strike_color">Cancellation colour</string>
     <string name="settings_exam_color">Exam highlight color</string>
     <string name="settings_display">Display</string>
     <string name="settings_cancelled_desaturation">Desaturate cancelled</string>
@@ -155,6 +154,7 @@
     <string name="timetable_holiday">Holiday</string>
     <string name="timetable_restricted">Restricted</string>
     <string name="timetable_today">Today</string>
+    <string name="timetable_parallel_more">%1$d more lessons at the same time</string>
     <string name="timetable_last_refreshed">Last refreshed: %1$s</string>
     <string name="time_now">just now</string>
     <plurals name="time_minutes_ago">
@@ -270,23 +270,6 @@
     <string name="error_messages_load">Couldn\'t load messages.</string>
 
     <!-- Update dialog / about updates -->
-    <string name="update_available_title">Update available</string>
-    <string name="update_changelog">Changelog</string>
-    <string name="update_no_changelog">No changelog provided.</string>
-    <string name="update_downloading">Downloading… %1$d%%</string>
-    <string name="update_download_complete">Download complete. Tap install and confirm the system dialog.</string>
-    <string name="update_download">Download</string>
-    <string name="update_later">Later</string>
-    <string name="update_not_now">Not now</string>
-    <string name="updates_title">Updates</string>
-    <string name="updates_checking">Checking for updates…</string>
-    <string name="updates_up_to_date">You are on the latest version.</string>
-    <string name="updates_version_available">Version %1$s is available!</string>
-    <string name="updates_downloading_version">Downloading %1$s… %2$d%%</string>
-    <string name="updates_downloaded_ready">%1$s downloaded and ready to install.</string>
-    <string name="updates_pending_ready">Update downloaded and ready to install.</string>
-    <string name="updates_check_manually">Check for updates manually.</string>
-    <string name="updates_check_for_updates">Check for updates</string>
     <string name="updates_version">v%1$s</string>
 
     <!-- About -->
@@ -317,6 +300,7 @@
 
     <!-- Color picker -->
     <string name="color_picker_use_default">Use default color</string>
+    <string name="color_picker_no_own_color">No own color</string>
     <string name="color_picker_custom_hex">Custom hex</string>
     <string name="color_picker_invalid_hex">Invalid hex color.</string>
     <string name="color_picker_low_contrast">Low contrast with the card text color</string>
@@ -661,4 +645,135 @@
     <string name="notebook_delete_notice_title">Account removal</string>
     <string name="notebook_delete_inspect_failed_title">Notebook data unavailable</string>
     <string name="notebook_delete_inspect_failed_text">The notebook data could not be checked. The account was not removed. Try again later.</string>
+    <string name="settings_prefer_school_colors">School colors take priority</string>
+    <string name="settings_prefer_school_colors_desc">If your school sets a color for a subject, it is used instead of your own.</string>
+    <string name="settings_auto_colors">Automatic colors</string>
+    <string name="settings_auto_colors_desc">Subjects without a color get distinct colors automatically.</string>
+    <string name="settings_color_from_school">school</string>
+    <string name="color_picker_locked_by_school">Your school sets this color. To use your own color, turn off \"School colors take priority\" in the subject colors.</string>
+    <string name="color_picker_school_fallback">Your school sets a color for this subject. Your own color replaces it because school colors do not take priority.</string>
+    <string name="lesson_edit_color">Color</string>
+    <string name="dino_title">Dino mode</string>
+    <string name="dino_intro">Run through your own timetable. Cancelled lessons tear holes into the ground, jump over them! Homework piles block the way, too.</string>
+    <string name="dino_sample_day">No timetable loaded yet, so you run through a sample day.</string>
+    <string name="dino_tap_to_start">Tap to start, hold to jump higher</string>
+    <string name="dino_game_over">Caught!</string>
+    <string name="dino_score">%1$d points</string>
+    <string name="dino_best">Best: %1$d</string>
+    <string name="dino_new_best">New high score!</string>
+    <string name="dino_summary">%1$d cancellations jumped · %2$d homework piles · %3$d school days</string>
+    <string name="dino_again">Again</string>
+    <string name="dino_school_start">On the way to school</string>
+    <string name="dino_school_end">"School's out!"</string>
+    <string name="dino_break">Break</string>
+    <string name="dino_cancelled">Cancelled: %1$s</string>
+    <string name="homework_reminder_same_day">Same day, %1$s</string>
+    <string name="homework_reminder_day_before">Day before, %1$s</string>
+    <string name="homework_reminder_days_before">%1$d days before, %2$s</string>
+    <string name="homework_reminder_before_custom">Before…</string>
+    <string name="homework_reminder_fixed">Fixed time</string>
+    <string name="homework_reminder_follows">Moves along when the due date changes.</string>
+    <string name="homework_reminder_fixed_hint">Stays at the date and time above, even if the due date changes.</string>
+    <string name="homework_reminder_before_title">Remind me before</string>
+    <string name="homework_reminder_amount">Amount</string>
+    <string name="homework_reminder_before_hint">Counted from the start of the due lesson.</string>
+    <string name="homework_unit_minutes">Minutes</string>
+    <string name="homework_unit_hours">Hours</string>
+    <string name="homework_unit_days">Days</string>
+    <plurals name="homework_before_minutes">
+        <item quantity="one">%1$d minute before</item>
+        <item quantity="other">%1$d minutes before</item>
+    </plurals>
+    <plurals name="homework_before_hours">
+        <item quantity="one">%1$d hour before</item>
+        <item quantity="other">%1$d hours before</item>
+    </plurals>
+    <plurals name="homework_before_days">
+        <item quantity="one">%1$d day before</item>
+        <item quantity="other">%1$d days before</item>
+    </plurals>
+    <string name="settings_homework">Homework</string>
+    <string name="settings_homework_auto_due">Due at the next lesson</string>
+    <string name="settings_homework_auto_due_desc">New homework is due at the next lesson of its subject. You can change it any time.</string>
+    <string name="settings_homework_reminder">Remind me by default</string>
+    <string name="settings_homework_reminder_desc">New homework gets this reminder. Existing reminders stay as they are.</string>
+    <string name="settings_homework_reminder_days">When</string>
+    <string name="settings_homework_reminder_time">At</string>
+    <string name="settings_homework_same_day">Same day</string>
+    <string name="settings_homework_day_before">Day before</string>
+    <string name="own_exam_add">Add exam</string>
+    <string name="own_exam_add_short">Exam</string>
+    <string name="own_exam_edit">Edit own exam</string>
+    <string name="own_exam_badge">Own exam</string>
+    <string name="own_exam_default_type">Exam</string>
+    <string name="own_exam_hint">Entered by you. Counts like an exam from your school, but is marked in purple.</string>
+    <string name="own_exam_subject">Subject</string>
+    <string name="own_exam_type">Type (e.g. exam, test)</string>
+    <string name="own_exam_pick_date">Choose a date</string>
+    <string name="own_exam_lesson">Lesson</string>
+    <string name="own_exam_no_lesson">No lesson of this subject on that day. Set the time yourself if you want.</string>
+    <string name="own_exam_from">From %1$s</string>
+    <string name="own_exam_to">To %1$s</string>
+    <string name="own_exam_note">Note (topics, pages, …)</string>
+    <string name="own_exam_delete">Delete</string>
+    <string name="own_exam_delete_title">Delete exam?</string>
+    <string name="own_exam_delete_text">The exam you entered is removed from this device.</string>
+    <string name="homework_title">Homework</string>
+    <string name="homework_add">Homework</string>
+    <string name="homework_empty">No open homework. Add some with the button below or from a lesson.</string>
+    <string name="homework_untitled">(no title)</string>
+    <string name="homework_group_overdue">Overdue</string>
+    <string name="homework_group_today">Today</string>
+    <string name="homework_group_tomorrow">Tomorrow</string>
+    <string name="homework_group_week">This week</string>
+    <string name="homework_group_later">Later</string>
+    <string name="homework_group_no_date">No due date</string>
+    <string name="homework_show_done">Show done (%1$d)</string>
+    <string name="homework_hide_done">Hide done (%1$d)</string>
+    <string name="homework_due_lesson">due %1$s, %2$s</string>
+    <string name="homework_due_day">due %1$s</string>
+    <plurals name="homework_open_count">
+        <item quantity="one">%1$d open</item>
+        <item quantity="other">%1$d open</item>
+    </plurals>
+    <plurals name="homework_overdue_count">
+        <item quantity="one">%1$d overdue</item>
+        <item quantity="other">%1$d overdue</item>
+    </plurals>
+    <plurals name="homework_done_count">
+        <item quantity="one">%1$d done</item>
+        <item quantity="other">%1$d done</item>
+    </plurals>
+    <string name="stats_legend_held">held</string>
+    <string name="stats_legend_substituted">substitution</string>
+    <string name="stats_legend_cancelled">cancelled</string>
+    <string name="stats_by_subject_hint">Rates relate to the lessons of each subject only.</string>
+    <string name="stats_by_subject_partial">Some older days were counted before this view existed. Load the history again to include them.</string>
+    <string name="stats_cancel_rate_short">%1$s cancelled</string>
+    <string name="stats_subject_line">%1$d planned · %2$d held · %3$d substitution · %4$d cancelled · lost: %5$s</string>
+    <string name="stats_duration_none">nothing</string>
+    <string name="stats_duration_minutes">%1$d min</string>
+    <string name="stats_duration_hours">%1$d h</string>
+    <string name="stats_duration_hours_minutes">%1$d h %2$d min</string>
+    <string name="login_password_show">Show</string>
+    <string name="login_password_hide">Hide</string>
+    <string name="target_title">Choose timetable</string>
+    <string name="target_hint">Shows only what your school shares with your account. Other timetables are not cached or counted in statistics.</string>
+    <string name="target_search">Search class or name</string>
+    <string name="target_own">My timetable</string>
+    <string name="target_own_class">your class</string>
+    <string name="target_classes">Classes (%1$d)</string>
+    <string name="target_students">Students (%1$d)</string>
+    <string name="target_none">Your school does not share other timetables with your account, or they could not be loaded.</string>
+    <string name="target_no_students">Your school does not share timetables of other students with your account.</string>
+    <string name="absences_title">Absences</string>
+    <string name="absences_total">total</string>
+    <string name="absences_excused">excused</string>
+    <string name="absences_unexcused">not excused</string>
+    <string name="absences_excused_one">excused</string>
+    <string name="absences_unexcused_one">not excused</string>
+    <string name="absences_hours">≈ %1$d h</string>
+    <string name="absences_none">No absences recorded this school year.</string>
+    <string name="absences_not_shared">Your school does not share absences with your account.</string>
+    <string name="absences_failed">Absences could not be loaded.</string>
 </resources>

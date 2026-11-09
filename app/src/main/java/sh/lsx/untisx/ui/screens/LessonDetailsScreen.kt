@@ -15,6 +15,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import sh.lsx.untisx.ui.util.tapHaptic
+import sh.lsx.untisx.ui.components.OwnExamColor
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -60,9 +67,9 @@ import sh.lsx.untisx.ui.theme.tornNotebookPaper
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.timetable.LessonCardColors
 import sh.lsx.untisx.ui.timetable.LessonCardOptions
-import sh.lsx.untisx.ui.timetable.StrikeOverlay
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.timetable.cancelledCardColors
+import sh.lsx.untisx.ui.timetable.cancelledMarkColors
 import sh.lsx.untisx.ui.timetable.lessonCardBackground
 import sh.lsx.untisx.ui.timetable.rememberToday
 import sh.lsx.untisx.ui.util.motionEffects
@@ -91,6 +98,9 @@ fun LessonDetailsScreen(
     onCreateNote: () -> Unit = {},
     onCreateTask: () -> Unit = {},
     onJumpToDate: (Int) -> Unit = {},
+    onEditColor: (() -> Unit)? = null,
+    ownExam: ExamInfo? = null,
+    onAddExam: (() -> Unit)? = null,
 ) {
     val timeFormat = rememberTimeFormat()
 
@@ -114,7 +124,10 @@ fun LessonDetailsScreen(
     val paper = if (notebook) notebookNoteColor(color, LocalThemeAppearance.current.dark) else color
     val ink = if (notebook) notebookInk(paper, textColor) else textColor
 
-    val baseColors = if (cancelled) {
+    val marked = cancelled && cancelledStrike && !notebook
+    val baseColors = if (marked) {
+        cancelledMarkColors(paper, lessonOptions.strikeColor, MaterialTheme.colorScheme.surface)
+    } else if (cancelled) {
         cancelledCardColors(paper, ink, cancelledDesaturation, cancelledBrightness, notebook)
     } else {
         LessonCardColors(container = paper, title = ink, body = ink.copy(alpha = if (notebook) 1f else 0.8f))
@@ -129,8 +142,11 @@ fun LessonDetailsScreen(
     }
 
     val showExamOutline = exam != null || entry.exam != null
-    val examColor = lessonOptions.examColor ?: MaterialTheme.colorScheme.error
-    val examBadgeText = if (lessonOptions.examColor == null) {
+    val ownExamShown = exam?.own == true
+    val examColor = if (ownExamShown) OwnExamColor else lessonOptions.examColor ?: MaterialTheme.colorScheme.error
+    val examBadgeText = if (ownExamShown) {
+        Color.White
+    } else if (lessonOptions.examColor == null) {
         MaterialTheme.colorScheme.onError
     } else if (examColor.luminance() > 0.5f) {
         Color.Black
@@ -161,7 +177,7 @@ fun LessonDetailsScreen(
                             container = cardColors.container,
                             cornerRadius = 16.dp,
                             examColor = if (showExamOutline) examColor else null,
-                            strikeSlit = cancelled && cancelledStrike,
+                            outline = if (marked) lessonOptions.strikeColor else null,
                         )
                     },
                 ),
@@ -175,6 +191,7 @@ fun LessonDetailsScreen(
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = cardColors.title,
+                    textDecoration = if (marked) TextDecoration.LineThrough else null,
                     modifier = if (showExamBadge) Modifier.padding(end = if (notebook) 124.dp else 84.dp) else Modifier,
                 )
 
@@ -194,6 +211,34 @@ fun LessonDetailsScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = cardColors.body,
                     )
+                }
+
+                if (onAddExam != null || onEditColor != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    ) {
+                        if (onAddExam != null) {
+                            HeaderPill(
+                                text = stringResource(if (ownExam != null) R.string.own_exam_badge else R.string.own_exam_add_short),
+                                background = if (ownExam != null) OwnExamColor else cardColors.title.copy(alpha = 0.12f),
+                                content = if (ownExam != null) Color.White else cardColors.title,
+                                onClick = onAddExam,
+                            )
+                        }
+
+                        if (onEditColor != null) {
+                            HeaderPill(
+                                text = stringResource(R.string.lesson_edit_color),
+                                background = cardColors.title.copy(alpha = 0.12f),
+                                content = cardColors.title,
+                                onClick = onEditColor,
+                                icon = true,
+                            )
+                        }
+                    }
                 }
             }
 
@@ -223,13 +268,6 @@ fun LessonDetailsScreen(
                         )
                     }
                 }
-            }
-
-            if (!notebook && cancelled && cancelledStrike) {
-                StrikeOverlay(
-                    color = lessonOptions.strikeColor,
-                    modifier = Modifier.matchParentSize(),
-                )
             }
         }
 
@@ -420,7 +458,10 @@ private fun ElementRow(
         elements.forEachIndexed { index, el ->
             if (index > 0) append("  ")
 
-            val current = data?.get(el.id)?.displayName() ?: el.name
+            val elementLong = el.longName.orEmpty()
+            val current = data?.get(el.id)?.let { item ->
+                if (item.longName.isBlank() && elementLong.isNotBlank()) item.copy(longName = elementLong) else item
+            }?.displayName() ?: MasterDataItem(id = el.id, name = el.name, longName = el.longName.orEmpty()).displayName()
             val orgId = el.orgId?.takeIf { it > 0 && it != el.id }
             val orig = when {
                 orgId != null -> data?.get(orgId)?.displayName() ?: el.orgName
@@ -439,7 +480,10 @@ private fun ElementRow(
 }
 
 private fun MasterDataItem.displayName(): String {
-    val long = longName?.takeIf { it.isNotBlank() }
+    val surname = longName.takeIf { it.isNotBlank() }
+    val long = surname?.let { last ->
+        foreName.takeIf { it.isNotBlank() && !last.contains(it) }?.let { "$it $last" } ?: last
+    }
     val short = name.takeIf { it.isNotBlank() }
 
     return when {
@@ -517,6 +561,41 @@ private fun DetailRow(label: String, text: AnnotatedString) {
             text = text,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+@Composable
+private fun HeaderPill(
+    text: String,
+    background: Color,
+    content: Color,
+    onClick: () -> Unit,
+    icon: Boolean = false,
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(background)
+            .tapHaptic(onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon) {
+            Icon(
+                imageVector = Icons.Outlined.Edit,
+                contentDescription = null,
+                tint = content,
+                modifier = Modifier.size(16.dp),
+            )
+
+            Spacer(Modifier.width(4.dp))
+        }
+
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = content,
         )
     }
 }

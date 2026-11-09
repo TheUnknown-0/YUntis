@@ -50,6 +50,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import sh.lsx.untisx.R
+import sh.lsx.untisx.ui.timetable.TimetableTargetSheet
 import sh.lsx.untisx.data.AppTheme
 import sh.lsx.untisx.data.SubjectAlias
 import sh.lsx.untisx.data.model.TimetableEntry
@@ -82,7 +83,6 @@ import sh.lsx.untisx.ui.timetable.LessonCardOptions
 import sh.lsx.untisx.ui.timetable.TimetableViewModel
 import sh.lsx.untisx.ui.util.AppMotion
 import sh.lsx.untisx.ui.util.uiTextString
-import sh.lsx.untisx.update.UpdateViewModel
 
 private val entryJson = Json {
     ignoreUnknownKeys = true
@@ -156,7 +156,6 @@ internal fun MainApp(
     val notebookVm: NotebookViewModel = viewModel(
         key = "notebook:${AccountPrefs.accountId(auth)}",
     )
-    val updateVm: UpdateViewModel = viewModel()
 
     val notebookListState by notebookVm.listState.collectAsStateWithLifecycle()
     val notebookEditorState by notebookVm.editorState.collectAsStateWithLifecycle()
@@ -444,6 +443,11 @@ internal fun MainApp(
                 currentScreen = Screen.NOTEBOOK
             }
 
+            Screen.HOMEWORK -> {
+                notebookVm.refresh()
+                currentScreen = Screen.HOMEWORK
+            }
+
             Screen.SETTINGS -> {
                 settingsCategory = null
                 currentScreen = Screen.SETTINGS
@@ -463,6 +467,7 @@ internal fun MainApp(
                 messagesBadge = messagesVm.messageCount.takeIf { it > 0 }?.toString(),
                 eventsBadge = timetableVm.dayMessages.size.takeIf { it > 0 }?.toString(),
                 notebookBadge = notebookOpenTasks.takeIf { it > 0 }?.toString(),
+                homeworkBadge = notebookOpenTasks.takeIf { it > 0 }?.toString(),
                 teachersBadge = allTeachers.size.toString(),
                 statsBadge = timetableVm.currentYearLessonCount().takeIf { it > 0 }?.toString(),
                 onSelect = { target ->
@@ -472,6 +477,23 @@ internal fun MainApp(
         },
     ) {
         val isTimetable = currentScreen == Screen.TIMETABLE
+        var showTargetPicker by remember { mutableStateOf(false) }
+
+        if (showTargetPicker) {
+            TimetableTargetSheet(
+                current = timetableVm.viewTarget,
+                ownClassId = timetableVm.ownClassId,
+                classes = timetableVm.targetClasses,
+                students = timetableVm.targetStudents,
+                loading = timetableVm.targetsLoading,
+                onPick = {
+                    timetableVm.showTarget(it)
+                    showTargetPicker = false
+                },
+                onRetry = { timetableVm.loadTargets(force = true) },
+                onDismiss = { showTargetPicker = false },
+            )
+        }
         val selectionPrompt = when (notebookSelectionTarget) {
             NotebookLessonTarget.ORIGIN -> stringResource(R.string.notebook_select_source_lesson)
             NotebookLessonTarget.DUE -> stringResource(R.string.notebook_select_due_lesson)
@@ -499,9 +521,14 @@ internal fun MainApp(
             Screen.TEACHERS -> stringResource(R.string.teachers)
             Screen.ROOMS -> stringResource(R.string.rooms)
             Screen.STATS -> stringResource(R.string.stats)
+            Screen.HOMEWORK -> stringResource(R.string.homework_title)
+            Screen.ABSENCES -> stringResource(R.string.absences_title)
+            Screen.DINO -> stringResource(R.string.dino_title)
             Screen.SETTINGS -> settingsTitle
             Screen.ABOUT -> stringResource(R.string.about)
-            else -> stringResource(R.string.timetable)
+            else -> timetableVm.viewTarget?.let { target ->
+                target.longName.takeIf { it.isNotBlank() && it != target.name }?.let { "${target.name} · $it" } ?: target.name
+            } ?: stringResource(R.string.timetable)
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
@@ -537,6 +564,15 @@ internal fun MainApp(
                             },
                             onBack = { goBack() },
                             onProfile = { currentScreen = Screen.PROFILE },
+                            onTitleClick = if (isTimetable) {
+                                {
+                                    timetableVm.loadTargets()
+                                    showTargetPicker = true
+                                }
+                            } else {
+                                null
+                            },
+                            titleHighlight = isTimetable && timetableVm.viewTarget != null,
                         )
                     }
                 },
@@ -649,11 +685,6 @@ internal fun MainApp(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                ErrorBanner(
-                    text = updateVm.transientError?.let { uiTextString(it) },
-                    onRetry = updateVm::check,
-                )
-
                 if (isTimetable) {
                     ErrorBanner(
                         text = timetableVm.error?.let { uiTextString(it.text) },

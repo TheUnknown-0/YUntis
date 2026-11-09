@@ -110,6 +110,20 @@ data class LessonRef(
 data class ReminderSpec(
     val date: Int,
     val minutesOfDay: Int = NotebookReminderTime.DEFAULT_MINUTES_OF_DAY,
+    /** Set when the reminder follows the due date; [date] and [minutesOfDay] are then derived from it. */
+    val rule: ReminderRule? = null,
+)
+
+/**
+ * A reminder relative to the due date.
+ * With [atMinutes]: [daysBefore] days before the due date at that time of day.
+ * Without: [minutesBefore] minutes before the due moment (start of the due lesson).
+ */
+@Serializable
+data class ReminderRule(
+    val daysBefore: Int = 0,
+    val atMinutes: Int? = null,
+    val minutesBefore: Int = 0,
 )
 
 @Serializable

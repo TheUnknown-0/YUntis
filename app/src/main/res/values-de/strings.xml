@@ -9,7 +9,6 @@
     <string name="remove">Entfernen</string>
     <string name="apply">Übernehmen</string>
     <string name="reset">Zurücksetzen</string>
-    <string name="install">Installieren</string>
     <string name="close">Schließen</string>
     <string name="menu">Menü</string>
     <string name="profile">Profil</string>
@@ -106,7 +105,7 @@
     <string name="settings_rescan_subjects">Fächer erneut scannen</string>
     <string name="settings_custom">eigene Farbe</string>
     <string name="settings_strike_cancelled">Ausfälle durchstreichen</string>
-    <string name="settings_strike_cancelled_desc">Entfallene Stunden werden rot durchgestrichen</string>
+    <string name="settings_strike_cancelled_desc">Entfallene Stunden werden durchgestrichen, umrandet und farbig getönt</string>
     <string name="settings_cards">Karten</string>
     <string name="settings_show_teacher">Lehrer anzeigen</string>
     <string name="settings_show_room">Raum anzeigen</string>
@@ -114,7 +113,7 @@
     <string name="settings_show_changes_desc">Vertretungen als „alt → neu“ anzeigen</string>
     <string name="settings_hide_cancelled">Ausfälle ausblenden</string>
     <string name="settings_show_exam_badge">Klausur-Badge anzeigen</string>
-    <string name="settings_strike_color">Strichfarbe</string>
+    <string name="settings_strike_color">Farbe für Ausfälle</string>
     <string name="settings_exam_color">Klausur-Highlight-Farbe</string>
     <string name="settings_display">Darstellung</string>
     <string name="settings_cancelled_desaturation">Ausfälle ausgrauen</string>
@@ -155,6 +154,7 @@
     <string name="timetable_holiday">Ferien</string>
     <string name="timetable_restricted">Gesperrt</string>
     <string name="timetable_today">Heute</string>
+    <string name="timetable_parallel_more">%1$d weitere Stunden gleichzeitig</string>
     <string name="timetable_last_refreshed">Zuletzt aktualisiert: %1$s</string>
     <string name="time_now">gerade eben</string>
     <plurals name="time_minutes_ago">
@@ -270,23 +270,6 @@
     <string name="error_messages_load">Mitteilungen konnten nicht geladen werden.</string>
 
     <!-- Update dialog / about updates -->
-    <string name="update_available_title">Update verfügbar</string>
-    <string name="update_changelog">Änderungen</string>
-    <string name="update_no_changelog">Keine Änderungsliste verfügbar.</string>
-    <string name="update_downloading">Wird geladen… %1$d %%</string>
-    <string name="update_download_complete">Download abgeschlossen. Tippe auf „Installieren“ und bestätige den Systemdialog.</string>
-    <string name="update_download">Herunterladen</string>
-    <string name="update_later">Später</string>
-    <string name="update_not_now">Nicht jetzt</string>
-    <string name="updates_title">Updates</string>
-    <string name="updates_checking">Suche nach Updates…</string>
-    <string name="updates_up_to_date">Du verwendest bereits die neuste Version.</string>
-    <string name="updates_version_available">Version %1$s ist verfügbar!</string>
-    <string name="updates_downloading_version">Version %1$s wird heruntergeladen… %2$d %%</string>
-    <string name="updates_downloaded_ready">Version %1$s wurde heruntergeladen und kann installiert werden.</string>
-    <string name="updates_pending_ready">Das Update wurde heruntergeladen und kann installiert werden.</string>
-    <string name="updates_check_manually">Hier kannst du manuell nach Updates suchen.</string>
-    <string name="updates_check_for_updates">Nach Updates suchen</string>
     <string name="updates_version">v%1$s</string>
 
     <!-- About -->
@@ -317,6 +300,7 @@
 
     <!-- Color picker -->
     <string name="color_picker_use_default">Standardfarbe verwenden</string>
+    <string name="color_picker_no_own_color">Keine eigene Farbe</string>
     <string name="color_picker_custom_hex">Eigener Hex-Code</string>
     <string name="color_picker_invalid_hex">Das ist kein gültiger Hex-Code.</string>
     <string name="color_picker_low_contrast">Geringer Kontrast zur Textfarbe der Karten</string>
@@ -378,7 +362,7 @@
 
     <!-- Notification settings -->
     <string name="settings_notifications">Benachrichtigungen</string>
-    <string name="settings_notifications_desc">Stundenplanänderngen und -übersicht</string>
+    <string name="settings_notifications_desc">Stundenplanänderungen und -übersicht</string>
     <string name="settings_notifications_master">Benachrichtigungen aktivieren</string>
     <string name="settings_notifications_master_desc">UntisX erlauben, Benachrichtigungen zu senden.</string>
     <string name="settings_notifications_permission_missing">Benachrichtigungen sind in den Systemeinstellungen deaktiviert.</string>
@@ -661,4 +645,135 @@
     <string name="notebook_delete_notice_title">Kontoentfernung</string>
     <string name="notebook_delete_inspect_failed_title">Schulheft-Daten nicht verfügbar</string>
     <string name="notebook_delete_inspect_failed_text">Die Schulheft-Daten konnten nicht geprüft werden. Das Konto wurde nicht entfernt. Versuche es später erneut.</string>
+    <string name="settings_prefer_school_colors">Schulfarben haben Vorrang</string>
+    <string name="settings_prefer_school_colors_desc">Gibt deine Schule einem Fach eine Farbe, wird sie statt deiner eigenen verwendet.</string>
+    <string name="settings_auto_colors">Automatische Farben</string>
+    <string name="settings_auto_colors_desc">Fächer ohne Farbe bekommen automatisch unterschiedliche Farben.</string>
+    <string name="settings_color_from_school">Schule</string>
+    <string name="color_picker_locked_by_school">Diese Farbe gibt deine Schule vor. Für eine eigene Farbe schalte bei den Fächerfarben \"Schulfarben haben Vorrang\" aus.</string>
+    <string name="color_picker_school_fallback">Deine Schule gibt für dieses Fach eine Farbe vor. Weil Schulfarben keinen Vorrang haben, ersetzt deine eigene Farbe sie.</string>
+    <string name="lesson_edit_color">Farbe</string>
+    <string name="dino_title">Dino-Modus</string>
+    <string name="dino_intro">Lauf durch deinen eigenen Stundenplan. Ausfälle reißen Löcher in den Boden, spring drüber! Auch Hausaufgaben-Stapel stehen im Weg.</string>
+    <string name="dino_sample_day">Noch kein Stundenplan geladen, darum läufst du durch einen Beispieltag.</string>
+    <string name="dino_tap_to_start">Tippen zum Starten, gedrückt halten springt höher</string>
+    <string name="dino_game_over">Erwischt!</string>
+    <string name="dino_score">%1$d Punkte</string>
+    <string name="dino_best">Rekord: %1$d</string>
+    <string name="dino_new_best">Neuer Rekord!</string>
+    <string name="dino_summary">%1$d Ausfälle übersprungen · %2$d Hausaufgaben-Stapel · %3$d Schultage</string>
+    <string name="dino_again">Nochmal</string>
+    <string name="dino_school_start">Auf dem Weg zur Schule</string>
+    <string name="dino_school_end">Schulschluss!</string>
+    <string name="dino_break">Pause</string>
+    <string name="dino_cancelled">Entfall: %1$s</string>
+    <string name="homework_reminder_same_day">Am selben Tag, %1$s</string>
+    <string name="homework_reminder_day_before">Vortag, %1$s</string>
+    <string name="homework_reminder_days_before">%1$d Tage vorher, %2$s</string>
+    <string name="homework_reminder_before_custom">Vorher…</string>
+    <string name="homework_reminder_fixed">Feste Zeit</string>
+    <string name="homework_reminder_follows">Wandert mit, wenn sich die Fälligkeit ändert.</string>
+    <string name="homework_reminder_fixed_hint">Bleibt bei Datum und Uhrzeit oben, auch wenn sich die Fälligkeit ändert.</string>
+    <string name="homework_reminder_before_title">Wie lange vorher erinnern?</string>
+    <string name="homework_reminder_amount">Anzahl</string>
+    <string name="homework_reminder_before_hint">Gerechnet ab Beginn der Stunde, in der die Aufgabe fällig ist.</string>
+    <string name="homework_unit_minutes">Minuten</string>
+    <string name="homework_unit_hours">Stunden</string>
+    <string name="homework_unit_days">Tage</string>
+    <plurals name="homework_before_minutes">
+        <item quantity="one">%1$d Minute vorher</item>
+        <item quantity="other">%1$d Minuten vorher</item>
+    </plurals>
+    <plurals name="homework_before_hours">
+        <item quantity="one">%1$d Stunde vorher</item>
+        <item quantity="other">%1$d Stunden vorher</item>
+    </plurals>
+    <plurals name="homework_before_days">
+        <item quantity="one">%1$d Tag vorher</item>
+        <item quantity="other">%1$d Tage vorher</item>
+    </plurals>
+    <string name="settings_homework">Hausaufgaben</string>
+    <string name="settings_homework_auto_due">Fällig zur nächsten Stunde</string>
+    <string name="settings_homework_auto_due_desc">Neue Hausaufgaben sind zur nächsten Stunde des Fachs fällig. Du kannst das jederzeit ändern.</string>
+    <string name="settings_homework_reminder">Standardmäßig erinnern</string>
+    <string name="settings_homework_reminder_desc">Neue Hausaufgaben bekommen diese Erinnerung. Bestehende Erinnerungen bleiben, wie sie sind.</string>
+    <string name="settings_homework_reminder_days">Wann</string>
+    <string name="settings_homework_reminder_time">Um</string>
+    <string name="settings_homework_same_day">Am selben Tag</string>
+    <string name="settings_homework_day_before">Am Vortag</string>
+    <string name="own_exam_add">Klausur eintragen</string>
+    <string name="own_exam_add_short">Klausur</string>
+    <string name="own_exam_edit">Eigene Klausur bearbeiten</string>
+    <string name="own_exam_badge">Eigene Klausur</string>
+    <string name="own_exam_default_type">Klausur</string>
+    <string name="own_exam_hint">Von dir eingetragen. Zählt wie eine Klausur der Schule, ist aber lila markiert.</string>
+    <string name="own_exam_subject">Fach</string>
+    <string name="own_exam_type">Art (z. B. Klausur, Test)</string>
+    <string name="own_exam_pick_date">Datum wählen</string>
+    <string name="own_exam_lesson">Stunde</string>
+    <string name="own_exam_no_lesson">An diesem Tag gibt es keine Stunde dieses Fachs. Die Uhrzeit kannst du selbst setzen.</string>
+    <string name="own_exam_from">Von %1$s</string>
+    <string name="own_exam_to">Bis %1$s</string>
+    <string name="own_exam_note">Notiz (Themen, Seiten, …)</string>
+    <string name="own_exam_delete">Löschen</string>
+    <string name="own_exam_delete_title">Klausur löschen?</string>
+    <string name="own_exam_delete_text">Die von dir eingetragene Klausur wird von diesem Gerät entfernt.</string>
+    <string name="homework_title">Hausaufgaben</string>
+    <string name="homework_add">Hausaufgabe</string>
+    <string name="homework_empty">Keine offenen Hausaufgaben. Neue trägst du unten oder direkt in einer Stunde ein.</string>
+    <string name="homework_untitled">(ohne Titel)</string>
+    <string name="homework_group_overdue">Überfällig</string>
+    <string name="homework_group_today">Heute</string>
+    <string name="homework_group_tomorrow">Morgen</string>
+    <string name="homework_group_week">Diese Woche</string>
+    <string name="homework_group_later">Später</string>
+    <string name="homework_group_no_date">Ohne Termin</string>
+    <string name="homework_show_done">Erledigte zeigen (%1$d)</string>
+    <string name="homework_hide_done">Erledigte ausblenden (%1$d)</string>
+    <string name="homework_due_lesson">fällig %1$s, %2$s</string>
+    <string name="homework_due_day">fällig %1$s</string>
+    <plurals name="homework_open_count">
+        <item quantity="one">%1$d offen</item>
+        <item quantity="other">%1$d offen</item>
+    </plurals>
+    <plurals name="homework_overdue_count">
+        <item quantity="one">%1$d überfällig</item>
+        <item quantity="other">%1$d überfällig</item>
+    </plurals>
+    <plurals name="homework_done_count">
+        <item quantity="one">%1$d erledigt</item>
+        <item quantity="other">%1$d erledigt</item>
+    </plurals>
+    <string name="stats_legend_held">stattgefunden</string>
+    <string name="stats_legend_substituted">Vertretung</string>
+    <string name="stats_legend_cancelled">Ausfall</string>
+    <string name="stats_by_subject_hint">Die Quoten beziehen sich nur auf die Stunden des jeweiligen Fachs.</string>
+    <string name="stats_by_subject_partial">Einige ältere Tage wurden gezählt, bevor es diese Ansicht gab. Lade den Verlauf neu, um sie einzubeziehen.</string>
+    <string name="stats_cancel_rate_short">%1$s Ausfall</string>
+    <string name="stats_subject_line">%1$d geplant · %2$d stattgefunden · %3$d Vertretung · %4$d Ausfall · Ausfallzeit: %5$s</string>
+    <string name="stats_duration_none">keine</string>
+    <string name="stats_duration_minutes">%1$d Min.</string>
+    <string name="stats_duration_hours">%1$d Std.</string>
+    <string name="stats_duration_hours_minutes">%1$d Std. %2$d Min.</string>
+    <string name="login_password_show">Zeigen</string>
+    <string name="login_password_hide">Verbergen</string>
+    <string name="target_title">Stundenplan wählen</string>
+    <string name="target_hint">Zeigt nur, was deine Schule für dein Konto freigibt. Andere Pläne werden nicht gespeichert und zählen nicht zur Statistik.</string>
+    <string name="target_search">Klasse oder Name suchen</string>
+    <string name="target_own">Mein Stundenplan</string>
+    <string name="target_own_class">deine Klasse</string>
+    <string name="target_classes">Klassen (%1$d)</string>
+    <string name="target_students">Schüler (%1$d)</string>
+    <string name="target_none">Deine Schule gibt deinem Konto keine weiteren Stundenpläne frei, oder sie ließen sich nicht laden.</string>
+    <string name="target_no_students">Stundenpläne anderer Schüler gibt deine Schule für dein Konto nicht frei.</string>
+    <string name="absences_title">Fehlzeiten</string>
+    <string name="absences_total">gesamt</string>
+    <string name="absences_excused">entschuldigt</string>
+    <string name="absences_unexcused">unentschuldigt</string>
+    <string name="absences_excused_one">entschuldigt</string>
+    <string name="absences_unexcused_one">unentschuldigt</string>
+    <string name="absences_hours">≈ %1$d Std.</string>
+    <string name="absences_none">In diesem Schuljahr sind keine Fehlzeiten eingetragen.</string>
+    <string name="absences_not_shared">Deine Schule gibt Fehlzeiten für dein Konto nicht frei.</string>
+    <string name="absences_failed">Die Fehlzeiten ließen sich nicht laden.</string>
 </resources>

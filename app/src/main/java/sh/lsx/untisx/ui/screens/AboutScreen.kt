@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -28,7 +27,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,10 +43,7 @@ import sh.lsx.untisx.ui.theme.AppCard
 import sh.lsx.untisx.ui.theme.appCardShape
 import sh.lsx.untisx.ui.util.personTypeName
 import sh.lsx.untisx.ui.util.uiTextString
-import sh.lsx.untisx.ui.util.Haptics
 import sh.lsx.untisx.ui.util.tapHaptic
-import sh.lsx.untisx.update.UpdateState
-import sh.lsx.untisx.update.UpdateViewModel
 import android.widget.Toast
 
 private const val REPO_URL = "https://codeberg.org/Losterixx/UntisX"
@@ -79,8 +74,6 @@ fun AboutScreen(
     ) {
         AppCard(versionName)
 
-        UpdatesCard()
-
         LinksCard(
             onOpen = uriHandler::openUri,
         )
@@ -96,65 +89,6 @@ fun AboutScreen(
         )
 
         DebugCard(auth)
-    }
-}
-
-@Composable
-private fun UpdatesCard() {
-    val updateVm: UpdateViewModel = viewModel()
-
-    AppCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = appCardShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-    ) {
-        Column(Modifier.padding(18.dp)) {
-            Text(stringResource(R.string.updates_title), style = MaterialTheme.typography.titleMedium)
-
-            Spacer(Modifier.height(10.dp))
-
-            val status: String = when (val state = updateVm.state) {
-                is UpdateState.Checking -> stringResource(R.string.updates_checking)
-                is UpdateState.UpToDate -> stringResource(R.string.updates_up_to_date)
-                is UpdateState.Available -> stringResource(R.string.updates_version_available, state.info.versionName)
-                is UpdateState.Downloading -> stringResource(R.string.updates_downloading_version, state.info.versionName, (state.progress * 100).toInt())
-                is UpdateState.Downloaded -> stringResource(R.string.updates_downloaded_ready, state.info.versionName)
-                is UpdateState.Idle ->
-                    updateVm.transientError
-                        ?.let { uiTextString(it) }
-                        ?: if (updateVm.pendingInstall != null) {
-                            stringResource(R.string.updates_pending_ready)
-                        } else {
-                            stringResource(R.string.updates_check_manually)
-                        }
-            }
-
-            Text(
-                text = status,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (updateVm.pendingInstall != null) {
-                    Button(onClick = Haptics.haptic(updateVm::installPending)) {
-                        Text(stringResource(R.string.install))
-                    }
-                }
-
-                Button(
-                    onClick = Haptics.haptic(updateVm::check),
-                    enabled = updateVm.state !is UpdateState.Checking &&
-                        updateVm.state !is UpdateState.Downloading,
-                ) {
-                    Text(stringResource(R.string.updates_check_for_updates))
-                }
-            }
-        }
     }
 }
 

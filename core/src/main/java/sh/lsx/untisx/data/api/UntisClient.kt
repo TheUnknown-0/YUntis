@@ -1,5 +1,6 @@
 package sh.lsx.untisx.data.api
 
+import sh.lsx.untisx.data.model.Absence
 import sh.lsx.untisx.data.model.AuthResult
 import sh.lsx.untisx.data.model.DayMessage
 import sh.lsx.untisx.data.model.DirectMessage
@@ -10,6 +11,7 @@ import sh.lsx.untisx.data.model.MessagesData
 import sh.lsx.untisx.data.model.School
 import sh.lsx.untisx.data.model.SchoolYear
 import sh.lsx.untisx.data.model.TimegridDay
+import sh.lsx.untisx.data.model.TimetableTarget
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.prefs.AuthData
 import sh.lsx.untisx.data.prefs.AccountPrefs
@@ -29,6 +31,15 @@ object UntisClient {
             UntisRpc.allowHttpForTests = value
         }
 
+    /**
+     * Points a debuggable build at a local test server (plain HTTP allowed).
+     * Release builds never call this.
+     */
+    fun useLocalTestServer(baseUrl: String) {
+        UntisRpc.allowHttpForTests = true
+        UntisAuthApi.schoolSearchUrlOverride = baseUrl.trimEnd('/') + "/ms/schoolquery2"
+    }
+
     fun clearSessionCache(accountId: String) = UntisRpc.clearSessionCache(accountId)
 
     suspend fun searchSchools(query: String): List<School> = UntisAuthApi.searchSchools(query)
@@ -42,9 +53,16 @@ object UntisClient {
         auth: AuthData,
         startDate: Int,
         endDate: Int,
-    ): List<TimetableEntry> = InFlightRequests.read(listOf("legacy", AccountPrefs.accountId(auth), auth.session.sessionId, startDate, endDate)) {
-        UntisTimetableApi.getTimetable(auth, startDate, endDate)
+        target: TimetableTarget? = null,
+    ): List<TimetableEntry> = InFlightRequests.read(listOf("legacy", AccountPrefs.accountId(auth), auth.session.sessionId, startDate, endDate, target ?: "own")) {
+        UntisTimetableApi.getTimetable(auth, startDate, endDate, target)
     }
+
+    /** Classes the account may see. Empty when the school does not allow it. */
+    suspend fun getKlassen(auth: AuthData): List<MasterDataItem> = UntisMasterDataApi.getKlassen(auth)
+
+    /** Students the account may see. Usually empty for student accounts. */
+    suspend fun getStudents(auth: AuthData): List<MasterDataItem> = UntisMasterDataApi.getStudents(auth)
 
     suspend fun getSubjects(auth: AuthData): List<MasterDataItem> = UntisMasterDataApi.getSubjects(auth)
 
@@ -76,8 +94,9 @@ object UntisClient {
         password: String,
         from: LocalDate,
         to: LocalDate,
-    ): List<TimetableEntry> = InFlightRequests.read(listOf("internal", AccountPrefs.accountId(auth), from, to)) {
-        UntisTimetableApi.getTimetableIntern(auth, password, from, to)
+        target: TimetableTarget? = null,
+    ): List<TimetableEntry> = InFlightRequests.read(listOf("internal", AccountPrefs.accountId(auth), from, to, target ?: "own")) {
+        UntisTimetableApi.getTimetableIntern(auth, password, from, to, target)
     }
 
     suspend fun fetchTimetableEntries(
@@ -85,8 +104,18 @@ object UntisClient {
         password: String,
         from: LocalDate,
         to: LocalDate,
-    ): List<TimetableEntry>? = InFlightRequests.read(listOf("rest", AccountPrefs.accountId(auth), from, to)) {
-        UntisTimetableApi.fetchTimetableEntries(auth, password, from, to)
+        target: TimetableTarget? = null,
+    ): List<TimetableEntry>? = InFlightRequests.read(listOf("rest", AccountPrefs.accountId(auth), from, to, target ?: "own")) {
+        UntisTimetableApi.fetchTimetableEntries(auth, password, from, to, target)
+    }
+
+    /** Week of another class or student via the WebUntis web page endpoint. Null if refused. */
+    suspend fun fetchWebWeek(
+        auth: AuthData,
+        monday: LocalDate,
+        target: TimetableTarget,
+    ): List<TimetableEntry>? = InFlightRequests.read(listOf("web", AccountPrefs.accountId(auth), auth.session.sessionId, monday, target)) {
+        UntisTimetableApi.fetchWebWeek(auth, monday, target)
     }
 
     suspend fun fetchTimegridFromInternalRpc(auth: AuthData): List<TimegridDay> =
@@ -102,6 +131,14 @@ object UntisClient {
     ): List<ExamInfo> = InFlightRequests.read(listOf("exams", AccountPrefs.accountId(auth), from, to)) {
         UntisExamsApi.fetchExams(auth, password, from, to)
     }
+
+    /** Own absences; throws UntisException.Api with RPC_NO_RIGHTS if the school does not share them. */
+    suspend fun fetchAbsences(
+        auth: AuthData,
+        password: String,
+        from: LocalDate,
+        to: LocalDate,
+    ): List<Absence> = UntisAbsencesApi.fetchAbsences(auth, password, from, to)
 
     suspend fun fetchCurrentSchoolYear(auth: AuthData, password: String): SchoolYear? =
         UntisExamsApi.fetchCurrentSchoolYear(auth, password)

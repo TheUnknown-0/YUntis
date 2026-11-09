@@ -14,6 +14,9 @@ import sh.lsx.untisx.data.prefs.AuthData
 internal object UntisAuthApi {
 
     private const val SCHOOL_SEARCH_URL = "https://mobile.webuntis.com/ms/schoolquery2"
+
+    /** Only set by debuggable builds that point at a local test server. */
+    @Volatile var schoolSearchUrlOverride: String? = null
     private const val CLIENT_NAME = "UntisX"
 
     suspend fun searchSchools(query: String): List<School> = withContext(Dispatchers.IO) {
@@ -27,7 +30,7 @@ internal object UntisAuthApi {
         }
 
         try {
-            val result = UntisRpc.executeRpc(SCHOOL_SEARCH_URL, "searchSchool", params)
+            val result = UntisRpc.executeRpc(schoolSearchUrlOverride ?: SCHOOL_SEARCH_URL, "searchSchool", params)
 
             val schools = runCatching {
                 UntisRpc.json.decodeFromJsonElement<SchoolSearchResult>(result).schools

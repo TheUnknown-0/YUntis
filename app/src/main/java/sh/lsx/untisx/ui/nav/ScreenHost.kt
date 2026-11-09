@@ -12,6 +12,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import sh.lsx.untisx.ui.components.LocalSubjectColorState
+import sh.lsx.untisx.ui.components.SubjectColorDialog
+import sh.lsx.untisx.ui.components.ExamLessonSlot
+import sh.lsx.untisx.ui.components.ExamSubjectChoice
+import sh.lsx.untisx.ui.components.OwnExamDialog
+import sh.lsx.untisx.ui.components.newOwnExam
+import sh.lsx.untisx.ui.timetable.resolveSubject
+import sh.lsx.untisx.data.model.ExamInfo
+import sh.lsx.untisx.data.subjectLongLabel
+import androidx.compose.ui.res.stringResource
+import sh.lsx.untisx.R
+import sh.lsx.untisx.data.AppClock
+import sh.lsx.untisx.ui.game.DinoGameScreen
+import sh.lsx.untisx.ui.homework.HomeworkScreen
+import sh.lsx.untisx.ui.absences.AbsencesScreen
+import sh.lsx.untisx.ui.game.buildDinoDays
+import sh.lsx.untisx.ui.game.sampleDays
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntOffset
@@ -125,6 +144,42 @@ internal fun ScreenHost(
     onHideCancelledChange: (Boolean) -> Unit,
 ) {
     val spatialSpec = motionSpatial<IntOffset>()
+    val colorState = LocalSubjectColorState.current
+    var colorDialogFor by remember { mutableStateOf<String?>(null) }
+    var ownExamEdit by remember { mutableStateOf<Pair<ExamInfo, Boolean>?>(null) }
+    val defaultExamType = stringResource(R.string.own_exam_default_type)
+
+    ownExamEdit?.let { (exam, isNew) ->
+        val subjectChoices = remember(knownSubjects, timetableVm.subjectsById, subjectAliases) {
+            knownSubjects.map { name ->
+                ExamSubjectChoice(
+                    id = timetableVm.subjectsById.values.firstOrNull { it.name == name }?.id ?: 0,
+                    name = name,
+                    label = subjectLongLabel(subjectAliases, name).let { label ->
+                        if (label != name) "$label ($name)" else
+                            timetableVm.subjectsById.values.firstOrNull { it.name == name }?.longName
+                                ?.takeIf { it.isNotBlank() && it != name }?.let { "$it ($name)" } ?: name
+                    },
+                )
+            }
+        }
+
+        OwnExamDialog(
+            initial = exam,
+            isNew = isNew,
+            subjects = subjectChoices,
+            lessonsOn = { date, name -> examLessonSlots(timetableVm, date, name) },
+            onSave = {
+                timetableVm.saveOwnExam(it)
+                ownExamEdit = null
+            },
+            onDelete = {
+                timetableVm.deleteOwnExam(exam.id)
+                ownExamEdit = null
+            },
+            onDismiss = { ownExamEdit = null },
+        )
+    }
     val effectsSpec = motionEffects<Float>()
 
     val notebookSubjectChoices by notebookVm.subjectChoices.collectAsStateWithLifecycle()
@@ -279,6 +334,25 @@ internal fun ScreenHost(
                 .padding(padding),
         )
 
+        Screen.ABSENCES -> AbsencesScreen(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        )
+
+        Screen.HOMEWORK -> HomeworkScreen(
+            items = notebookItems,
+            subjectColors = subjectColors,
+            defaultColor = defaultSubjectColor,
+            subjectAliases = subjectAliases,
+            onToggle = notebookVm::toggleCompleted,
+            onOpen = { itemId -> onNotebookOpenItem(itemId, Screen.HOMEWORK) },
+            onCreate = { onNotebookCreate(NotebookKind.TASK, null, Screen.HOMEWORK) },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        )
+
         Screen.NOTEBOOK_EDITOR -> NotebookEditorScreen(
             vm = notebookVm,
             onBack = {
@@ -310,6 +384,8 @@ internal fun ScreenHost(
             subjectsById = timetableVm.subjectsById,
             subjectAliases = subjectAliases,
             teachersById = timetableVm.teachersById,
+            onAddExam = { ownExamEdit = newOwnExam(type = defaultExamType) to true },
+            onEditOwnExam = { ownExamEdit = it to false },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -359,6 +435,27 @@ internal fun ScreenHost(
                 .padding(padding),
         )
 
+        Screen.DINO -> {
+            val realDays = remember(timetableVm.weeks, subjectColors, subjectTextColors, subjectAliases) {
+                buildDinoDays(
+                    weeks = timetableVm.weeks,
+                    subjectsById = timetableVm.subjectsById,
+                    aliases = subjectAliases,
+                    colors = subjectColors,
+                    textColors = subjectTextColors,
+                    defaultColor = defaultSubjectColor,
+                    defaultTextColor = lessonTextColor,
+                    today = AppClock.today(),
+                )
+            }
+
+            DinoGameScreen(
+                days = realDays.ifEmpty { sampleDays() },
+                usesRealTimetable = realDays.isNotEmpty(),
+                modifier = Modifier.fillMaxSize().padding(padding),
+            )
+        }
+
         Screen.ABOUT -> AboutScreen(
             auth = auth,
             modifier = Modifier
@@ -366,7 +463,10 @@ internal fun ScreenHost(
                 .padding(padding),
         )
 
-        Screen.LESSON_DETAILS -> selectedLesson?.let { lesson ->
+        Screen.LESSON_DETAILS -> if (selectedLesson == null) {
+            timetableContent()
+        } else {
+            val lesson = selectedLesson
             val subjectName = lesson.subject.firstOrNull()
                 ?.let { timetableVm.subjectsById[it.id]?.name?.takeIf { name -> name.isNotBlank() } ?: it.name }
 
@@ -402,12 +502,61 @@ internal fun ScreenHost(
                     onNotebookCreate(NotebookKind.TASK, lessonRef, Screen.LESSON_DETAILS)
                 },
                 onJumpToDate = onNotebookJumpToDate,
+                onEditColor = subjectName?.takeIf { it.isNotBlank() }?.let { { colorDialogFor = it } },
+                ownExam = timetableVm.examFor(lesson)?.takeIf { it.own },
+                onAddExam = {
+                    val existing = timetableVm.examFor(lesson)?.takeIf { it.own }
+                    ownExamEdit = if (existing != null) {
+                        existing to false
+                    } else {
+                        newOwnExam(
+                            date = lesson.date,
+                            subjectId = lesson.subject.firstOrNull()?.id ?: 0,
+                            subjectName = subjectName.orEmpty(),
+                            startTime = lesson.startTime,
+                            endTime = lesson.endTime,
+                            type = defaultExamType,
+                        ) to true
+                    }
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
             )
-        } ?: timetableContent()
+
+            colorDialogFor?.let { name ->
+                SubjectColorDialog(
+                    subject = name,
+                    cardColor = colorState.sources.own[name],
+                    textColor = colorState.sources.ownText[name],
+                    defaultCardColor = colorState.fallbackColor(name, defaultSubjectColor),
+                    defaultTextColor = lessonTextColor,
+                    schoolColor = colorState.sources.school[name],
+                    lockedBySchool = colorState.lockedBySchool(name),
+                    onApply = { card, text ->
+                        onSubjectColor(name, card)
+                        onSubjectTextColor(name, text)
+                        colorDialogFor = null
+                    },
+                    onDismiss = { colorDialogFor = null },
+                )
+            }
+        }
 
         else -> timetableContent()
     }
 }
+
+/** Lessons of a subject on a day, offered as time choices for an own exam. */
+private fun examLessonSlots(vm: TimetableViewModel, date: Int, subjectName: String): List<ExamLessonSlot> =
+    vm.weeks.values.flatten()
+        .filter { it.date == date && !it.cancelled && resolveSubject(it, vm.subjectsById) == subjectName }
+        .distinctBy { it.startTime to it.endTime }
+        .sortedBy { it.startTime }
+        .map {
+            ExamLessonSlot(
+                startTime = it.startTime,
+                endTime = it.endTime,
+                label = "%02d:%02d – %02d:%02d".format(it.startTime / 100, it.startTime % 100, it.endTime / 100, it.endTime % 100),
+            )
+        }

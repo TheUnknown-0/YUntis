@@ -30,13 +30,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.lsx.untisx.R
 import sh.lsx.untisx.UntisXApp
 import sh.lsx.untisx.data.AppTheme
+import sh.lsx.untisx.data.SubjectColorResolver
 import sh.lsx.untisx.data.SubjectColorsPrefs
+import sh.lsx.untisx.ui.components.LocalSubjectColorState
+import sh.lsx.untisx.ui.components.SubjectColorState
 import sh.lsx.untisx.data.ThemePrefs
 import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.data.notifications.Notifications
@@ -47,7 +48,6 @@ import sh.lsx.untisx.data.prefs.AnimationPrefs
 import sh.lsx.untisx.data.prefs.AppearancePrefs
 import sh.lsx.untisx.data.prefs.HapticsPrefs
 import sh.lsx.untisx.data.prefs.TimetablePrefs
-import sh.lsx.untisx.ui.components.UpdateDialog
 import sh.lsx.untisx.ui.screens.LoginScreen
 import sh.lsx.untisx.ui.screens.OnboardingScreen
 import sh.lsx.untisx.ui.theme.UntisXTheme
@@ -56,7 +56,6 @@ import sh.lsx.untisx.ui.theme.appBackground
 import sh.lsx.untisx.ui.timetable.LessonCardOptions
 import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 import sh.lsx.untisx.ui.util.LocalHapticsEnabled
-import sh.lsx.untisx.update.UpdateViewModel
 
 private fun readOnboardingDone(context: Context): Boolean =
     context.getSharedPreferences(UntisXApp.PREFS_NAME, Context.MODE_PRIVATE)
@@ -81,8 +80,6 @@ internal fun AppRoot(
     var hapticsEnabled by remember { mutableStateOf(HapticsPrefs.isEnabled(context)) }
     var showLastRefreshed by remember { mutableStateOf(TimetablePrefs.showLastRefreshed(context)) }
     var animationsEnabled by remember { mutableStateOf(AnimationPrefs.isEnabled(context)) }
-    var subjectColors by remember { mutableStateOf(SubjectColorsPrefs.getColors(context)) }
-    var subjectTextColors by remember { mutableStateOf(SubjectColorsPrefs.getSubjectTextColors(context)) }
     var subjectAliases by remember { mutableStateOf(SubjectColorsPrefs.getAliases(context)) }
     var knownSubjects by remember { mutableStateOf(SubjectColorsPrefs.getKnown(context)) }
     var defaultSubjectColor by remember { mutableStateOf(SubjectColorsPrefs.getDefaultColor(context)) }
@@ -90,6 +87,7 @@ internal fun AppRoot(
     var strikeColor by remember { mutableStateOf(SubjectColorsPrefs.getStrikeColor(context)) }
     var examColor by remember { mutableStateOf(SubjectColorsPrefs.getExamColor(context)) }
     var cancelledStrike by remember { mutableStateOf(SubjectColorsPrefs.isCancelledStrike(context)) }
+    var colorSources by remember { mutableStateOf(SubjectColorsPrefs.sources(context)) }
     var cancelledDesaturation by remember { mutableStateOf(AppearancePrefs.getCancelledDesaturation(context)) }
     var cancelledBrightness by remember { mutableStateOf(AppearancePrefs.getCancelledBrightness(context)) }
     var pastDim by remember { mutableStateOf(AppearancePrefs.getPastDim(context)) }
@@ -135,8 +133,6 @@ internal fun AppRoot(
             }
 
             if (key in SubjectColorsPrefs.KEYS) {
-                subjectColors = SubjectColorsPrefs.getColors(context)
-                subjectTextColors = SubjectColorsPrefs.getSubjectTextColors(context)
                 subjectAliases = SubjectColorsPrefs.getAliases(context)
                 knownSubjects = SubjectColorsPrefs.getKnown(context)
                 defaultSubjectColor = SubjectColorsPrefs.getDefaultColor(context)
@@ -144,6 +140,7 @@ internal fun AppRoot(
                 strikeColor = SubjectColorsPrefs.getStrikeColor(context)
                 examColor = SubjectColorsPrefs.getExamColor(context)
                 cancelledStrike = SubjectColorsPrefs.isCancelledStrike(context)
+                colorSources = SubjectColorsPrefs.sources(context)
             }
 
             if (key in AppearancePrefs.KEYS) {
@@ -164,24 +161,27 @@ internal fun AppRoot(
 
     fun saveTheme(newTheme: AppTheme) = ThemePrefs.save(context, newTheme)
 
+    val effectiveSubjectColors = remember(knownSubjects, colorSources) {
+        SubjectColorResolver.cardColors(knownSubjects, colorSources)
+    }
+    val effectiveSubjectTextColors = remember(knownSubjects, colorSources) {
+        SubjectColorResolver.textColors(knownSubjects, colorSources)
+    }
+    val subjectColorState = remember(colorSources, effectiveSubjectColors) {
+        SubjectColorState(
+            sources = colorSources,
+            effective = effectiveSubjectColors,
+            onPreferSchool = { SubjectColorsPrefs.setPreferSchoolColors(context, it) },
+            onAutoColors = { SubjectColorsPrefs.setAutoColors(context, it) },
+        )
+    }
+
     CompositionLocalProvider(
+        LocalSubjectColorState provides subjectColorState,
         LocalHapticsEnabled provides hapticsEnabled,
         LocalAnimationsEnabled provides animationsEnabled,
     ) {
         UntisXTheme(mode = theme.mode, preset = theme.preset, customSeed = theme.customSeed, style = theme.style) {
-            val updateVm: UpdateViewModel = viewModel()
-
-            LaunchedEffect(Unit) {
-                updateVm.checkOnStartup()
-            }
-
-            LaunchedEffect(updateVm.transientError) {
-                if (updateVm.transientError != null) {
-                    delay(3000)
-                    updateVm.clearTransientError()
-                }
-            }
-
             LaunchedEffect(Unit) {
                 Notifications.ensureChannels(context)
                 NotificationScheduler.ensureAll(context)
@@ -229,10 +229,10 @@ internal fun AppRoot(
                         onShowLastRefreshedChange = { TimetablePrefs.setShowLastRefreshed(context, it) },
                         animationsEnabled = animationsEnabled,
                         onAnimationsChange = { AnimationPrefs.setEnabled(context, it) },
-                        subjectColors = subjectColors,
+                        subjectColors = effectiveSubjectColors,
                         knownSubjects = knownSubjects,
                         onSubjectColor = { name, argb -> SubjectColorsPrefs.setColor(context, name, argb) },
-                        subjectTextColors = subjectTextColors,
+                        subjectTextColors = effectiveSubjectTextColors,
                         onSubjectTextColor = { name, argb -> SubjectColorsPrefs.setSubjectTextColor(context, name, argb) },
                         subjectAliases = subjectAliases,
                         onSubjectAlias = { name, short, long -> SubjectColorsPrefs.setAlias(context, name, short, long) },
@@ -276,13 +276,6 @@ internal fun AppRoot(
                         onFocusConsumed = onFocusConsumed,
                     )
                 }
-
-                UpdateDialog(
-                    state = updateVm.state,
-                    onDownload = updateVm::download,
-                    onInstall = updateVm::install,
-                    onDismiss = updateVm::dismiss,
-                )
             }
         }
     }

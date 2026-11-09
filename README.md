@@ -28,7 +28,7 @@ An open-source timetable viewer for the Untis school system - built natively wit
 - **Notifications** - alerts for cancellations and room/teacher changes, automatically silent during lessons, plus an overview of the upcoming school day
 - **Background sync** - configurable sync profiles and an optional before-school boost
 - **Data export & import** - transfer personal notebook tasks and notes separately from your settings backup
-- **In-app updates** - new versions install straight from the app
+- **No in-app updater** - this build never checks for or installs updates on its own; updates are installed manually
 - **Lightweight** - <10 MB, no ads, no tracking
 
 UntisX is in early development - expect bugs and incomplete features. If you find one, please [report it as an issue](https://codeberg.org/Losterixx/UntisX/issues).
@@ -50,7 +50,7 @@ Your username and password are sent exclusively to your school's Untis server an
 
 Notebook export is available under **Settings > General > Data** for the active account. It includes only personal tasks and notes, not login details, passwords or sessions. Exported JSON files are **not encrypted**: anyone with access can read them. Store them safely. Notebook export and import are separate from the settings backup.
 
-The phone also contacts this project's releases for updates. Watch synchronization uses the Google Play services Data Layer, which may relay data through Google's infrastructure when a direct connection is unavailable.
+The app does not contact any update server. Watch synchronization uses the Google Play services Data Layer, which may relay data through Google's infrastructure when a direct connection is unavailable.
 
 The watch receives timetable and display data for the active account, not passwords or login sessions. Its local cache is encrypted with Android Keystore. Account changes replace the watch snapshot when the devices synchronize; a disconnected watch can still show its previously received data until then.
 

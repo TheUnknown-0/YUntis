@@ -30,6 +30,8 @@ data class DayStats(
     val eventTeacherCounts: Map<Int, Int> = emptyMap(),
     val roomCounts: Map<Int, Int> = emptyMap(),
     val eventRoomCounts: Map<Int, Int> = emptyMap(),
+    /** Per subject: planned, substituted and cancelled lessons and minutes (since rule version 3). */
+    val subjectDays: Map<Int, SubjectDayStats> = emptyMap(),
     val ruleVersion: Int = 0,
 )
 
@@ -54,7 +56,7 @@ object StatsStore {
     private const val VERSION = 2
     private const val TAG = "StatsStore"
 
-    internal const val RULE_VERSION = 2
+    internal const val RULE_VERSION = 3
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -175,6 +177,7 @@ object StatsStore {
         val eventRooms = HashMap<Int, Int>()
 
         val eventSpans = entries.filter { it.isEvent }.map { it.timeSpan() }
+        val subjectDays = HashMap<Int, SubjectDayStats>()
 
         for (entry in entries) {
             if (entry.isEvent) {
@@ -191,6 +194,19 @@ object StatsStore {
             lessons++
             if (entry.cancelled) cancelled++
             if (entryChanged) changes++
+
+            entry.subject.firstOrNull()?.id?.takeIf { it > 0 }?.let { id ->
+                val span = entry.timeSpan()
+                val minutes = if (entry.endTime == 0) 0 else (span.end - span.start).coerceIn(0, 12 * 60)
+                // a substitution: the lesson takes place, but with another teacher or marked irregular
+                val substituted = !entry.cancelled && (entry.code == "irregular" || entry.teacher.changed())
+                subjectDays[id] = (subjectDays[id] ?: SubjectDayStats()).add(
+                    cancelled = entry.cancelled,
+                    substituted = substituted,
+                    minutes = minutes,
+                    event = eventOverlap,
+                )
+            }
 
             if (eventOverlap) {
                 eventLessons++
@@ -234,6 +250,7 @@ object StatsStore {
             eventTeacherCounts = eventTeachers,
             roomCounts = rooms,
             eventRoomCounts = eventRooms,
+            subjectDays = subjectDays,
             ruleVersion = RULE_VERSION,
         )
     }

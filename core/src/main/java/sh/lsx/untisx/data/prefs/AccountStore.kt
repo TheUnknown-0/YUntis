@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import sh.lsx.untisx.data.CorePrefs
 import sh.lsx.untisx.data.ExamsStore
+import sh.lsx.untisx.data.OwnExamsStore
 import sh.lsx.untisx.data.MessagesStore
 import sh.lsx.untisx.data.StatsStore
 import sh.lsx.untisx.data.TimetableCache
@@ -482,6 +483,7 @@ object AccountStore {
                         TimetableCache.clear(context, id)
                         StatsStore.clear(context, id)
                         ExamsStore.clear(context, id)
+                        OwnExamsStore.clear(context, id)
                         MessagesStore.clear(context, id)
                         CredentialsPrefs.clear(context, id)
                     } catch (e: CancellationException) {

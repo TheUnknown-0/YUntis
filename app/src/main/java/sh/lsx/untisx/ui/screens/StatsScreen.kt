@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sh.lsx.untisx.R
+import sh.lsx.untisx.data.SubjectStats
 import sh.lsx.untisx.data.DayStats
 import sh.lsx.untisx.data.SchoolYearStats
 import sh.lsx.untisx.data.model.MasterDataItem
@@ -81,6 +82,9 @@ fun StatsScreen(
     val start = startDate?.let { runCatching { it.toUntisLocalDate() }.getOrNull() }
     val end = endDate?.let { runCatching { it.toUntisLocalDate() }.getOrNull() }
     val lastDay = end?.let { minOf(today, it) }
+
+    // weeks the timetable was never opened for are missing; fetch only those, once per visit
+    LaunchedEffect(Unit) { onLoadHistory() }
 
     var selectedMonth by remember { mutableStateOf<YearMonth?>(null) }
 
@@ -161,6 +165,8 @@ fun StatsScreen(
     }
 
     val locale = LocalConfiguration.current.locales[0]
+    val subjectTotals = remember(filteredDays, includeEvents) { SubjectStats.totals(filteredDays, includeEvents) }
+    val olderDaysMissing = remember(filteredDays) { SubjectStats.hasOldDays(filteredDays) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -311,7 +317,16 @@ fun StatsScreen(
                 }
             }
 
-            if (subjects.isNotEmpty()) {
+            if (subjectTotals.isNotEmpty()) {
+                item {
+                    SubjectStatsCard(
+                        totals = subjectTotals,
+                        nameFor = { subjectName(it, subjectsById) },
+                        locale = locale,
+                        olderDaysMissing = olderDaysMissing,
+                    )
+                }
+            } else if (subjects.isNotEmpty()) {
                 item {
                     BreakdownCard(
                         title = stringResource(R.string.stats_by_subject),

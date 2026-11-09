@@ -40,6 +40,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import sh.lsx.untisx.R
+import sh.lsx.untisx.data.notebook.HomeworkPrefs
 import sh.lsx.untisx.data.notifications.NotificationPrefs
 import sh.lsx.untisx.data.notifications.NotificationScheduler
 import sh.lsx.untisx.data.notifications.Notifications
@@ -72,6 +73,10 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
     var examRemindersEnabled by remember { mutableStateOf(NotificationPrefs.examRemindersEnabled(context)) }
     var examDaysBefore by remember { mutableIntStateOf(NotificationPrefs.examReminderDaysBefore(context)) }
     var examMinute by remember { mutableIntStateOf(NotificationPrefs.examReminderMinute(context)) }
+    var homeworkAutoDue by remember { mutableStateOf(HomeworkPrefs.autoDue(context)) }
+    var homeworkReminder by remember { mutableStateOf(HomeworkPrefs.reminderEnabled(context)) }
+    var homeworkDays by remember { mutableIntStateOf(HomeworkPrefs.reminderDaysBefore(context)) }
+    var homeworkMinute by remember { mutableIntStateOf(HomeworkPrefs.reminderMinutes(context)) }
 
     var newsMessages by remember { mutableStateOf(NotificationPrefs.notifyNewMessages(context)) }
     var newsEvents by remember { mutableStateOf(NotificationPrefs.notifyNewEvents(context)) }
@@ -354,6 +359,55 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
                     reschedule()
                 },
             )
+        }
+
+        SettingsSectionCard(title = stringResource(R.string.settings_homework)) {
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_homework_auto_due),
+                description = stringResource(R.string.settings_homework_auto_due_desc),
+                checked = homeworkAutoDue,
+                onCheckedChange = {
+                    homeworkAutoDue = it
+                    HomeworkPrefs.setAutoDue(context, it)
+                },
+            )
+
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_homework_reminder),
+                description = stringResource(R.string.settings_homework_reminder_desc),
+                checked = homeworkReminder,
+                onCheckedChange = {
+                    homeworkReminder = it
+                    HomeworkPrefs.setReminderEnabled(context, it)
+                },
+            )
+
+            if (homeworkReminder) {
+                SettingsSliderRow(
+                    title = stringResource(R.string.settings_homework_reminder_days),
+                    value = homeworkDays.toFloat(),
+                    onValueChange = {
+                        homeworkDays = it.roundToInt()
+                        HomeworkPrefs.setReminderDaysBefore(context, homeworkDays)
+                    },
+                    valueLabel = when (homeworkDays) {
+                        0 -> stringResource(R.string.settings_homework_same_day)
+                        1 -> stringResource(R.string.settings_homework_day_before)
+                        else -> pluralStringResource(R.plurals.homework_before_days, homeworkDays, homeworkDays)
+                    },
+                    valueRange = 0f..7f,
+                    steps = 6,
+                )
+
+                SettingsTimeRow(
+                    label = stringResource(R.string.settings_homework_reminder_time),
+                    minute = homeworkMinute,
+                    onPick = {
+                        homeworkMinute = it
+                        HomeworkPrefs.setReminderMinutes(context, it)
+                    },
+                )
+            }
         }
 
         SettingsSectionCard(

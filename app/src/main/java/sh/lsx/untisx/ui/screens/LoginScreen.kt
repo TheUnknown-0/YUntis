@@ -57,6 +57,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -94,6 +95,7 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
 
     var user by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
     var signingIn by remember { mutableStateOf(false) }
     var signedIn by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<UiText?>(null) }
@@ -378,7 +380,12 @@ fun LoginScreen(modifier: Modifier = Modifier, onDone: (() -> Unit)? = null) {
             label = { Text(stringResource(R.string.login_password)) },
             singleLine = true,
             enabled = !signedIn,
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                TextButton(onClick = { showPassword = !showPassword }, enabled = !signedIn) {
+                    Text(stringResource(if (showPassword) R.string.login_password_hide else R.string.login_password_show))
+                }
+            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 autoCorrectEnabled = false,

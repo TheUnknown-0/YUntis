@@ -74,13 +74,12 @@ import sh.lsx.untisx.ui.theme.paperVariation
 import sh.lsx.untisx.ui.theme.NotebookLessonTextStyle
 import sh.lsx.untisx.ui.theme.notebookLessonTypeScale
 import sh.lsx.untisx.data.SubjectColorsPrefs
+import sh.lsx.untisx.ui.components.OwnExamColor
 import sh.lsx.untisx.data.notebook.NotebookLessonSummary
 import sh.lsx.untisx.ui.util.AppMotion
 import sh.lsx.untisx.ui.util.LocalAnimationsEnabled
 import sh.lsx.untisx.ui.util.sharedElementBounds
 
-private val RibbonWidth = 6.dp
-private val SlitGap = 1.5.dp
 
 @Immutable
 data class LessonCardOptions(
@@ -145,7 +144,7 @@ internal fun Modifier.lessonCardBackground(
     container: Color,
     cornerRadius: Dp,
     examColor: Color?,
-    strikeSlit: Boolean,
+    outline: Color? = null,
 ): Modifier = drawBehind {
     val radius = cornerRadius.toPx()
 
@@ -154,36 +153,34 @@ internal fun Modifier.lessonCardBackground(
         cornerRadius = CornerRadius(radius),
     )
 
-    if (examColor != null) {
+    (examColor ?: outline)?.let { border ->
+        val width = (if (examColor != null) 2.dp else 1.5.dp).toPx()
+
         drawRoundRect(
-            color = examColor,
-            cornerRadius = CornerRadius(radius),
-            style = Stroke(width = 2.dp.toPx()),
+            color = border,
+            topLeft = Offset(width / 2f, width / 2f),
+            size = Size(size.width - width, size.height - width),
+            cornerRadius = CornerRadius((radius - width / 2f).coerceAtLeast(0f)),
+            style = Stroke(width = width),
         )
     }
+}
 
-    if (strikeSlit) {
-        val angle = Math.toDegrees(atan2(size.height.toDouble(), size.width.toDouble())).toFloat()
-        val bandWidth = RibbonWidth.toPx() + 3 * SlitGap.toPx()
-        val bandLength = size.width * 3f
+/**
+ * Look of a cancelled lesson: a pale card in the subject colour, tinted towards [mark]
+ * (the cancellation colour, red by default). Text is struck through by the caller and the
+ * card gets a [mark] outline.
+ */
+internal fun cancelledMarkColors(color: Color, mark: Color, surface: Color): LessonCardColors {
+    val tinted = lerp(color, mark, 0.3f)
+    val container = lerp(tinted, surface, 0.55f).copy(alpha = 1f)
+    val ink = if (container.luminance() > 0.45f) Color(0xFF1C1B1F) else Color(0xFFF4EFF4)
 
-        val cardShape = Path().apply {
-            addRoundRect(
-                RoundRect(0f, 0f, size.width, size.height, CornerRadius(radius)),
-            )
-        }
-
-        clipPath(cardShape) {
-            withTransform({ rotate(degrees = -angle, pivot = center) }) {
-                drawRect(
-                    color = Color.Transparent,
-                    topLeft = Offset(center.x - bandLength / 2f, center.y - bandWidth / 2f),
-                    size = Size(bandLength, bandWidth),
-                    blendMode = BlendMode.Clear,
-                )
-            }
-        }
-    }
+    return LessonCardColors(
+        container = container,
+        title = ink.copy(alpha = 0.8f),
+        body = ink.copy(alpha = 0.65f),
+    )
 }
 
 @Composable
@@ -213,7 +210,11 @@ internal fun LessonCard(
         Modifier
     }
 
-    val target = if (cancelled) {
+    val surface = MaterialTheme.colorScheme.surface
+    val marked = cancelled && strike && !notebook
+    val target = if (marked) {
+        cancelledMarkColors(noteColor, options.strikeColor, surface)
+    } else if (cancelled) {
         cancelledCardColors(noteColor, inkColor, cancelledDesaturation, cancelledBrightness, notebook).let {
             if (notebook) {
                 val ink = notebookInk(it.container, inkColor)
@@ -250,8 +251,11 @@ internal fun LessonCard(
         label = "lessonBodyColor",
     )
 
-    val examColor = options.examColor ?: MaterialTheme.colorScheme.error
-    val examTextColor = if (options.examColor == null) {
+    val ownExam = lesson.exam?.own == true
+    val examColor = if (ownExam) OwnExamColor else options.examColor ?: MaterialTheme.colorScheme.error
+    val examTextColor = if (ownExam) {
+        Color.White
+    } else if (options.examColor == null) {
         MaterialTheme.colorScheme.onError
     } else if (examColor.luminance() > 0.5f) {
         Color.Black
@@ -290,7 +294,7 @@ internal fun LessonCard(
                             container = container,
                             cornerRadius = cardCornerRadius,
                             examColor = if (lesson.exam != null) examColor else null,
-                            strikeSlit = cancelled && strike && measured,
+                            outline = if (marked) options.strikeColor else null,
                         )
                     },
                 )
@@ -307,6 +311,7 @@ internal fun LessonCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontWeight = FontWeight.Bold,
+                    textDecoration = if (marked) TextDecoration.LineThrough else null,
                     modifier = Modifier
                         .alpha(if (options.showTeacher) 1f else 0f)
                         .then(if (options.showTeacher) Modifier else Modifier.clearAndSetSemantics {}),
@@ -331,6 +336,7 @@ internal fun LessonCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
+                textDecoration = if (marked) TextDecoration.LineThrough else null,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -348,6 +354,7 @@ internal fun LessonCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontWeight = FontWeight.Bold,
+                    textDecoration = if (marked) TextDecoration.LineThrough else null,
                     modifier = Modifier
                         .alpha(if (options.showRoom) 1f else 0f)
                         .then(if (options.showRoom) Modifier else Modifier.clearAndSetSemantics {}),
@@ -418,69 +425,6 @@ internal fun LessonCard(
                     maxLines = 1,
                 )
             }
-        }
-
-        AnimatedVisibility(
-            visible = !notebook && cancelled && strike && measured,
-            enter = fadeIn(animationSpec = if (animations) AppMotion.effects() else snap()) +
-                scaleIn(
-                    initialScale = 0.6f,
-                    animationSpec = if (animations) AppMotion.spatial() else snap(),
-                ),
-            exit = fadeOut(animationSpec = if (animations) AppMotion.effects() else snap()),
-            modifier = Modifier.matchParentSize(),
-        ) {
-            StrikeOverlay(
-                color = options.strikeColor,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun StrikeRibbon(
-    angle: Float,
-    length: Dp,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Box(
-            modifier = Modifier
-                .requiredWidth(length)
-                .requiredHeight(RibbonWidth)
-                .graphicsLayer { rotationZ = -angle }
-                .background(color, RoundedCornerShape(3.dp)),
-        )
-    }
-}
-
-@Composable
-internal fun StrikeOverlay(
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    var cell by remember { mutableStateOf(IntSize.Zero) }
-    val density = LocalDensity.current
-    val measured = cell.width > 0 && cell.height > 0
-    val angle = if (measured) {
-        Math.toDegrees(atan2(cell.height.toFloat(), cell.width.toFloat()).toDouble()).toFloat()
-    } else {
-        0f
-    }
-
-    Box(modifier = modifier.onSizeChanged { cell = it }) {
-        if (measured) {
-            val overhangPx = with(density) { 1.dp.toPx() }
-            val diagonal = sqrt(cell.width.toFloat() * cell.width + cell.height.toFloat() * cell.height)
-
-            StrikeRibbon(
-                angle = angle,
-                length = with(density) { (diagonal + overhangPx * 2).toDp() },
-                color = color,
-                modifier = Modifier.matchParentSize(),
-            )
         }
     }
 }

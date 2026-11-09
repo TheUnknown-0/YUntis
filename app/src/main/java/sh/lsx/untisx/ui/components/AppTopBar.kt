@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Menu
@@ -37,6 +38,8 @@ internal fun AppTopBar(
     onMenuToggle: () -> Unit,
     onBack: () -> Unit,
     onProfile: () -> Unit,
+    onTitleClick: (() -> Unit)? = null,
+    titleHighlight: Boolean = false,
 ) {
     val effectsSpec = motionEffects<Float>()
 
@@ -91,9 +94,18 @@ internal fun AppTopBar(
             label = "topBarTitle",
         ) { text ->
             Text(
-                text = text,
+                text = if (onTitleClick != null) "$text ▾" else text,
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.fillMaxWidth(),
+                color = if (titleHighlight) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (onTitleClick != null) {
+                            Modifier.clip(RoundedCornerShape(12.dp)).tapHaptic(onTitleClick).padding(vertical = 4.dp)
+                        } else {
+                            Modifier
+                        },
+                    ),
                 textAlign = TextAlign.Center,
             )
         }

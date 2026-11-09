@@ -35,8 +35,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sh.lsx.untisx.R
+import sh.lsx.untisx.data.ThemeStyle
+import sh.lsx.untisx.ui.theme.LocalThemeAppearance
 import sh.lsx.untisx.data.SubjectAlias
+import sh.lsx.untisx.data.SubjectColorResolver
 import sh.lsx.untisx.data.SubjectColorsPrefs
+import sh.lsx.untisx.ui.components.LocalSubjectColorState
 import sh.lsx.untisx.data.subjectLongLabel
 import sh.lsx.untisx.data.prefs.AppearancePrefs
 import sh.lsx.untisx.ui.components.ColorPickerDialog
@@ -87,6 +91,12 @@ fun TimetableSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
 
+    val colorState = LocalSubjectColorState.current
+    val longNames = remember(vm.subjectsById) {
+        vm.subjectsById.values
+            .filter { it.name.isNotBlank() && it.longName.isNotBlank() && it.longName != it.name }
+            .associate { it.name to it.longName }
+    }
     var colorDialogFor by remember { mutableStateOf<String?>(null) }
     var renameDialogFor by remember { mutableStateOf<String?>(null) }
     var pickDefaultColor by remember { mutableStateOf(false) }
@@ -116,6 +126,22 @@ fun TimetableSettingsScreen(
         }
 
         SettingsSectionCard(title = stringResource(R.string.settings_subjects)) {
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_prefer_school_colors),
+                description = stringResource(R.string.settings_prefer_school_colors_desc),
+                checked = colorState.sources.preferSchool,
+                onCheckedChange = colorState.onPreferSchool,
+            )
+
+            SettingsSwitchRow(
+                title = stringResource(R.string.settings_auto_colors),
+                description = stringResource(R.string.settings_auto_colors_desc),
+                checked = colorState.sources.autoColors,
+                onCheckedChange = colorState.onAutoColors,
+            )
+
+            Spacer(Modifier.size(4.dp))
+
             if (knownSubjects.isEmpty()) {
                 Text(
                     text = stringResource(R.string.settings_no_subjects),
@@ -130,9 +156,11 @@ fun TimetableSettingsScreen(
                 }
             } else {
                 knownSubjects.forEach { name ->
-                    val custom = subjectColors.containsKey(name)
+                    val origin = colorState.origin(name)
                     val color = subjectColors[name]?.let { Color(it) } ?: Color(defaultSubjectColor)
-                    val label = subjectLongLabel(subjectAliases, name)
+                    val label = subjectLongLabel(subjectAliases, name).let { alias ->
+                        if (alias != name) alias else longNames[name] ?: name
+                    }
 
                     Row(
                         modifier = Modifier
@@ -181,11 +209,21 @@ fun TimetableSettingsScreen(
                             }
                         }
 
-                        if (custom) {
+                        val originLabel = when (origin) {
+                            SubjectColorResolver.Origin.SCHOOL -> stringResource(R.string.settings_color_from_school)
+                            SubjectColorResolver.Origin.OWN -> stringResource(R.string.settings_custom)
+                            else -> null
+                        }
+
+                        if (originLabel != null) {
                             Text(
-                                text = stringResource(R.string.settings_custom),
+                                text = originLabel,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = if (origin == SubjectColorResolver.Origin.SCHOOL) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
                             )
                         }
 
@@ -266,21 +304,24 @@ fun TimetableSettingsScreen(
         }
 
         SettingsSectionCard(title = stringResource(R.string.settings_display)) {
-            SettingsSliderRow(
-                title = stringResource(R.string.settings_cancelled_desaturation),
-                description = stringResource(R.string.settings_cancelled_desaturation_desc),
-                value = cancelledDesaturation,
-                onValueChange = onCancelledDesaturation,
-                valueLabel = percentLabel(cancelledDesaturation),
-            )
+            // the grey look and the notebook theme use these; the marked look has its own colours
+            if (!cancelledStrike || LocalThemeAppearance.current.style == ThemeStyle.NOTEBOOK) {
+                SettingsSliderRow(
+                    title = stringResource(R.string.settings_cancelled_desaturation),
+                    description = stringResource(R.string.settings_cancelled_desaturation_desc),
+                    value = cancelledDesaturation,
+                    onValueChange = onCancelledDesaturation,
+                    valueLabel = percentLabel(cancelledDesaturation),
+                )
 
-            SettingsSliderRow(
-                title = stringResource(R.string.settings_cancelled_darken),
-                description = stringResource(R.string.settings_cancelled_darken_desc),
-                value = cancelledBrightness,
-                onValueChange = onCancelledBrightness,
-                valueLabel = percentLabel(cancelledBrightness),
-            )
+                SettingsSliderRow(
+                    title = stringResource(R.string.settings_cancelled_darken),
+                    description = stringResource(R.string.settings_cancelled_darken_desc),
+                    value = cancelledBrightness,
+                    onValueChange = onCancelledBrightness,
+                    valueLabel = percentLabel(cancelledBrightness),
+                )
+            }
 
             SettingsSliderRow(
                 title = stringResource(R.string.settings_past_dim),
@@ -308,9 +349,11 @@ fun TimetableSettingsScreen(
     colorDialogFor?.let { subjectName ->
         SubjectColorDialog(
             subject = subjectName,
-            cardColor = subjectColors[subjectName],
-            textColor = subjectTextColors[subjectName],
-            defaultCardColor = defaultSubjectColor,
+            cardColor = colorState.sources.own[subjectName],
+            textColor = colorState.sources.ownText[subjectName],
+            defaultCardColor = colorState.fallbackColor(subjectName, defaultSubjectColor),
+            schoolColor = colorState.sources.school[subjectName],
+            lockedBySchool = colorState.lockedBySchool(subjectName),
             defaultTextColor = lessonTextColor,
             onApply = { card, text ->
                 onSubjectColor(subjectName, card)

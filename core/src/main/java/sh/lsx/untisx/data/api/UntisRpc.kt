@@ -214,6 +214,57 @@ internal object UntisRpc {
         return null
     }
 
+    /**
+     * GET on a WebUntis web endpoint with the session cookies the browser sends.
+     * Returns null when the server refuses the request. An anonymous (expired)
+     * session throws [UntisException.SessionExpired] so the caller can log in again.
+     */
+    internal fun webGet(auth: AuthData, url: String): String? {
+        val sessionId = auth.session.sessionId.takeIf { it.isNotBlank() } ?: throw UntisException.SessionExpired
+        val school = java.util.Base64.getEncoder()
+            .encodeToString(auth.loginName.trim().toByteArray(Charsets.UTF_8))
+
+        val request = Request.Builder().url(url)
+            .header("Cookie", "JSESSIONID=$sessionId; schoolname=\"_$school\"")
+            .header("Accept", "application/json")
+            .get()
+            .build()
+
+        return try {
+            http.newCall(request).execute().use { response ->
+                if (response.code == 429) {
+                    throw UntisException.RateLimited(response.header("Retry-After")?.toLongOrNull())
+                }
+
+                val body = response.body?.string().orEmpty()
+
+                if (response.isSuccessful) return body
+                if (response.code >= 500) throw UntisException.Network
+
+                if ((response.code == 401 || response.code == 403) && body.contains("anonymous", ignoreCase = true)) {
+                    log("web GET: session not accepted")
+                    throw UntisException.SessionExpired
+                }
+
+                val reason = runCatching {
+                    json.parseToJsonElement(body).jsonObject.let { obj ->
+                        listOf("errorCode", "errorMessage")
+                            .mapNotNull { obj[it]?.jsonPrimitive?.contentOrNull }
+                            .joinToString(": ")
+                    }
+                }.getOrDefault("").take(120)
+                warn("web GET ${response.code} $reason")
+                null
+            }
+        } catch (e: UntisException) {
+            throw e
+        } catch (e: SSLException) {
+            throw UntisException.Certificate
+        } catch (e: IOException) {
+            throw UntisException.Network
+        }
+    }
+
     private fun mobileJwt(auth: AuthData, password: String): String? =
         synchronized(jwtLocks.getOrPut(AccountPrefs.accountId(auth)) { Any() }) {
             loadMobileJwt(auth, password)
@@ -376,7 +427,7 @@ internal object UntisRpc {
             log("rpc '$method' failed TLS verification")
             throw UntisException.Certificate
         } catch (e: IOException) {
-            log("rpc '$method' network failure")
+            log("rpc '$method' network failure: ${e.javaClass.simpleName}")
             throw UntisException.Network
         }
     }

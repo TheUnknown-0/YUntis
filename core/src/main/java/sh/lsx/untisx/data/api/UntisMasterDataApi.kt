@@ -29,6 +29,10 @@ internal object UntisMasterDataApi {
 
     suspend fun getRooms(auth: AuthData): List<MasterDataItem> = masterData(auth, "getRooms")
 
+    suspend fun getKlassen(auth: AuthData): List<MasterDataItem> = masterData(auth, "getKlassen")
+
+    suspend fun getStudents(auth: AuthData): List<MasterDataItem> = masterData(auth, "getStudents")
+
     suspend fun getHolidays(auth: AuthData): List<Holiday> = withContext(Dispatchers.IO) {
         UntisRpc.json.decodeFromJsonElement<List<Holiday>>(
             UntisRpc.rpcCall(auth, "getHolidays"),
@@ -88,6 +92,8 @@ internal object UntisMasterDataApi {
                 name = name,
                 longName = obj["longName"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: name,
                 foreName = obj["foreName"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                backColor = obj["backColor"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank),
+                foreColor = obj["foreColor"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank),
             )
         }
     }

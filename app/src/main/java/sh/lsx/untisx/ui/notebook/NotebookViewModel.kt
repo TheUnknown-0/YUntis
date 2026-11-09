@@ -23,6 +23,9 @@ import sh.lsx.untisx.data.StatsStore
 import sh.lsx.untisx.data.AppClock
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.notebook.DueRef
+import sh.lsx.untisx.data.notebook.HomeworkPrefs
+import sh.lsx.untisx.data.notebook.HomeworkReminders
+import sh.lsx.untisx.data.notebook.ReminderRule
 import sh.lsx.untisx.data.notebook.LessonRef
 import sh.lsx.untisx.data.notebook.NotebookConversion
 import sh.lsx.untisx.data.notebook.NotebookConversionWarning
@@ -158,6 +161,9 @@ class NotebookViewModel internal constructor(
     private var data: NotebookData? = null
     private var baseline: NotebookItem? = null
     private var lessonCache = NotebookLessonCache()
+
+    /** The automatic due date is only filled in once per new item, so clearing it sticks. */
+    private var autoDueApplied = false
     private var editorGeneration: Long = 0
 
     private var loadJob: Job? = null
@@ -315,13 +321,16 @@ class NotebookViewModel internal constructor(
             clearLessonPicks()
             loadLessonCache()
 
-            val draft = NotebookDraft(
-                id = UUID.randomUUID().toString(),
-                itemId = null,
-                kind = kind,
-                subject = origin?.subject?.normalized()?.takeIf { !it.isBlank },
-                origin = origin?.normalized(),
-                due = null,
+            autoDueApplied = false
+            val draft = withHomeworkDefaults(
+                NotebookDraft(
+                    id = UUID.randomUUID().toString(),
+                    itemId = null,
+                    kind = kind,
+                    subject = origin?.subject?.normalized()?.takeIf { !it.isBlank },
+                    origin = origin?.normalized(),
+                    due = null,
+                ),
             )
 
             _editorState.value = NotebookEditorState.Ready(
@@ -398,9 +407,17 @@ class NotebookViewModel internal constructor(
         val linksChanged = candidate.origin != current.draft.origin ||
             candidate.due?.lesson != current.draft.due?.lesson
 
-        val updated = if (current.isNew || linksChanged) {
+        val linked = if (current.isNew || linksChanged) {
             candidate.copy(subject = notebookLessonSubject(candidate))
         } else candidate
+        // new homework gets the next lesson of its subject as soon as the subject is known,
+        // and a reminder that follows the due date keeps following it
+        val withDefaults = if (current.isNew) withHomeworkDefaults(linked) else linked
+        val dueMoved = withDefaults.due?.date != current.draft.due?.date ||
+            withDefaults.due?.lesson != current.draft.due?.lesson
+        val updated = if (dueMoved) {
+            withDefaults.copy(due = HomeworkReminders.refresh(withDefaults.due))
+        } else withDefaults
         val dirty = notebookHasUnsavedChanges(updated, baseline) || editorFlagsChanged(current.item)
 
         _editorState.value = current.copy(
@@ -410,6 +427,49 @@ class NotebookViewModel internal constructor(
         )
 
     }
+
+    /** Homework defaults: due at the next lesson of the subject, reminder as set in the settings. */
+    private fun withHomeworkDefaults(draft: NotebookDraft): NotebookDraft {
+        if (draft.kind != NotebookKind.TASK || draft.due != null || autoDueApplied) return draft
+        if (!HomeworkPrefs.autoDue(context)) return draft
+        val subject = draft.subject?.takeIf { !it.isBlank } ?: return draft
+
+        val block = notebookNextLesson(
+            cache = lessonCache,
+            now = AppClock.now(),
+            subject = subject,
+            dueLesson = null,
+            origin = draft.origin,
+        ) ?: return draft
+
+        autoDueApplied = true
+        val lesson = block.toRef()
+        val base = DueRef(date = lesson.date, lesson = lesson)
+        val reminder = HomeworkPrefs.defaultRule(context)?.let { HomeworkReminders.resolve(it, base) }
+
+        return draft.copy(due = base.copy(reminder = reminder))
+    }
+
+    /** Sets a reminder that follows the due date, or removes it with null. */
+    fun setReminderRule(rule: ReminderRule?) {
+        updateDraft { draft ->
+            val due = draft.due ?: return@updateDraft draft
+            draft.copy(due = due.copy(reminder = rule?.let { HomeworkReminders.resolve(it, due) }))
+        }
+    }
+
+    /** Keeps the current reminder time but stops it from following the due date. */
+    fun fixReminder() {
+        updateDraft { draft ->
+            val due = draft.due ?: return@updateDraft draft
+            val reminder = due.reminder ?: return@updateDraft draft
+            draft.copy(due = due.copy(reminder = reminder.copy(rule = null)))
+        }
+    }
+
+    fun defaultReminderRule(): ReminderRule =
+        HomeworkPrefs.defaultRule(context)
+            ?: ReminderRule(daysBefore = HomeworkPrefs.DEFAULT_DAYS_BEFORE, atMinutes = HomeworkPrefs.reminderMinutes(context))
 
     fun applyOriginLesson(lesson: LessonRef) {
         val normalizedLesson = lesson.normalized()

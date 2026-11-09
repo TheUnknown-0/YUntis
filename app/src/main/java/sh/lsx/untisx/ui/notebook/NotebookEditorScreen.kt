@@ -358,7 +358,7 @@ fun NotebookEditorScreen(
                             ?: ReminderSpec(date = date, minutesOfDay = NotebookReminderTime.DEFAULT_MINUTES_OF_DAY)
 
                         draft.copy(
-                            due = currentDue.copy(reminder = reminder.copy(date = date)),
+                            due = currentDue.copy(reminder = reminder.copy(date = date, rule = null)),
                         )
                     }
 
@@ -387,7 +387,7 @@ fun NotebookEditorScreen(
 
                     draft.copy(
                         due = currentDue.copy(
-                            reminder = currentReminder.copy(minutesOfDay = minutes),
+                            reminder = currentReminder.copy(minutesOfDay = minutes, rule = null),
                         ),
                     )
                 }
@@ -747,22 +747,7 @@ private fun NotebookEditorContent(
                                 Switch(
                                     checked = currentDue.reminder != null,
                                     onCheckedChange = { enabled ->
-                                        vm.updateDraft { draft ->
-                                            val target = draft.due ?: return@updateDraft draft
-
-                                            draft.copy(
-                                                due = target.copy(
-                                                    reminder = if (enabled) {
-                                                        ReminderSpec(
-                                                            date = target.date,
-                                                            minutesOfDay = NotebookReminderTime.DEFAULT_MINUTES_OF_DAY,
-                                                        )
-                                                    } else {
-                                                        null
-                                                    },
-                                                ),
-                                            )
-                                        }
+                                        vm.setReminderRule(if (enabled) vm.defaultReminderRule() else null)
                                     },
                                     enabled = !readOnly,
                                 )
@@ -788,25 +773,13 @@ private fun NotebookEditorContent(
                                     trailingIcon = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                                 )
 
-                                OutlinedButton(
-                                    onClick = {
-                                        vm.updateDraft { draft ->
-                                            val target = draft.due ?: return@updateDraft draft
-                                            val spec = target.reminder ?: return@updateDraft draft
-
-                                            draft.copy(
-                                                due = target.copy(
-                                                    reminder = spec.copy(
-                                                        date = notebookPreviousDay(target.date),
-                                                    ),
-                                                ),
-                                            )
-                                        }
-                                    },
+                                ReminderPresets(
+                                    current = currentReminder.rule,
+                                    defaultRule = vm.defaultReminderRule(),
                                     enabled = !readOnly,
-                                ) {
-                                    Text(stringResource(R.string.notebook_reminder_previous_day))
-                                }
+                                    onRule = vm::setReminderRule,
+                                    onFixed = vm::fixReminder,
+                                )
 
                                 if (reminderInPast) {
                                     Text(

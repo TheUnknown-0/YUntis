@@ -36,6 +36,8 @@ data class TimetableEntry(
     val exam: PeriodExam? = null,
     val layoutStartPosition: Int = 0,
     val layoutWidth: Int = 1000,
+    val backColor: String? = null,
+    val foreColor: String? = null,
 ) {
     val cancelled: Boolean get() = code == "cancelled"
     val irregular: Boolean get() = code == "irregular"
@@ -68,6 +70,10 @@ data class ExamInfo(
     val roomIds: List<Int> = emptyList(),
     val teacherIds: List<Int> = emptyList(),
     val klasseIds: List<Int> = emptyList(),
+    /** Added by the user in the app, not by the school. */
+    val own: Boolean = false,
+    /** Subject short name, kept for own exams in case the subject id is unknown. */
+    val subjectName: String = "",
 )
 
 @Serializable
@@ -91,6 +97,8 @@ data class MasterDataItem(
     val name: String = "",
     @SerialName("longName") val longName: String = "",
     @SerialName("foreName") val foreName: String = "",
+    val backColor: String? = null,
+    val foreColor: String? = null,
 )
 
 @Serializable
@@ -147,4 +155,40 @@ fun LocalDate.toVisibleWeekStart(): LocalDate {
 fun LocalDate.plusUntisWeeks(weeks: Long): LocalDate {
     val monday = toUntisWeekStart()
     return monday.plusWeeks(weeks)
+}
+
+/**
+ * Another timetable than the account's own one: a class or a student.
+ * [type] uses Untis element types (1 = class, 5 = student).
+ */
+@Serializable
+data class TimetableTarget(
+    val type: Int,
+    val id: Int,
+    val name: String,
+    val longName: String = "",
+) {
+    companion object {
+        const val CLASS = 1
+        const val STUDENT = 5
+    }
+}
+
+/** One absence of the student. Times use Untis format (date YYYYMMDD, time HHMM). */
+@Serializable
+data class Absence(
+    val id: Int = 0,
+    val date: Int = 0,
+    val startTime: Int = 0,
+    val endDate: Int = 0,
+    val endTime: Int = 0,
+    val reason: String = "",
+    val text: String = "",
+    val excused: Boolean = false,
+    val excuseStatus: String = "",
+) {
+    /** Length in minutes if the absence lies within one day, otherwise 0. */
+    val minutes: Int
+        get() = if (endDate != date || endTime <= startTime) 0
+        else (endTime / 100 * 60 + endTime % 100) - (startTime / 100 * 60 + startTime % 100)
 }

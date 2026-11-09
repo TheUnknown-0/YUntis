@@ -18,13 +18,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.List
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +55,7 @@ internal fun AppDrawer(
     messagesBadge: String?,
     eventsBadge: String?,
     notebookBadge: String?,
+    homeworkBadge: String? = null,
     teachersBadge: String,
     statsBadge: String?,
     onSelect: (Screen) -> Unit,
@@ -124,11 +128,23 @@ internal fun AppDrawer(
         )
 
         SidebarItem(
+            icon = Icons.Outlined.CheckCircle,
+            label = stringResource(R.string.homework_title),
+            badge = homeworkBadge,
+            visible = open,
+            index = 2,
+            onClick = {
+                close()
+                onSelect(Screen.HOMEWORK)
+            },
+        )
+
+        SidebarItem(
             icon = Icons.Outlined.Edit,
             label = stringResource(R.string.notebook_title),
             badge = notebookBadge,
             visible = open,
-            index = 2,
+            index = 3,
             onClick = {
                 close()
                 onSelect(Screen.NOTEBOOK)
@@ -140,10 +156,21 @@ internal fun AppDrawer(
             label = stringResource(R.string.teachers),
             badge = teachersBadge,
             visible = open,
-            index = 3,
+            index = 4,
             onClick = {
                 close()
                 onSelect(Screen.TEACHERS)
+            },
+        )
+
+        SidebarItem(
+            icon = Icons.Outlined.Warning,
+            label = stringResource(R.string.absences_title),
+            visible = open,
+            index = 5,
+            onClick = {
+                close()
+                onSelect(Screen.ABSENCES)
             },
         )
 
@@ -152,10 +179,21 @@ internal fun AppDrawer(
             label = stringResource(R.string.stats),
             badge = statsBadge,
             visible = open,
-            index = 4,
+            index = 6,
             onClick = {
                 close()
                 onSelect(Screen.STATS)
+            },
+        )
+
+        SidebarItem(
+            icon = Icons.Outlined.PlayArrow,
+            label = stringResource(R.string.dino_title),
+            visible = open,
+            index = 7,
+            onClick = {
+                close()
+                onSelect(Screen.DINO)
             },
         )
 
@@ -166,7 +204,7 @@ internal fun AppDrawer(
             icon = Icons.Outlined.Settings,
             label = stringResource(R.string.settings),
             visible = open,
-            index = 5,
+            index = 8,
             onClick = {
                 close()
                 onSelect(Screen.SETTINGS)
@@ -177,7 +215,7 @@ internal fun AppDrawer(
             icon = Icons.Outlined.Info,
             label = stringResource(R.string.about),
             visible = open,
-            index = 6,
+            index = 9,
             onClick = {
                 close()
                 onSelect(Screen.ABOUT)

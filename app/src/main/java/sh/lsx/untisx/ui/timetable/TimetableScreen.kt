@@ -61,6 +61,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.launch
@@ -300,7 +305,8 @@ fun TimetableScreen(
                         notebookBadges = notebookBadges,
                         onLessonClick = lessonClick,
                         onEventClick = eventClick,
-                        exams = vm.exams,
+                        // own exams belong to the own timetable, not to another class
+                        exams = if (vm.viewTarget == null) vm.exams else emptyList(),
                     )
                 }
             }
@@ -359,7 +365,9 @@ private fun WeekPage(
                 CircularProgressIndicator()
             }
         } else {
-            val safeEntries = entries.orEmpty()
+            val safeEntries = remember(entries, exams, subjectsById) {
+                withExamBlocks(entries.orEmpty(), exams, subjectsById)
+            }
 
             val displays = remember(safeEntries, subjectsById, teachersById, roomsById, exams, subjectAliases) {
                 safeEntries.map { entry ->
@@ -787,8 +795,25 @@ private fun DayColumn(
             }
         }
 
+        var openStack by remember { mutableStateOf<LessonStack?>(null) }
+        val stacks = remember(lessons) { stackParallelLessons(lessons) }
+
+        openStack?.let { stack ->
+            ParallelLessonsDialog(
+                lessons = stack.all,
+                colorFor = colorFor,
+                textColorFor = textColorFor,
+                onLessonClick = { entry ->
+                    openStack = null
+                    onLessonClick(entry)
+                },
+                onDismiss = { openStack = null },
+            )
+        }
+
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            lessons.forEach { lesson ->
+            stacks.forEach { stack ->
+                val lesson = stack.shown
                 val entry = lesson.entry
                 val topMinutes = (minutesOf(entry.startTime) - dayStartMinutes)
                     .coerceIn(0, gridEndMinutes - dayStartMinutes)
@@ -804,24 +829,50 @@ private fun DayColumn(
                     val left = maxWidth * startFraction
                     val cardWidth = (maxWidth * widthFraction).coerceAtMost(maxWidth - left)
 
-                    LessonCard(
-                        lesson = lesson,
-                        color = colorFor(lesson.subject),
-                        textColor = textColorFor(lesson.subject),
-                        strike = cancelledStrike,
-                        cancelledDesaturation = cancelledDesaturation,
-                        cancelledBrightness = cancelledBrightness,
-                        options = lessonOptions,
-                        notebookBadge = notebookBadges[
-                            LessonKey(entry.id, entry.date, entry.startTime)
-                        ],
+                    Box(
                         modifier = Modifier
                             .width(cardWidth)
                             .offset(x = left, y = top)
                             .padding(horizontal = 1.dp)
-                            .height(lessonHeight)
-                            .tapHaptic { onLessonClick(entry) },
-                    )
+                            .height(lessonHeight),
+                    ) {
+                        LessonCard(
+                            lesson = lesson,
+                            color = colorFor(lesson.subject),
+                            textColor = textColorFor(lesson.subject),
+                            strike = cancelledStrike,
+                            cancelledDesaturation = cancelledDesaturation,
+                            cancelledBrightness = cancelledBrightness,
+                            options = lessonOptions,
+                            notebookBadge = notebookBadges[
+                                LessonKey(entry.id, entry.date, entry.startTime)
+                            ],
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .tapHaptic {
+                                    if (stack.hidden.isEmpty()) onLessonClick(entry) else openStack = stack
+                                },
+                        )
+
+                        if (stack.hidden.isNotEmpty()) {
+                            val more = stringResource(R.string.timetable_parallel_more, stack.hidden.size)
+
+                            Text(
+                                text = "+${stack.hidden.size}",
+                                fontSize = 10.sp,
+                                lineHeight = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(2.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(MaterialTheme.colorScheme.primary)
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                                    .semantics { contentDescription = more },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -921,4 +972,89 @@ private fun relativeTimeText(timestamp: Long, now: Long): String {
         else -> rememberDateFormat("dMMMjm")
             .format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
     }
+}
+
+/**
+ * Lists lessons that run at the same time; tapping one opens its details. The title shows the
+ * time of the tapped card; a row shows its own time only when it differs from that.
+ */
+@Composable
+private fun ParallelLessonsDialog(
+    lessons: List<LessonDisplay>,
+    colorFor: (String) -> Color,
+    textColorFor: (String) -> Color,
+    onLessonClick: (TimetableEntry) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val timeFormat = rememberTimeFormat()
+    val reference = lessons.first().entry
+    fun range(entry: TimetableEntry) =
+        entry.startTime.toUntisLocalTime().format(timeFormat) + "–" + entry.endTime.toUntisLocalTime().format(timeFormat)
+    val sorted = remember(lessons) {
+        lessons.sortedWith(compareBy({ it.entry.startTime }, { it.entry.cancelled }, { it.label.lowercase() }))
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(range(reference)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                sorted.forEach { lesson ->
+                    val entry = lesson.entry
+                    val sameTime = entry.startTime == reference.startTime && entry.endTime == reference.endTime
+                    val details = listOf(lesson.teachers, lesson.rooms, if (sameTime) "" else range(entry))
+                        .filter { it.isNotBlank() }
+                        .joinToString(" · ")
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .tapHaptic { onLessonClick(entry) }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = lesson.label,
+                            fontWeight = FontWeight.Bold,
+                            color = textColorFor(lesson.subject),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textDecoration = if (entry.cancelled) TextDecoration.LineThrough else null,
+                            modifier = Modifier
+                                .width(96.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(colorFor(lesson.subject))
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                        )
+
+                        Spacer(Modifier.width(10.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = details,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+
+                            if (entry.cancelled) {
+                                Text(
+                                    text = stringResource(R.string.lesson_cancelled),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+        },
+    )
 }
