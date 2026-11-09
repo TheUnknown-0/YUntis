@@ -188,6 +188,9 @@ class TimetableSyncWorker(
 
         ChangeBaseline.save(context, accountId, pruned)
 
+        // a first lesson cancelled over night moves the alarm and the quiet times at once
+        sh.lsx.untisx.data.automation.Automation.refresh(context, observed.values.flatten())
+
         return fresh
     }
 

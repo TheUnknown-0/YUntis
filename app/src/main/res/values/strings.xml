@@ -1034,4 +1034,101 @@
     <string name="rights_import_time">Time of the last import</string>
     <string name="rights_import_time_desc">For economical refreshing</string>
     <string name="timetable_school_import">school: %1$s</string>
+    <string name="alarm_channel">YUntis alarm</string>
+    <string name="alarm_title">Time to get up</string>
+    <string name="alarm_first_lesson">First lesson %1$s %2$s</string>
+    <string name="alarm_snooze">Snooze</string>
+    <string name="alarm_snooze_minutes">Snooze (%1$d min)</string>
+    <string name="alarm_dismiss">Off</string>
+    <string name="alarm_test_label">Test alarm</string>
+    <string name="alarm_card">Alarm clock</string>
+    <string name="alarm_enable">Let YUntis wake me</string>
+    <string name="alarm_enable_desc">Rings before the first lesson that takes place (way and getting-ready time from \"Getting up and leaving\"). If the first lesson is cancelled over night, the alarm moves.</string>
+    <string name="alarm_next">Next alarm: %1$s</string>
+    <string name="alarm_none">No school day loaded for the next days.</string>
+    <string name="alarm_snooze_setting">Snooze length</string>
+    <string name="alarm_test">Test alarm in 10 seconds</string>
+    <string name="alarm_need_exact">To wake you on time, YUntis needs the \"Alarms &amp; reminders\" permission.</string>
+    <string name="alarm_need_fullscreen">To show the alarm over the lock screen, allow \"full-screen notifications\".</string>
+    <string name="alarm_grant">Allow</string>
+    <string name="quiet_card">Quiet in class</string>
+    <string name="quiet_enable">Silence during lessons</string>
+    <string name="quiet_enable_desc">Silences the phone when a lesson starts and turns it back on in long breaks, free periods, on cancellations and after school. Short changes up to 15 minutes count as class.</string>
+    <string name="quiet_kind_dnd">Do not disturb</string>
+    <string name="quiet_kind_vibrate">Vibrate only</string>
+    <string name="quiet_need_access">For \"Do not disturb\" YUntis needs Do not disturb access.</string>
+    <string name="quiet_dnd_hint">What still gets through (alarms, calls from favourites ...) is set in Android settings under Do not disturb → Schedules → \"YUntis: Unterricht\".</string>
+    <string name="quiet_now_on">Active right now (class).</string>
+    <string name="quiet_next_on">Next silencing: %1$s</string>
+    <string name="quiet_next_off">Sound back on: %1$s</string>
+    <string name="quiet_rule_name">YUntis: Unterricht</string>
+    <string name="quiet_rule_summary">Lessons from the timetable</string>
+    <string name="share_title">Share</string>
+    <string name="share_qr">QR code to scan</string>
+    <string name="share_hint">Scan with YUntis (profile picture → Scan QR code) or send as a link.</string>
+    <string name="share_as_link">Send as link</string>
+    <string name="share_link_intro">Open in YUntis:</string>
+    <string name="share_kind_homework">Homework</string>
+    <string name="share_kind_exam">Exam</string>
+    <string name="share_due">Due %1$s</string>
+    <string name="share_week_text">Lesson times of the week from %1$s (no subjects), to find free time together.</string>
+    <string name="share_received">From %1$s</string>
+    <string name="share_someone">someone</string>
+    <string name="share_free_together">Free together</string>
+    <string name="share_free_none">No shared free time during school hours this week.</string>
+    <string name="share_take_homework">Add to notebook</string>
+    <string name="share_take_exam">Add as own exam</string>
+    <string name="share_taken">Added.</string>
+    <string name="share_invalid">This is not a valid YUntis code.</string>
+    <string name="share_scan">Scan QR code</string>
+    <string name="share_scan_failed">Scanning is not possible. Are Google Play services up to date?</string>
+    <string name="share_my_week">Share my week</string>
+    <!-- alarm v2 -->
+    <string name="alarm_need_notifications">Notifications for YUntis are off. Without them the alarm does not show up on the screen.</string>
+    <string name="alarm_volume_muted">The alarm volume is at 0. Turn it up in the volume settings, otherwise nothing rings.</string>
+    <string name="alarm_test_started">The test alarm rings in 10 seconds. You can lock the device to try that too.</string>
+
+    <!-- widget style -->
+    <string name="widget_style_card">Widgets</string>
+    <string name="widget_style_desc">Look of all YUntis widgets on the home screen</string>
+    <string name="widget_style_auto">Automatic</string>
+    <string name="widget_style_light">Light</string>
+    <string name="widget_style_dark">Dark</string>
+    <string name="widget_style_dynamic">Material You</string>
+    <string name="widget_style_postit">Post-it</string>
+    <string name="widget_style_opacity">Opacity</string>
+    <string name="widget_style_preview_day">Mon, Nov 9</string>
+    <string name="widget_style_preview_subject1">Maths</string>
+    <string name="widget_style_preview_subject2">English</string>
+    <string name="widget_style_preview_room">Room 204</string>
+
+    <!-- excuse reminders -->
+    <string name="excuse_channel">Excuses</string>
+    <string name="excuse_card">Excuses</string>
+    <string name="excuse_enable">Remind me to hand in excuses</string>
+    <string name="excuse_enable_desc">Every day from the day after an absence until it is excused or marked as handed in. For absences from school and ones you entered.</string>
+    <string name="excuse_time">Reminder time</string>
+    <string name="excuse_check_now">Check now</string>
+    <string name="excuse_overdue">deadline passed</string>
+    <string name="excuse_last_day">last day today</string>
+    <plurals name="excuse_days_left">
+        <item quantity="one">%1$d day left</item>
+        <item quantity="other">%1$d days left</item>
+    </plurals>
+    <plurals name="excuse_title">
+        <item quantity="one">Hand in your excuse</item>
+        <item quantity="other">Hand in %1$d excuses</item>
+    </plurals>
+    <string name="excuse_title_today">Hand in your excuse today</string>
+    <string name="excuse_title_overdue">Excuse overdue</string>
+    <string name="excuse_handed_in_one">Handed in</string>
+    <string name="excuse_handed_in_all">All handed in</string>
+    <string name="excuse_handed_in_check">Excuse handed in</string>
+
+    <!-- settings search -->
+    <string name="settings_search_hint">Search settings</string>
+    <string name="settings_search_clear">Clear search</string>
+    <string name="settings_search_none">Nothing found for \"%1$s\"</string>
+    <string name="alarm_snooze_channel">Alarm snoozing</string>
+    <string name="alarm_snoozed_until">Snoozing until %1$s</string>
 </resources>

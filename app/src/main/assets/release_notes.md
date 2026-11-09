@@ -1,3 +1,27 @@
+## 0.11.0
+
+YUntis weckt dich jetzt selbst, schaltet im Unterricht stumm, erinnert an Entschuldigungen und teilt Hausaufgaben per QR-Code. Dazu Widget-Stile bis hin zum Post-it und eine Suche in den Einstellungen.
+
+### Neu
+* [Wecker] Eigener YUntis-Wecker: klingelt vor der ersten Stunde, die wirklich stattfindet, und verschiebt sich, wenn sie über Nacht ausfällt. Mit Vollbild über dem Sperrbildschirm, Schlummern und Probealarm
+* [Ruhe] Im Unterricht automatisch „Nicht stören“ oder nur Vibration, in Pausen, Freistunden und nach der Schule wieder laut
+* [Fehlzeiten] Tägliche Erinnerung, Entschuldigungen abzugeben, ab dem Tag nach der Fehlzeit, mit Restfrist. Gilt für Fehlzeiten der Schule und selbst eingetragene; „Abgegeben“ direkt in der Benachrichtigung oder in der Liste
+* [Teilen] Hausaufgaben und Klausuren als QR-Code oder Link teilen und übernehmen
+* [Teilen] „Meine Woche teilen“ zeigt euch die gemeinsame freie Zeit, ohne Fächer zu verraten
+* [Widgets] Widget-Stil wählbar: Automatisch, Hell, Dunkel, Material You oder **Post-it** in fünf Papierfarben mit Klebestreifen und Handschrift, dazu einstellbare Deckkraft und Vorschau
+* [Einstellungen] Suche über alle Einstellungen; ein Treffer springt direkt zur Stelle und hebt sie kurz hervor
+
+### Verbessert
+* [Wecker] Klingelt jetzt über einen eigenen Weckdienst auf dem Wecker-Kanal, wird langsam lauter, vibriert und läuft auch im Stumm-Modus
+* [Wecker] Hinweise, wenn Benachrichtigungen aus sind oder die Weckerlautstärke auf 0 steht
+* [Wecker] Während des Schlummerns zeigt eine Benachrichtigung die Weckzeit und lässt den Wecker ausschalten
+
+### Behoben
+* [Wecker] Der Weckerbildschirm erschien nicht über dem Sperrbildschirm, und der Probealarm konnte den echten Wecker überschreiben
+
+### Intern
+* Neue Tests für Weckzeiten, Teilen-Codes, Entschuldigungs-Erinnerungen und die Einstellungs-Suche
+
 ## 0.10.1
 
 YUntis hat jetzt einen eigenen Signaturschlüssel. Updates installieren sich wie bisher einfach über die alte Version, alle Daten bleiben erhalten.

@@ -1,69 +1,103 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Background, paper shade and tape are separate images so the style can tint and fade them. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/widget_background"
-    android:orientation="vertical"
-    android:paddingStart="16dp"
-    android:paddingTop="14dp"
-    android:paddingEnd="16dp"
-    android:paddingBottom="10dp">
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_background" />
+
+    <ImageView
+        android:id="@+id/widget_shade"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_postit_shade"
+        android:visibility="gone" />
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="bottom"
-        android:orientation="horizontal">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="10dp">
 
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:gravity="bottom"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.08"
+                    android:textAllCaps="true"
+                    android:textColor="@color/widget_accent"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/widget_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:maxLines="1"
+                    android:textColor="@color/widget_text"
+                    android:textSize="22sp" />
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/widget_label"
+                android:id="@+id/widget_count"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
-                android:letterSpacing="0.08"
-                android:textAllCaps="true"
-                android:textColor="@color/widget_accent"
-                android:textSize="11sp" />
-
-            <TextView
-                android:id="@+id/widget_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-black"
-                android:maxLines="1"
-                android:textColor="@color/widget_text"
-                android:textSize="22sp" />
+                android:layout_marginBottom="3dp"
+                android:textColor="@color/widget_text_soft"
+                android:textSize="12sp" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/widget_count"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:id="@+id/widget_list"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="3dp"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical" />
+
+        <TextView
+            android:id="@+id/widget_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
             android:textColor="@color/widget_text_soft"
-            android:textSize="12sp" />
+            android:textSize="13sp"
+            android:visibility="gone" />
     </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/widget_list"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="vertical" />
-
-    <TextView
-        android:id="@+id/widget_empty"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:textColor="@color/widget_text_soft"
-        android:textSize="13sp"
+    <ImageView
+        android:id="@+id/widget_tape"
+        android:layout_width="64dp"
+        android:layout_height="18dp"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="-2dp"
+        android:importantForAccessibility="no"
+        android:rotation="-3"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_postit_tape"
         android:visibility="gone" />
-</LinearLayout>
+</FrameLayout>

@@ -18,6 +18,7 @@ class BootReceiver : BroadcastReceiver() {
         try {
             NotificationScheduler.ensureAll(context)
             sh.lsx.untisx.data.widget.WidgetUpdater.updateAll(context)
+            sh.lsx.untisx.data.automation.Automation.refresh(context)
         } catch (e: Exception) {
             pendingResult.finish()
             return

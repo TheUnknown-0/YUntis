@@ -69,6 +69,7 @@ internal fun ExamPlanScreen(
     onOpenDate: (Int) -> Unit,
     onLoadWeeksUntil: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
+    onShare: ((ExamInfo) -> Unit)? = null,
 ) {
     val now = remember { LocalDateTime.now() }
     val today = now.toLocalDate()
@@ -114,6 +115,7 @@ internal fun ExamPlanScreen(
                 subjectAliases = subjectAliases,
                 colorFor = colorFor,
                 onOpenDate = onOpenDate,
+                onShare = onShare?.let { share -> { share(exam) } },
             )
         }
     }
@@ -131,6 +133,7 @@ private fun ExamPlanCard(
     subjectAliases: Map<String, SubjectAlias>,
     colorFor: (String) -> Color,
     onOpenDate: (Int) -> Unit,
+    onShare: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
@@ -187,6 +190,12 @@ private fun ExamPlanCard(
                             )
                         }
                     }
+                }
+            }
+
+            if (onShare != null) {
+                TextButton(onClick = onShare, modifier = Modifier.align(Alignment.End)) {
+                    Text(stringResource(R.string.share_title))
                 }
             }
 

@@ -96,6 +96,7 @@ internal fun ScreenHost(
     profileStartAdding: Boolean = false,
     selectedSubjectId: Int = 0,
     onSubjectClick: (Int) -> Unit = {},
+    onShare: (sh.lsx.untisx.data.share.SharePayload) -> Unit = {},
     messagesVm: MessagesViewModel,
     notebookVm: NotebookViewModel,
     notebookItems: List<NotebookItem>,
@@ -375,6 +376,17 @@ internal fun ScreenHost(
             onToggle = notebookVm::toggleCompleted,
             onOpen = { itemId -> onNotebookOpenItem(itemId, Screen.HOMEWORK) },
             onCreate = { onNotebookCreate(NotebookKind.TASK, null, Screen.HOMEWORK) },
+            onShare = { item ->
+                onShare(
+                    sh.lsx.untisx.data.share.SharePayload.Homework(
+                        from = auth.user,
+                        title = item.title.ifBlank { item.displayTitle },
+                        body = item.body.takeIf { it != item.displayTitle }.orEmpty(),
+                        subject = item.subject?.longName?.takeIf { it.isNotBlank() } ?: item.subject?.name.orEmpty(),
+                        due = item.due?.date ?: 0,
+                    ),
+                )
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -407,6 +419,21 @@ internal fun ScreenHost(
             colorFor = { name -> subjectColors[name]?.let { Color(it) } ?: Color(defaultSubjectColor) },
             onOpenDate = onExamClick,
             onLoadWeeksUntil = timetableVm::preloadWeeksUntil,
+            onShare = { exam ->
+                val subject = timetableVm.subjectsById[exam.subjectId]
+                onShare(
+                    sh.lsx.untisx.data.share.SharePayload.Exam(
+                        from = auth.user,
+                        type = exam.examType,
+                        subject = subject?.longName?.takeIf { it.isNotBlank() } ?: subject?.name ?: exam.subjectName,
+                        date = exam.date,
+                        start = exam.startTime,
+                        end = exam.endTime,
+                        name = exam.name,
+                        text = exam.text,
+                    ),
+                )
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),

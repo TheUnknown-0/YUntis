@@ -1034,4 +1034,101 @@
     <string name="rights_import_time">Zeitpunkt des letzten Imports</string>
     <string name="rights_import_time_desc">Für sparsames Aktualisieren</string>
     <string name="timetable_school_import">Schule: %1$s</string>
+    <string name="alarm_channel">YUntis-Wecker</string>
+    <string name="alarm_title">Aufstehen</string>
+    <string name="alarm_first_lesson">Erste Stunde %1$s %2$s</string>
+    <string name="alarm_snooze">Schlummern</string>
+    <string name="alarm_snooze_minutes">Schlummern (%1$d min)</string>
+    <string name="alarm_dismiss">Aus</string>
+    <string name="alarm_test_label">Probealarm</string>
+    <string name="alarm_card">Wecker</string>
+    <string name="alarm_enable">YUntis weckt mich</string>
+    <string name="alarm_enable_desc">Klingelt vor der ersten Stunde, die stattfindet (Schulweg und Vorbereitungszeit aus „Aufstehen und Losgehen“). Fällt die erste Stunde über Nacht aus, verschiebt sich der Wecker.</string>
+    <string name="alarm_next">Nächster Wecker: %1$s</string>
+    <string name="alarm_none">Kein Schultag in den nächsten Tagen geladen.</string>
+    <string name="alarm_snooze_setting">Schlummerdauer</string>
+    <string name="alarm_test">Probealarm in 10 Sekunden</string>
+    <string name="alarm_need_exact">Für pünktliches Wecken braucht YUntis die Erlaubnis für „Wecker und Erinnerungen“.</string>
+    <string name="alarm_need_fullscreen">Damit der Wecker über dem Sperrbildschirm erscheint, erlaube „Vollbild-Benachrichtigungen“.</string>
+    <string name="alarm_grant">Erlauben</string>
+    <string name="quiet_card">Ruhe im Unterricht</string>
+    <string name="quiet_enable">Im Unterricht stumm schalten</string>
+    <string name="quiet_enable_desc">Schaltet zu Stundenbeginn auf stumm und in großen Pausen, Freistunden, bei Ausfall und nach der Schule zurück. Kurze Wechsel bis 15 Minuten zählen zum Unterricht.</string>
+    <string name="quiet_kind_dnd">Nicht stören</string>
+    <string name="quiet_kind_vibrate">Nur Vibration</string>
+    <string name="quiet_need_access">Für „Nicht stören“ braucht YUntis Zugriff auf „Nicht stören“.</string>
+    <string name="quiet_dnd_hint">Was trotzdem durchkommt (Wecker, Anrufe von Favoriten …), stellst du in den Android-Einstellungen unter Nicht stören → Zeitpläne → „YUntis: Unterricht“ ein.</string>
+    <string name="quiet_now_on">Gerade aktiv (Unterricht).</string>
+    <string name="quiet_next_on">Nächstes Stummschalten: %1$s</string>
+    <string name="quiet_next_off">Wieder laut: %1$s</string>
+    <string name="quiet_rule_name">YUntis: Unterricht</string>
+    <string name="quiet_rule_summary">Unterricht laut Stundenplan</string>
+    <string name="share_title">Teilen</string>
+    <string name="share_qr">QR-Code zum Scannen</string>
+    <string name="share_hint">Mit YUntis scannen (Profilbild → QR-Code scannen) oder als Link schicken.</string>
+    <string name="share_as_link">Als Link senden</string>
+    <string name="share_link_intro">In YUntis öffnen:</string>
+    <string name="share_kind_homework">Hausaufgabe</string>
+    <string name="share_kind_exam">Klausur</string>
+    <string name="share_due">Bis %1$s</string>
+    <string name="share_week_text">Unterrichtszeiten der Woche ab %1$s (ohne Fächer), um gemeinsame Freizeit zu finden.</string>
+    <string name="share_received">Von %1$s</string>
+    <string name="share_someone">jemandem</string>
+    <string name="share_free_together">Gemeinsam frei</string>
+    <string name="share_free_none">In dieser Woche habt ihr keine gemeinsame freie Zeit während der Schulzeit.</string>
+    <string name="share_take_homework">Ins Schulheft übernehmen</string>
+    <string name="share_take_exam">Als eigene Klausur übernehmen</string>
+    <string name="share_taken">Übernommen.</string>
+    <string name="share_invalid">Das ist kein gültiger YUntis-Code.</string>
+    <string name="share_scan">QR-Code scannen</string>
+    <string name="share_scan_failed">Scannen nicht möglich. Sind die Google Play-Dienste aktuell?</string>
+    <string name="share_my_week">Meine Woche teilen</string>
+    <!-- alarm v2 -->
+    <string name="alarm_need_notifications">Benachrichtigungen für YUntis sind aus. Ohne sie erscheint der Wecker nicht auf dem Bildschirm.</string>
+    <string name="alarm_volume_muted">Die Weckerlautstärke steht auf 0. Stell sie in den Lautstärke-Einstellungen hoch, sonst klingelt nichts.</string>
+    <string name="alarm_test_started">Probealarm klingelt in 10 Sekunden. Du kannst das Gerät dafür auch sperren.</string>
+
+    <!-- widget style -->
+    <string name="widget_style_card">Widgets</string>
+    <string name="widget_style_desc">Aussehen aller YUntis-Widgets auf dem Startbildschirm</string>
+    <string name="widget_style_auto">Automatisch</string>
+    <string name="widget_style_light">Hell</string>
+    <string name="widget_style_dark">Dunkel</string>
+    <string name="widget_style_dynamic">Material You</string>
+    <string name="widget_style_postit">Post-it</string>
+    <string name="widget_style_opacity">Deckkraft</string>
+    <string name="widget_style_preview_day">Mo., 9. Nov.</string>
+    <string name="widget_style_preview_subject1">Mathematik</string>
+    <string name="widget_style_preview_subject2">Deutsch</string>
+    <string name="widget_style_preview_room">Raum 204</string>
+
+    <!-- excuse reminders -->
+    <string name="excuse_channel">Entschuldigungen</string>
+    <string name="excuse_card">Entschuldigungen</string>
+    <string name="excuse_enable">An Entschuldigungen erinnern</string>
+    <string name="excuse_enable_desc">Ab dem Tag nach einer Fehlzeit jeden Tag, bis sie entschuldigt oder als abgegeben markiert ist. Gilt für Fehlzeiten der Schule und selbst eingetragene.</string>
+    <string name="excuse_time">Uhrzeit der Erinnerung</string>
+    <string name="excuse_check_now">Jetzt prüfen</string>
+    <string name="excuse_overdue">Frist abgelaufen</string>
+    <string name="excuse_last_day">heute letzter Tag</string>
+    <plurals name="excuse_days_left">
+        <item quantity="one">noch %1$d Tag</item>
+        <item quantity="other">noch %1$d Tage</item>
+    </plurals>
+    <plurals name="excuse_title">
+        <item quantity="one">Entschuldigung abgeben</item>
+        <item quantity="other">%1$d Entschuldigungen abgeben</item>
+    </plurals>
+    <string name="excuse_title_today">Entschuldigung heute abgeben</string>
+    <string name="excuse_title_overdue">Entschuldigung überfällig</string>
+    <string name="excuse_handed_in_one">Abgegeben</string>
+    <string name="excuse_handed_in_all">Alle abgegeben</string>
+    <string name="excuse_handed_in_check">Entschuldigung abgegeben</string>
+
+    <!-- settings search -->
+    <string name="settings_search_hint">Einstellungen durchsuchen</string>
+    <string name="settings_search_clear">Suche leeren</string>
+    <string name="settings_search_none">Nichts gefunden für „%1$s“</string>
+    <string name="alarm_snooze_channel">Wecker schlummert</string>
+    <string name="alarm_snoozed_until">Schlummert bis %1$s</string>
 </resources>

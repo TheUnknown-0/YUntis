@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -75,6 +76,7 @@ import sh.lsx.untisx.data.prefs.PasswordVault
 import sh.lsx.untisx.ui.util.rememberDateFormat
 import sh.lsx.untisx.ui.util.rememberTimeFormat
 import sh.lsx.untisx.ui.util.tapHaptic
+import sh.lsx.untisx.data.absences.ExcuseReminders
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -90,12 +92,24 @@ class AbsencesViewModel(app: Application) : AndroidViewModel(app) {
     var items by mutableStateOf<List<AbsenceItem>>(emptyList())
         private set
 
+    /** Excuses the user marked as handed in (keys of [ExcuseReminders.keyOf]). */
+    var handed by mutableStateOf<Set<String>>(emptySet())
+        private set
+
     private var accountId: String? = null
     private var school: List<AbsenceItem> = emptyList()
 
     private fun publish() {
         val own = accountId?.let { OwnAbsencesStore.load(getApplication(), it) }.orEmpty().map(AbsenceItem::of)
         items = (school + own).sortedByDescending { it.date * 10000L + it.startTime }
+        handed = accountId?.let { ExcuseReminders.handedIn(getApplication(), it) }.orEmpty()
+        accountId?.let { ExcuseReminders.clearIfDone(getApplication(), it) }
+    }
+
+    fun setHanded(item: AbsenceItem, on: Boolean) {
+        val id = accountId ?: return
+        ExcuseReminders.setHandedIn(getApplication(), id, ExcuseReminders.keyOf(item), on)
+        publish()
     }
 
     fun load() {
@@ -174,6 +188,8 @@ fun AbsencesScreen(
                 onRetry = vm::load,
                 onEdit = { editing = it },
                 onExcuse = { excuseFor = it },
+                handed = vm.handed,
+                onHanded = vm::setHanded,
                 onOpenDate = onOpenDate,
             )
         }
@@ -217,6 +233,8 @@ private fun AbsenceList(
     onEdit: (OwnAbsence) -> Unit,
     onExcuse: (AbsenceItem) -> Unit,
     onOpenDate: (Int) -> Unit,
+    handed: Set<String> = emptySet(),
+    onHanded: (AbsenceItem, Boolean) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val excused = items.filter { it.excused }
@@ -304,6 +322,8 @@ private fun AbsenceList(
                     deadline = if (item.excused) null else AbsenceAssistant.deadline(item, deadlineDays),
                     onClick = { item.own?.let(onEdit) ?: onOpenDate(item.date) },
                     onExcuse = { onExcuse(item) },
+                    handedIn = ExcuseReminders.keyOf(item) in handed,
+                    onHanded = { onHanded(item, it) },
                 )
             }
         }
@@ -339,6 +359,8 @@ private fun AbsenceRow(
     deadline: LocalDate?,
     onClick: () -> Unit,
     onExcuse: () -> Unit,
+    handedIn: Boolean = false,
+    onHanded: (Boolean) -> Unit = {},
 ) {
     val dateFormat = rememberDateFormat("EEEdMMM")
     val timeFormat = rememberTimeFormat()
@@ -405,6 +427,14 @@ private fun AbsenceRow(
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedButton(onClick = onExcuse) { Text(stringResource(R.string.absences_write_excuse)) }
+            }
+            // handed in, but the school has not entered it yet: no more daily reminders
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).tapHaptic { onHanded(!handedIn) },
+            ) {
+                Checkbox(checked = handedIn, onCheckedChange = onHanded)
+                Text(stringResource(R.string.excuse_handed_in_check), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

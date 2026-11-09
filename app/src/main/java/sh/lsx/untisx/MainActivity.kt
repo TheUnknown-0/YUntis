@@ -77,6 +77,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        if (intent?.data?.scheme == sh.lsx.untisx.data.share.ShareCodec.SCHEME) {
+            sh.lsx.untisx.ui.share.PendingShare.offer(intent.dataString)
+        }
+
         val date = intent?.getIntExtra(Notifications.EXTRA_FOCUS_DATE, 0) ?: 0
         val screen = intent?.getStringExtra(Notifications.EXTRA_FOCUS_SCREEN)
         val token = intent?.getStringExtra(NotebookNotificationFocus.EXTRA_FOCUS_TOKEN)

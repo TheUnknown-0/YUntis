@@ -15,6 +15,7 @@ import sh.lsx.untisx.data.AppTheme
 import sh.lsx.untisx.ui.components.SettingsSectionCard
 import sh.lsx.untisx.ui.components.SettingsSwitchRow
 import sh.lsx.untisx.ui.components.ThemeSettingsContent
+import sh.lsx.untisx.ui.components.WidgetStyleSettingsCard
 
 @Composable
 fun AppearanceSettingsScreen(
@@ -43,5 +44,7 @@ fun AppearanceSettingsScreen(
                 onCheckedChange = onAnimationsChange,
             )
         }
+
+        WidgetStyleSettingsCard()
     }
 }

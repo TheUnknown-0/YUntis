@@ -44,7 +44,7 @@ fun SettingsSectionCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     AppCard(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().then(if (title != null) Modifier.settingsFocus(title) else Modifier),
         shape = appCardShape(20.dp),
         border = LocalThemeAppearance.current.settingsBorder,
         elevation = CardDefaults.cardElevation(defaultElevation = LocalThemeAppearance.current.settingsElevation),
@@ -85,6 +85,7 @@ fun SettingsSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .settingsFocus(title)
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -129,6 +130,7 @@ fun SettingsSliderRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .settingsFocus(title)
             .padding(vertical = 6.dp),
     ) {
         Row(
@@ -180,6 +182,7 @@ fun SettingsTimeRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .settingsFocus(label)
             .padding(vertical = 6.dp),
     ) {
         Row(
@@ -228,6 +231,7 @@ fun SettingsActionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .settingsFocus(title)
             .clip(RoundedCornerShape(12.dp))
             .tapHaptic(enabled, onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),

@@ -515,6 +515,10 @@ fun NotificationSettingsContent(modifier: Modifier = Modifier) {
         }
 
         PlannerSettingsCards()
+
+        AutomationSettingsCards()
+
+        ExcuseReminderCard()
     }
 }
 

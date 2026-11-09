@@ -17,6 +17,8 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DrawerValue
@@ -242,6 +244,74 @@ internal fun MainApp(
         if (seen != current && notes.isNotBlank()) current to notes else null
     }
     var showWhatsNew by rememberSaveable { mutableStateOf(whatsNew != null) }
+
+    var sharing by remember { mutableStateOf<sh.lsx.untisx.data.share.SharePayload?>(null) }
+    sharing?.let { payload -> sh.lsx.untisx.ui.share.ShareDialog(payload) { sharing = null } }
+
+    if (sh.lsx.untisx.ui.share.PendingShare.invalid) {
+        LaunchedEffect(Unit) {
+            android.widget.Toast.makeText(context, R.string.share_invalid, android.widget.Toast.LENGTH_LONG).show()
+            sh.lsx.untisx.ui.share.PendingShare.invalid = false
+        }
+    }
+
+    sh.lsx.untisx.ui.share.PendingShare.payload?.let { incoming ->
+        sh.lsx.untisx.ui.share.ImportDialog(
+            payload = incoming,
+            freeTogether = { week ->
+                val mine = sh.lsx.untisx.data.share.ShareCodec.weekOf(
+                    "",
+                    java.time.LocalDate.of(week.monday / 10000, week.monday / 100 % 100, week.monday % 100),
+                    timetableVm.ownEntries(),
+                )
+                sh.lsx.untisx.data.share.ShareCodec.freeTogether(mine.busy, week.busy)
+            },
+            onImport = { payload ->
+                sh.lsx.untisx.ui.share.PendingShare.payload = null
+                when (payload) {
+                    is sh.lsx.untisx.data.share.SharePayload.Homework -> scope.launch {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            sh.lsx.untisx.data.notebook.NotebookRepository(context, accountId).commitDraft(
+                                sh.lsx.untisx.data.notebook.NotebookDraft(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    kind = NotebookKind.TASK,
+                                    title = payload.title,
+                                    body = payload.body,
+                                    subject = payload.subject.takeIf { it.isNotBlank() }
+                                        ?.let { sh.lsx.untisx.data.notebook.SubjectRef(name = it) },
+                                    due = payload.due.takeIf { it > 0 }?.let { sh.lsx.untisx.data.notebook.DueRef(date = it) },
+                                ),
+                                cleanupDraft = false,
+                            )
+                        }
+                        notebookVm.refresh()
+                        android.widget.Toast.makeText(context, R.string.share_taken, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                    is sh.lsx.untisx.data.share.SharePayload.Exam -> {
+                        val subject = timetableVm.subjectsById.values.firstOrNull {
+                            it.longName.equals(payload.subject, true) || it.name.equals(payload.subject, true)
+                        }
+                        timetableVm.saveOwnExam(
+                            sh.lsx.untisx.data.model.ExamInfo(
+                                examType = payload.type,
+                                name = payload.name,
+                                text = payload.text,
+                                date = payload.date,
+                                startTime = payload.start,
+                                endTime = payload.end,
+                                subjectId = subject?.id ?: 0,
+                                subjectName = subject?.name ?: payload.subject,
+                                own = true,
+                            ),
+                        )
+                        android.widget.Toast.makeText(context, R.string.share_taken, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                    is sh.lsx.untisx.data.share.SharePayload.Week -> Unit
+                }
+            },
+            onDismiss = { sh.lsx.untisx.ui.share.PendingShare.payload = null },
+        )
+    }
     if (showWhatsNew && whatsNew != null) {
         sh.lsx.untisx.ui.screens.WhatsNewDialog(whatsNew.first, whatsNew.second) { showWhatsNew = false }
     }
@@ -711,6 +781,31 @@ internal fun MainApp(
                                     )
                                 }
 
+                                HorizontalDivider()
+
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.share_scan)) },
+                                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                                    onClick = {
+                                        close()
+                                        sh.lsx.untisx.ui.share.scanShareCode(context) {
+                                            android.widget.Toast.makeText(context, R.string.share_scan_failed, android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.share_my_week)) },
+                                    leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
+                                    onClick = {
+                                        close()
+                                        val today = java.time.LocalDate.now()
+                                        // on the weekend the coming week is the interesting one
+                                        val day = if (today.dayOfWeek.value >= 6) today.plusDays(2) else today
+                                        sharing = sh.lsx.untisx.data.share.ShareCodec.weekOf(auth.user, day, timetableVm.ownEntries())
+                                    },
+                                )
+
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.account_menu_manage)) },
                                     leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
@@ -793,6 +888,7 @@ internal fun MainApp(
                         lessonVm = if (lessonFromCompare && compareVm != null) compareVm else timetableVm,
                         lessonReadOnly = lessonFromCompare && compareVm != null,
                         profileStartAdding = profileStartAdding,
+                        onShare = { sharing = it },
                         selectedTeacherId = selectedTeacherId,
                         selectedSubjectId = selectedSubjectId,
                         onSubjectClick = { id ->

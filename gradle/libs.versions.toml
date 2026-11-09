@@ -18,8 +18,12 @@ robolectric = "4.17"
 androidxTestCore = "1.7.0"
 wearCompose = "1.7.1"
 playServicesWearable = "20.0.1"
+zxingCore = "3.5.3"
+playServicesCodeScanner = "16.1.0"
 
 [libraries]
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
+play-services-code-scanner = { group = "com.google.android.gms", name = "play-services-code-scanner", version.ref = "playServicesCodeScanner" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.8.0" }

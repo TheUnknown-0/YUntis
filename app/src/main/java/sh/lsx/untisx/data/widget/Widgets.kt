@@ -64,6 +64,7 @@ object WidgetUpdater {
         val color: (String) -> Int,
         val cancelled: Int,
         val changed: Int,
+        val look: WidgetLook,
     )
 
     /** Redraws all widgets from the cached timetable of the active account. Cheap, no network. */
@@ -92,6 +93,7 @@ object WidgetUpdater {
             val aliases = SubjectColorsPrefs.getAliases(app)
             val colors = SubjectColorResolver.cardColors(SubjectColorsPrefs.getKnown(app), SubjectColorsPrefs.sources(app))
             val fallback = SubjectColorsPrefs.getDefaultColor(app)
+            val look = WidgetLook.resolve(app)
             val style = Style(
                 // an own long name wins, then the school's full name, then the short code
                 label = { lesson ->
@@ -99,8 +101,9 @@ object WidgetUpdater {
                         ?: lesson.subjectLong.ifBlank { subjectShortLabel(aliases, lesson.subject).ifBlank { lesson.subject } }
                 },
                 color = { colors[it] ?: fallback },
-                cancelled = ContextCompat.getColor(app, R.color.widget_cancelled),
-                changed = ContextCompat.getColor(app, R.color.widget_changed),
+                cancelled = look.colors?.cancelled ?: ContextCompat.getColor(app, R.color.widget_cancelled),
+                changed = look.colors?.changed ?: ContextCompat.getColor(app, R.color.widget_changed),
+                look = look,
             )
 
             dayIds.forEach { id ->
@@ -161,8 +164,8 @@ object WidgetUpdater {
 
     internal fun subjectText(lesson: WidgetLesson, style: Style): CharSequence {
         val label = style.label(lesson)
-        if (!lesson.cancelled) return label
-        return SpannableString(label).apply { setSpan(StrikethroughSpan(), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
+        if (!lesson.cancelled) return style.look.text(label)
+        return style.look.text(SpannableString(label).apply { setSpan(StrikethroughSpan(), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) })
     }
 
     internal fun detailText(context: Context, lesson: WidgetLesson): String = when {
@@ -174,6 +177,43 @@ object WidgetUpdater {
     private fun rowsFor(heightDp: Int): Int =
         if (heightDp <= 0) 4 else ((heightDp - HEADER_DP) / ROW_DP).coerceIn(1, MAX_ROWS)
 
+    /** One lesson line, in the colours and font of the chosen widget style. */
+    internal fun lessonRow(context: Context, lesson: WidgetLesson, style: Style, compact: Boolean): RemoteViews {
+        val look = style.look
+        val row = RemoteViews(context.packageName, if (compact) R.layout.widget_lesson_row_compact else R.layout.widget_lesson_row)
+        row.setInt(R.id.row_bar, "setColorFilter", barColor(lesson, style))
+        row.setTextViewText(R.id.row_subject, subjectText(lesson, style))
+        look.setText(row, R.id.row_detail, detailText(context, lesson))
+        look.setText(row, R.id.row_start, time(context, lesson.start))
+        if (!compact) look.setText(row, R.id.row_end, time(context, lesson.end))
+
+        look.color(row, R.id.row_subject, WidgetLook.Role.TEXT)
+        look.color(row, R.id.row_detail, WidgetLook.Role.SOFT)
+        look.color(row, R.id.row_start, if (compact) WidgetLook.Role.SOFT else WidgetLook.Role.TEXT)
+        if (!compact) look.color(row, R.id.row_end, WidgetLook.Role.SOFT)
+
+        when {
+            lesson.cancelled -> {
+                row.setTextColor(R.id.row_subject, style.cancelled)
+                row.setTextColor(R.id.row_detail, style.cancelled)
+            }
+            lesson.changed -> row.setTextColor(R.id.row_detail, style.changed)
+        }
+        return row
+    }
+
+    /** Header texts shared by the day widgets. */
+    internal fun header(views: RemoteViews, look: WidgetLook, label: String, title: String, count: String) {
+        look.applyFrame(views)
+        look.setText(views, R.id.widget_label, label)
+        look.setText(views, R.id.widget_title, title)
+        look.setText(views, R.id.widget_count, count)
+        look.color(views, R.id.widget_label, WidgetLook.Role.ACCENT)
+        look.color(views, R.id.widget_title, WidgetLook.Role.TEXT)
+        look.color(views, R.id.widget_count, WidgetLook.Role.SOFT)
+        look.color(views, R.id.widget_empty, WidgetLook.Role.SOFT)
+    }
+
     private fun dayViews(
         context: Context,
         day: WidgetDay,
@@ -182,10 +222,9 @@ object WidgetUpdater {
         style: Style,
         rows: Int,
     ): RemoteViews {
+        val look = style.look
         val views = RemoteViews(context.packageName, R.layout.widget_day)
         views.setOnClickPendingIntent(R.id.widget_root, openApp(context, day.date))
-        views.setTextViewText(R.id.widget_label, dayLabel(context, day.date, now))
-        views.setTextViewText(R.id.widget_title, AppDateFormats.formatter(context, "EEEdMMM").format(day.date))
         views.removeAllViews(R.id.widget_list)
 
         // today only what is still ahead; another day completely
@@ -193,36 +232,24 @@ object WidgetUpdater {
         val shown = if (day.date == now.toLocalDate()) day.lessons.filter { it.end > nowTime } else day.lessons
         val held = day.lessons.count { !it.cancelled }
 
-        views.setTextViewText(
-            R.id.widget_count,
-            if (day.lessons.isEmpty()) "" else context.resources.getQuantityString(R.plurals.widget_lesson_count, held, held),
+        header(
+            views,
+            look,
+            label = dayLabel(context, day.date, now),
+            title = AppDateFormats.formatter(context, "EEEdMMM").format(day.date),
+            count = if (day.lessons.isEmpty()) "" else context.resources.getQuantityString(R.plurals.widget_lesson_count, held, held),
         )
 
         if (!loggedIn || shown.isEmpty()) {
             views.setViewVisibility(R.id.widget_empty, View.VISIBLE)
-            views.setTextViewText(R.id.widget_empty, context.getString(if (loggedIn) R.string.widget_no_lessons else R.string.widget_login))
+            look.setText(views, R.id.widget_empty, context.getString(if (loggedIn) R.string.widget_no_lessons else R.string.widget_login))
             return views
         }
         views.setViewVisibility(R.id.widget_empty, View.GONE)
 
         shown.take(rows).forEach { lesson ->
-            val row = RemoteViews(context.packageName, R.layout.widget_lesson_row)
-            row.setInt(R.id.row_bar, "setColorFilter", barColor(lesson, style))
-            row.setTextViewText(R.id.row_subject, subjectText(lesson, style))
-            row.setTextViewText(R.id.row_detail, detailText(context, lesson))
-            row.setTextViewText(R.id.row_start, time(context, lesson.start))
-            row.setTextViewText(R.id.row_end, time(context, lesson.end))
-
-            when {
-                lesson.cancelled -> {
-                    row.setTextColor(R.id.row_subject, style.cancelled)
-                    row.setTextColor(R.id.row_detail, style.cancelled)
-                }
-                lesson.changed -> row.setTextColor(R.id.row_detail, style.changed)
-            }
-
-            if (lesson == day.next) row.setInt(R.id.row_root, "setBackgroundResource", R.drawable.widget_row_highlight)
-
+            val row = lessonRow(context, lesson, style, compact = false)
+            if (lesson == day.next) look.highlight(row, R.id.row_root)
             views.addView(R.id.widget_list, row)
         }
 
@@ -230,13 +257,20 @@ object WidgetUpdater {
     }
 
     private fun nextViews(context: Context, day: WidgetDay, now: LocalDateTime, loggedIn: Boolean, style: Style): RemoteViews {
+        val look = style.look
         val views = RemoteViews(context.packageName, R.layout.widget_next)
         views.setOnClickPendingIntent(R.id.widget_root, openApp(context, day.date))
+        look.applyFrame(views)
+        look.color(views, R.id.widget_label, WidgetLook.Role.ACCENT)
+        look.color(views, R.id.widget_main, WidgetLook.Role.TEXT)
+        look.color(views, R.id.widget_sub, WidgetLook.Role.SOFT)
+        look.color(views, R.id.row_start, WidgetLook.Role.TEXT)
+        look.color(views, R.id.row_end, WidgetLook.Role.SOFT)
         val next = day.next
 
         if (!loggedIn || next == null) {
-            views.setTextViewText(R.id.widget_label, dayLabel(context, day.date, now))
-            views.setTextViewText(R.id.widget_main, context.getString(if (loggedIn) R.string.widget_no_lessons_short else R.string.widget_login))
+            look.setText(views, R.id.widget_label, dayLabel(context, day.date, now))
+            look.setText(views, R.id.widget_main, context.getString(if (loggedIn) R.string.widget_no_lessons_short else R.string.widget_login))
             views.setTextViewText(R.id.widget_sub, "")
             views.setTextViewText(R.id.row_start, "")
             views.setTextViewText(R.id.row_end, "")
@@ -249,12 +283,12 @@ object WidgetUpdater {
             day.date == now.toLocalDate() -> context.getString(R.string.widget_next)
             else -> dayLabel(context, day.date, now)
         }
-        views.setTextViewText(R.id.widget_label, label)
-        views.setTextViewText(R.id.widget_main, style.label(next))
-        views.setTextViewText(R.id.widget_sub, detailText(context, next))
+        look.setText(views, R.id.widget_label, label)
+        look.setText(views, R.id.widget_main, style.label(next))
+        look.setText(views, R.id.widget_sub, detailText(context, next))
         if (next.changed) views.setTextColor(R.id.widget_sub, style.changed)
-        views.setTextViewText(R.id.row_start, time(context, next.start))
-        views.setTextViewText(R.id.row_end, time(context, next.end))
+        look.setText(views, R.id.row_start, time(context, next.start))
+        look.setText(views, R.id.row_end, time(context, next.end))
         views.setInt(R.id.row_bar, "setColorFilter", barColor(next, style))
         return views
     }

@@ -28,8 +28,8 @@ android {
         applicationId = "de.theunknown.yuntis"
         minSdk = 26
         targetSdk = 37
-        versionCode = 15
-        versionName = "0.10.1"
+        versionCode = 16
+        versionName = "0.11.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -135,6 +135,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.material)
     implementation(libs.play.services.wearable)
+    implementation(libs.zxing.core)
+    implementation(libs.play.services.code.scanner)
     implementation(libs.androidx.work.runtime.ktx)
     testImplementation(testFixtures(project(":core")))
     testImplementation(libs.junit)

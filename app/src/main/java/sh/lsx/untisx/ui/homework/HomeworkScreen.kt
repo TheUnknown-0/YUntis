@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -100,6 +101,7 @@ fun HomeworkScreen(
     onOpen: (String) -> Unit,
     onCreate: () -> Unit,
     modifier: Modifier = Modifier,
+    onShare: ((NotebookItem) -> Unit)? = null,
 ) {
     val today = rememberToday()
     val groups = remember(items, today) { groupOpenHomework(items, today) }
@@ -149,6 +151,7 @@ fun HomeworkScreen(
                         subjectAliases = subjectAliases,
                         onToggle = { onToggle(item.id) },
                         onOpen = { onOpen(item.id) },
+                        onShare = onShare?.let { share -> { share(item) } },
                     )
                 }
             }
@@ -229,6 +232,7 @@ private fun HomeworkRow(
     subjectAliases: Map<String, SubjectAlias>,
     onToggle: () -> Unit,
     onOpen: () -> Unit,
+    onShare: (() -> Unit)? = null,
 ) {
     val subjectName = item.subject?.name?.takeIf { it.isNotBlank() } ?: item.due?.lesson?.subject?.name.orEmpty()
     val subject = subjectName.takeIf { it.isNotBlank() }?.let { name ->
@@ -271,6 +275,17 @@ private fun HomeworkRow(
                     text = meta,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (overdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        if (onShare != null && !item.isCompleted) {
+            androidx.compose.material3.IconButton(onClick = onShare) {
+                Icon(
+                    imageVector = Icons.Outlined.Share,
+                    contentDescription = stringResource(R.string.share_title),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }

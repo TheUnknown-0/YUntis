@@ -34,6 +34,7 @@ object NotificationScheduler {
         ensureExamReminderAlarm(context)
         NotebookReminderScheduler.ensureAll(context)
         sh.lsx.untisx.data.planner.PlannerScheduler.ensureAll(context)
+        sh.lsx.untisx.data.absences.ExcuseReminders.schedule(context)
     }
 
     fun onAccountRemoved(context: Context, accountId: String) {

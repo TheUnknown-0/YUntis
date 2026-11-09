@@ -189,10 +189,16 @@ internal fun AppRoot(
                 NotificationScheduler.ensureAll(context)
                 sh.lsx.untisx.data.calendar.CalendarExportWorker.ensure(context)
                 sh.lsx.untisx.data.update.AppUpdater.ensure(context)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    sh.lsx.untisx.data.automation.Automation.refresh(context)
+                }
             }
 
             LaunchedEffect(currentAuth?.let { AccountPrefs.accountId(it) }) {
                 NotificationScheduler.ensureAll(context)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    sh.lsx.untisx.data.automation.Automation.refresh(context)
+                }
             }
 
             Box(modifier = Modifier.fillMaxSize()) {

@@ -126,20 +126,25 @@ object FullDayWidget {
         views.setOnClickPendingIntent(R.id.widget_prev, action(context, id, ACTION_PREV, 1))
         views.setOnClickPendingIntent(R.id.widget_next_day, action(context, id, ACTION_NEXT, 2))
         views.setOnClickPendingIntent(R.id.widget_header, action(context, id, ACTION_TODAY, 3))
-        views.setTextViewText(R.id.widget_label, WidgetUpdater.dayLabel(context, date, now))
-        views.setTextViewText(R.id.widget_title, sh.lsx.untisx.ui.util.AppDateFormats.formatter(context, "EEEdMMM").format(date))
-
+        val look = style.look
         val held = lessons.filter { !it.cancelled }
         val span = if (held.isEmpty()) "" else " · " + WidgetUpdater.time(context, held.first().start) + " – " + WidgetUpdater.time(context, held.maxOf { it.end })
-        views.setTextViewText(
-            R.id.widget_count,
-            if (lessons.isEmpty()) "" else context.resources.getQuantityString(R.plurals.widget_lesson_count, held.size, held.size) + span,
+        WidgetUpdater.header(
+            views,
+            look,
+            label = WidgetUpdater.dayLabel(context, date, now),
+            title = sh.lsx.untisx.ui.util.AppDateFormats.formatter(context, "EEEdMMM").format(date),
+            count = if (lessons.isEmpty()) "" else context.resources.getQuantityString(R.plurals.widget_lesson_count, held.size, held.size) + span,
         )
+        look.color(views, R.id.widget_prev, WidgetLook.Role.TEXT)
+        look.color(views, R.id.widget_next_day, WidgetLook.Role.TEXT)
+        look.highlight(views, R.id.widget_prev)
+        look.highlight(views, R.id.widget_next_day)
         views.removeAllViews(R.id.widget_list)
 
         if (!loggedIn || lessons.isEmpty()) {
             views.setViewVisibility(R.id.widget_empty, View.VISIBLE)
-            views.setTextViewText(R.id.widget_empty, context.getString(if (loggedIn) R.string.widget_free_day else R.string.widget_login))
+            look.setText(views, R.id.widget_empty, context.getString(if (loggedIn) R.string.widget_free_day else R.string.widget_login))
             return views
         }
         views.setViewVisibility(R.id.widget_empty, View.GONE)
@@ -163,32 +168,21 @@ object FullDayWidget {
             when (row) {
                 is FullDayRow.Free -> {
                     val free = RemoteViews(context.packageName, R.layout.widget_free_row)
-                    free.setTextViewText(
+                    look.setText(
+                        free,
                         R.id.row_subject,
                         context.getString(R.string.timetable_free, freeDurationText(row.minutes)) + "  " +
                             WidgetUpdater.time(context, row.start) + " – " + WidgetUpdater.time(context, row.end),
                     )
+                    look.color(free, R.id.row_subject, WidgetLook.Role.ACCENT)
+                    look.colors?.let { free.setInt(R.id.row_bar, "setColorFilter", it.accent) }
                     views.addView(R.id.widget_list, free)
                 }
 
                 is FullDayRow.Lesson -> {
                     val lesson = row.lesson
-                    val view = RemoteViews(context.packageName, if (compact) R.layout.widget_lesson_row_compact else R.layout.widget_lesson_row)
-                    view.setInt(R.id.row_bar, "setColorFilter", WidgetUpdater.barColor(lesson, style))
-                    view.setTextViewText(R.id.row_subject, WidgetUpdater.subjectText(lesson, style))
-                    view.setTextViewText(R.id.row_detail, WidgetUpdater.detailText(context, lesson))
-                    view.setTextViewText(R.id.row_start, WidgetUpdater.time(context, lesson.start))
-                    if (!compact) view.setTextViewText(R.id.row_end, WidgetUpdater.time(context, lesson.end))
-
-                    when {
-                        lesson.cancelled -> {
-                            view.setTextColor(R.id.row_subject, style.cancelled)
-                            view.setTextColor(R.id.row_detail, style.cancelled)
-                        }
-                        lesson.changed -> view.setTextColor(R.id.row_detail, style.changed)
-                    }
-
-                    if (lesson == running) view.setInt(R.id.row_root, "setBackgroundResource", R.drawable.widget_row_highlight)
+                    val view = WidgetUpdater.lessonRow(context, lesson, style, compact)
+                    if (lesson == running) look.highlight(view, R.id.row_root)
                     if (isToday && lesson.end <= nowTime) view.setFloat(R.id.row_root, "setAlpha", 0.45f)
 
                     views.addView(R.id.widget_list, view)

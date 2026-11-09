@@ -1032,6 +1032,7 @@ class TimetableViewModel(app: Application, private val boundAccountId: String?) 
         }
         if (AccountStore.activeId.value == AccountPrefs.accountId(currentAuth)) {
             sh.lsx.untisx.data.widget.WidgetUpdater.updateAll(getApplication())
+            viewModelScope.launch(Dispatchers.IO) { sh.lsx.untisx.data.automation.Automation.refresh(getApplication()) }
         }
     }
 }
