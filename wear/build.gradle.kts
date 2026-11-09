@@ -11,7 +11,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "sh.lsx.untisx"
+        applicationId = "de.theunknown.yuntis"
         minSdk = 33
         targetSdk = 37
         versionCode = 2

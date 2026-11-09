@@ -46,9 +46,9 @@ import sh.lsx.untisx.ui.util.uiTextString
 import sh.lsx.untisx.ui.util.tapHaptic
 import android.widget.Toast
 
-private const val REPO_URL = "https://codeberg.org/Losterixx/UntisX"
-private const val LICENSE_URL = "https://codeberg.org/Losterixx/UntisX/src/branch/main/LICENSE"
-private const val ISSUES_URL = "https://codeberg.org/Losterixx/UntisX/issues"
+private const val REPO_URL = "https://github.com/TheUnknown-0/YUntis"
+private const val LICENSE_URL = "https://github.com/TheUnknown-0/YUntis/blob/main/LICENSE"
+private const val ISSUES_URL = "https://github.com/TheUnknown-0/YUntis/issues"
 private const val BETTERUNTIS_URL = "https://github.com/Sapuseven/BetterUntis"
 
 @Composable
@@ -117,7 +117,7 @@ private fun AppCard(versionName: String) {
 
             Column {
                 Text(
-                    text = "UntisX",
+                    text = "YUntis",
                     style = MaterialTheme.typography.headlineMedium,
                 )
 
@@ -146,7 +146,7 @@ private fun LinksCard(onOpen: (String) -> Unit) {
     AboutCard(stringResource(R.string.about_project)) {
         LinkRow(
             label = stringResource(R.string.about_source_code),
-            value = "codeberg.org/Losterixx/UntisX",
+            value = "github.com/TheUnknown-0/YUntis",
             onClick = { onOpen(REPO_URL) },
         )
 

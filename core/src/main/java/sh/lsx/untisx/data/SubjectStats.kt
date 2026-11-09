@@ -31,6 +31,28 @@ data class SubjectDayStats(
 }
 
 /**
+ * One teacher on one day, counted for the teacher who was planned (the original one when
+ * another teacher covers). Lessons during school events are left out: a trip or exam week
+ * cancels lessons without the teacher being absent.
+ */
+@Serializable
+data class TeacherDayStats(
+    val planned: Int = 0,
+    val cancelled: Int = 0,
+    val substituted: Int = 0,
+)
+
+/** How often a teacher's planned lessons with the account did not take place with them. */
+data class TeacherTotals(
+    val planned: Int,
+    val cancelled: Int,
+    val substituted: Int,
+) {
+    val absent: Int get() = cancelled + substituted
+    val absentRate: Float get() = if (planned == 0) 0f else absent.toFloat() / planned
+}
+
+/**
  * Totals for one subject. Every planned lesson is exactly one of: held regularly, substituted, cancelled.
  * The cancellation rate only relates to this subject's own lessons.
  */
@@ -73,6 +95,21 @@ object SubjectStats {
             .map { (id, a) -> SubjectTotals(id, a[0], a[1], a[2], a[3], a[4]) }
             .filter { it.planned > 0 }
             .sortedWith(compareByDescending<SubjectTotals> { it.planned }.thenBy { it.subjectId })
+    }
+
+    fun teacherTotals(days: Collection<DayStats>, teacherId: Int): TeacherTotals {
+        var planned = 0
+        var cancelled = 0
+        var substituted = 0
+
+        for (day in days) {
+            val s = day.teacherDays[teacherId] ?: continue
+            planned += s.planned
+            cancelled += s.cancelled
+            substituted += s.substituted
+        }
+
+        return TeacherTotals(planned, cancelled, substituted)
     }
 
     /** True when some counted days were recorded before per-subject data existed. */

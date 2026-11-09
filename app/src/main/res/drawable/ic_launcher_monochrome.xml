@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- YUntis logo (generated): a calligraphic Y, its stem a pen grip ending in a fountain pen nib. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <!-- Scaled down so the logo stays inside the adaptive icon safe zone. -->
+    <group
+        android:scaleX="0.62"
+        android:scaleY="0.62"
+        android:pivotX="256"
+        android:pivotY="256">
+        <path
+            android:fillColor="#000000"
+            android:fillType="evenOdd"
+            android:pathData="M104,104 C92,98 96,80 118,80 C184,100 230,156 256,222 C282,168 330,110 372,80 C392,62 420,46 440,56 C456,64 452,88 434,94 C382,124 322,192 288,262 L282,268 L282,334 L300,344 C304,388 282,428 256,476 C230,428 208,388 212,344 L230,334 L230,268 C206,206 160,140 110,116 C106,113 104,108 104,104 Z M265,398 A9,9 0 1,0 247,398 A9,9 0 1,0 265,398 Z M253,409 L259,409 L259,478 L253,478 Z" />
+        <path
+            android:fillColor="#000000"
+            android:pathData="M256,482 C262,490 266,496 266,501 C266,507 261,511 256,511 C251,511 246,507 246,501 C246,496 250,490 256,482 Z" />
+    </group>
+</vector>

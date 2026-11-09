@@ -175,6 +175,7 @@ internal fun MainApp(
     var selectedLesson by rememberSaveable(stateSaver = timetableEntrySaver) {
         mutableStateOf<TimetableEntry?>(null)
     }
+    var selectedTeacherId by rememberSaveable { mutableStateOf(0) }
     var selectedEvent by rememberSaveable(stateSaver = timetableEntrySaver) {
         mutableStateOf<TimetableEntry?>(null)
     }
@@ -379,6 +380,7 @@ internal fun MainApp(
             currentScreen == Screen.NOTEBOOK_EDITOR -> notebookVm.requestEditorExit()
             currentScreen == Screen.NOTEBOOK -> currentScreen = Screen.TIMETABLE
             currentScreen == Screen.EVENT_DETAILS -> currentScreen = previousScreen
+            currentScreen == Screen.TEACHER_INFO -> currentScreen = Screen.LESSON_DETAILS
             currentScreen == Screen.MESSAGE_DETAILS -> currentScreen = Screen.MESSAGES
             else -> currentScreen = Screen.TIMETABLE
         }
@@ -505,6 +507,7 @@ internal fun MainApp(
         val title = when (currentScreen) {
             Screen.PROFILE -> stringResource(R.string.profile)
             Screen.LESSON_DETAILS -> stringResource(R.string.lesson)
+            Screen.TEACHER_INFO -> stringResource(R.string.teacher_info)
             Screen.EVENT_DETAILS -> stringResource(R.string.event)
             Screen.EVENTS -> stringResource(R.string.events)
             Screen.MESSAGES -> stringResource(R.string.messages)
@@ -617,6 +620,15 @@ internal fun MainApp(
                             selectedLesson = entry
                             timetableVm.loadLessonNotes(entry)
                             currentScreen = Screen.LESSON_DETAILS
+                        },
+                        selectedTeacherId = selectedTeacherId,
+                        onTeacherClick = { id ->
+                            selectedTeacherId = id
+                            currentScreen = Screen.TEACHER_INFO
+                        },
+                        onShowTargetTimetable = { target ->
+                            timetableVm.showTarget(target)
+                            currentScreen = Screen.TIMETABLE
                         },
                         onOpenEvent = { entry, from -> openEvent(entry, from) },
                         onScreenChange = { currentScreen = it },

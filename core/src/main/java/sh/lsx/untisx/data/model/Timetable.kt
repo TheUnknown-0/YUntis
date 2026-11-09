@@ -170,6 +170,7 @@ data class TimetableTarget(
 ) {
     companion object {
         const val CLASS = 1
+        const val TEACHER = 2
         const val STUDENT = 5
     }
 }

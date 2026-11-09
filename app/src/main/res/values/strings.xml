@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">UntisX</string>
+    <string name="app_name">YUntis</string>
 
     <!-- Generic -->
     <string name="cancel">Cancel</string>
@@ -18,7 +18,7 @@
     <string name="rooms">Rooms</string>
     <string name="timetable">Timetable</string>
     <string name="lesson">Lesson</string>
-    <string name="untisx_logo">UntisX logo</string>
+    <string name="untisx_logo">YUntis logo</string>
     <string name="person_teacher">Teacher</string>
     <string name="person_student">Student</string>
 
@@ -28,7 +28,7 @@
 
     <!-- Onboarding -->
     <string name="onboarding_get_started">Get started</string>
-    <string name="onboarding_welcome">Welcome to UntisX</string>
+    <string name="onboarding_welcome">Welcome to YUntis</string>
     <string name="onboarding_tagline">A better app for your timetable.</string>
     <string name="onboarding_permissions_title">Permissions</string>
     <string name="onboarding_notifications_title">Notifications (optional)</string>
@@ -36,14 +36,14 @@
     <string name="onboarding_notifications_granted">Granted</string>
     <string name="onboarding_notifications_allow">Allow notifications</string>
     <string name="onboarding_internet_title">Internet access (required)</string>
-    <string name="onboarding_internet_text">UntisX talks to your school\'s Untis server to load your timetable. No account is created, your credentials are only stored on this device.</string>
+    <string name="onboarding_internet_text">YUntis talks to your school\'s Untis server to load your timetable. No account is created, your credentials are only stored on this device.</string>
     <string name="onboarding_theme_title">Make it yours</string>
     <string name="onboarding_language_title">Language</string>
 
     <!-- Login -->
     <string name="login_connect_account">Connect your Account</string>
     <string name="login_privacy">Your username and password are encrypted using the Android Keystore and stored only on this device. They are sent exclusively to your school\'s Untis server.</string>
-    <string name="login_teacher_notice">UntisX is built for students; teacher accounts are not supported.</string>
+    <string name="login_teacher_notice">YUntis is built for students; teacher accounts are not supported.</string>
     <string name="login_school_label">Your school</string>
     <string name="login_school_selected">%1$s, \"%2$s\"</string>
     <string name="login_searching">Searching…</string>
@@ -135,7 +135,7 @@
     <string name="settings_backup_import_confirm_title">Import settings?</string>
     <string name="settings_backup_import_confirm_text">Your current customizations (colors, theme, language, etc.) will be overwritten.</string>
     <string name="settings_backup_import_success">Settings imported.</string>
-    <string name="settings_backup_import_failed">This file is not a valid UntisX settings backup.</string>
+    <string name="settings_backup_import_failed">This file is not a valid YUntis settings backup.</string>
     <string name="settings_backup_import_version">This backup was created by a newer app version.</string>
 
     <!-- Theme -->
@@ -155,6 +155,21 @@
     <string name="timetable_restricted">Restricted</string>
     <string name="timetable_today">Today</string>
     <string name="timetable_parallel_more">%1$d more lessons at the same time</string>
+    <string name="teacher_info">Teacher</string>
+    <string name="teacher_show_timetable">Show timetable</string>
+    <string name="teacher_subjects">Your subjects with this teacher</string>
+    <string name="teacher_subjects_none">This teacher does not regularly teach you in the loaded weeks.</string>
+    <string name="teacher_upcoming">Your next lessons</string>
+    <string name="teacher_upcoming_none">No further lessons in the loaded weeks.</string>
+    <string name="timetable_target_refused">Your school does not share this timetable with your account.</string>
+    <string name="timetable_target_back">Back to my timetable</string>
+    <string name="teacher_absence">Absence (this school year)</string>
+    <string name="teacher_absence_own">In your lessons</string>
+    <string name="teacher_absence_class">In all courses of %1$s</string>
+    <string name="teacher_absence_class_unnamed">In all courses of your class</string>
+    <string name="teacher_absence_counts">%1$d of %2$d · %3$d cancelled · %4$d covered</string>
+    <string name="teacher_absence_loading">Loading class timetable: %1$d of %2$d weeks</string>
+    <string name="teacher_absence_hint">Counts lessons planned with this teacher that were cancelled or covered by someone else. Lessons during school events are not counted.</string>
     <string name="timetable_last_refreshed">Last refreshed: %1$s</string>
     <string name="time_now">just now</string>
     <plurals name="time_minutes_ago">
@@ -283,11 +298,11 @@
     <string name="about_lib_serialization_desc">JSON parsing</string>
     <string name="about_lib_material3_desc">Theming with dynamic colors</string>
     <string name="about_license_title">License</string>
-    <string name="about_license_text">UntisX is free and open-source software licensed under the GNU GPL-3.0.</string>
-    <string name="about_unofficial_text">UntisX is an unofficial client and is not affiliated with Untis. It uses partially undocumented interfaces, which can change or stop working at any time.</string>
+    <string name="about_license_text">YUntis is free and open-source software licensed under the GNU GPL-3.0.</string>
+    <string name="about_unofficial_text">YUntis is an unofficial client and is not affiliated with Untis. It uses partially undocumented interfaces, which can change or stop working at any time.</string>
     <string name="about_view_license">View license</string>
     <string name="about_credits_title">Credits</string>
-    <string name="about_credits_text">UntisX is heavily inspired by BetterUntis, the open-source Untis client for Android.</string>
+    <string name="about_credits_text">YUntis is based on UntisX by Losterixx (codeberg.org/Losterixx/UntisX), which is heavily inspired by BetterUntis, the open-source Untis client for Android.</string>
     <string name="about_by_lsx">by LSX Studios</string>
     <string name="about_debug_title">Debug</string>
     <string name="about_debug_session_id">Session ID</string>
@@ -356,7 +371,7 @@
 
     <!-- Onboarding: exact alarms -->
     <string name="onboarding_exact_alarm_title">Exact alarms (optional)</string>
-    <string name="onboarding_exact_alarm_text">Lets UntisX deliver the timetable overview exactly at your chosen time.</string>
+    <string name="onboarding_exact_alarm_text">Lets YUntis deliver the timetable overview exactly at your chosen time.</string>
     <string name="onboarding_exact_alarm_granted">Granted</string>
     <string name="onboarding_exact_alarm_allow">Allow exact alarms</string>
 
@@ -364,7 +379,7 @@
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_desc">Schedule changes and overview</string>
     <string name="settings_notifications_master">Enable notifications</string>
-    <string name="settings_notifications_master_desc">Allow UntisX to send notifications.</string>
+    <string name="settings_notifications_master_desc">Allow YUntis to send notifications.</string>
     <string name="settings_notifications_permission_missing">Notifications are disabled in the system settings.</string>
     <string name="settings_notifications_grant">Allow notifications</string>
     <string name="settings_notifications_exact_alarm_desc">Exact alarms are not allowed - the overview and exam reminders may be delayed.</string>

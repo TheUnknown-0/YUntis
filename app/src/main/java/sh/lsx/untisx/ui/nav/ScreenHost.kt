@@ -1,5 +1,11 @@
 package sh.lsx.untisx.ui.nav
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import sh.lsx.untisx.data.SubjectStats
+import sh.lsx.untisx.data.prefs.StatsPrefs
+import sh.lsx.untisx.data.model.TimetableTarget
+import sh.lsx.untisx.ui.screens.TeacherInfoScreen
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -101,6 +107,9 @@ internal fun ScreenHost(
     selectedLesson: TimetableEntry?,
     selectedEvent: TimetableEntry?,
     onLessonClick: (TimetableEntry) -> Unit,
+    selectedTeacherId: Int = 0,
+    onTeacherClick: (Int) -> Unit = {},
+    onShowTargetTimetable: (TimetableTarget) -> Unit = {},
     onOpenEvent: (TimetableEntry, Screen) -> Unit,
     onScreenChange: (Screen) -> Unit,
     onExamClick: (Int) -> Unit,
@@ -463,6 +472,48 @@ internal fun ScreenHost(
                 .padding(padding),
         )
 
+        Screen.TEACHER_INFO -> {
+            val context = LocalContext.current
+            val yearStats = timetableVm.currentYearStats()
+            val totals = remember(yearStats) {
+                SubjectStats.totals(yearStats?.days?.values.orEmpty(), StatsPrefs.includeEvents(context))
+            }
+            val classStats = timetableVm.classYearStats()
+            val ownAbsence = remember(yearStats, selectedTeacherId) {
+                SubjectStats.teacherTotals(yearStats?.days?.values.orEmpty(), selectedTeacherId)
+            }
+            val classAbsence = remember(classStats, selectedTeacherId) {
+                SubjectStats.teacherTotals(classStats?.days?.values.orEmpty(), selectedTeacherId)
+            }
+
+            // fills in missing weeks: the own ones and, for the class rate, the own class
+            LaunchedEffect(Unit) {
+                timetableVm.loadHistoricalStats()
+                timetableVm.loadClassStats()
+            }
+
+            TeacherInfoScreen(
+                teacherId = selectedTeacherId,
+                teachersById = timetableVm.teachersById,
+                subjectsById = timetableVm.subjectsById,
+                subjectAliases = subjectAliases,
+                ownEntries = remember(timetableVm.weeks, timetableVm.viewTarget) { timetableVm.ownEntries() },
+                subjectTotals = totals,
+                colorFor = { name -> subjectColors[name]?.let { Color(it) } ?: Color(defaultSubjectColor) },
+                textColorFor = { name -> Color(subjectTextColors[name] ?: lessonTextColor) },
+                onLessonClick = onLessonClick,
+                onShowTimetable = onShowTargetTimetable,
+                ownAbsence = ownAbsence,
+                classAbsence = classAbsence,
+                className = timetableVm.targetClasses.firstOrNull { it.id == timetableVm.ownClassId }?.name.orEmpty(),
+                classLoading = timetableVm.classStatsLoading,
+                classProgress = timetableVm.classStatsProgress,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            )
+        }
+
         Screen.LESSON_DETAILS -> if (selectedLesson == null) {
             timetableContent()
         } else {
@@ -502,6 +553,7 @@ internal fun ScreenHost(
                     onNotebookCreate(NotebookKind.TASK, lessonRef, Screen.LESSON_DETAILS)
                 },
                 onJumpToDate = onNotebookJumpToDate,
+                onTeacherClick = onTeacherClick,
                 onEditColor = subjectName?.takeIf { it.isNotBlank() }?.let { { colorDialogFor = it } },
                 ownExam = timetableVm.examFor(lesson)?.takeIf { it.own },
                 onAddExam = {

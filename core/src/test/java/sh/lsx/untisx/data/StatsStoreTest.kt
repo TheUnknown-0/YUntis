@@ -119,6 +119,28 @@ class StatsStoreTest {
     }
 
     @Test
+    fun `absences are counted for the planned teacher outside events`() = runBlocking {
+        val covered = lesson(20261009, start = 955, end = 1040)
+            .copy(teacher = listOf(TimetableElement(id = 5, name = "Ersatz", orgId = 2)))
+        val entries = listOf(
+            lesson(20261009, start = 800, end = 845),
+            lesson(20261009, start = 850, end = 935, code = "cancelled"),
+            covered,
+            event(20261009, start = 1300, end = 1500),
+            lesson(20261009, start = 1400, end = 1445, code = "cancelled"),
+        )
+
+        val day = recordAndGetDay(entries, 20261009)
+        val totals = SubjectStats.teacherTotals(listOf(day), 2)
+
+        assertEquals(3, totals.planned)
+        assertEquals(1, totals.cancelled)
+        assertEquals(1, totals.substituted)
+        assertEquals(2, totals.absent)
+        assertEquals(null, day.teacherDays[5])
+    }
+
+    @Test
     fun `legacy days are queued for the rule recheck`() {
         writeLegacyStats()
 

@@ -57,4 +57,4 @@ if ! adb -s "$WATCH_SERIAL" install -r "$1"; then
   echo 'ERROR: Installation failed. No app or data was removed. Check the APK and signing certificate.' >&2
   exit 1
 fi
-adb -s "$WATCH_SERIAL" shell am start -n sh.lsx.untisx/sh.lsx.untisx.wear.MainActivity
+adb -s "$WATCH_SERIAL" shell am start -n de.theunknown.yuntis/sh.lsx.untisx.wear.MainActivity

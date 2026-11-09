@@ -46,7 +46,7 @@ object NotebookExportCodec {
 
         if (export.type != TYPE) {
             return NotebookDecodeResult.Invalid(
-                listOf(NotebookValidationIssue(null, "type", "This is not an UntisX notebook export.")),
+                listOf(NotebookValidationIssue(null, "type", "This is not a YUntis notebook export.")),
             )
         }
 

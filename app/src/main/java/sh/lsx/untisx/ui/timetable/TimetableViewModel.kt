@@ -176,6 +176,16 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         fetchStatsWeek = { account, week -> fetch.fetchStatsWeek(account, week) },
     )
 
+    /** All courses of the own class, used for the teachers' absence rates. */
+    private val classStatsLoader: TimetableStatsLoader = TimetableStatsLoader(
+        context = getApplication<Application>(),
+        scope = backgroundScope,
+        requireAuth = { requireAuth() },
+        withPassword = { withPassword() },
+        fetchStatsWeek = { account, week -> fetch.fetchClassWeek(account, week) },
+        keySuffix = "#class",
+    )
+
     private val eventsLoader: TimetableEventsLoader = TimetableEventsLoader(
         scope = backgroundScope,
         requireAuth = { requireAuth() },
@@ -198,6 +208,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             account?.let { statsLoader.load(AccountPrefs.accountId(it)) }
+            account?.let { classStatsLoader.load(AccountPrefs.accountId(it)) }
 
             ownExams = account?.let {
                 withContext(Dispatchers.IO) { OwnExamsStore.load(getApplication(), AccountPrefs.accountId(it)) }
@@ -247,12 +258,19 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var targetsLoading by mutableStateOf(false)
         private set
+
+    /** True when the school refused the timetable chosen in [viewTarget] on every API. */
+    var targetRefused by mutableStateOf(false)
+        private set
     var targetsLoaded by mutableStateOf(false)
         private set
 
     private var savedOwnWeeks: HashMap<Int, List<TimetableEntry>>? = null
     private var savedOwnRestricted: Set<Int> = emptySet()
     private val targetFetchedAt = HashMap<Int, Long>()
+
+    /** All loaded weeks of the account's own timetable, also while another timetable is shown. */
+    fun ownEntries(): List<TimetableEntry> = (savedOwnWeeks ?: weekCache).values.flatten()
 
     /** The account's own class, offered first in the picker. */
     val ownClassId: Int get() = auth?.session?.klasseId ?: 0
@@ -279,6 +297,7 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
         loadingWeeks = emptySet()
         synchronized(failedWeeks) { failedWeeks.clear() }
         error = null
+        targetRefused = false
         viewTarget = target
         publishWeeks()
         ensureWeekPage(lastPage)
@@ -424,6 +443,14 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun currentYearStats(): SchoolYearStats? = statsLoader.currentYear()
+
+    val classStatsLoading get() = classStatsLoader.loading
+    val classStatsProgress get() = classStatsLoader.progress
+
+    /** Touches [classStatsLoader]'s state so Compose recomposes when it changes. */
+    fun classYearStats(): SchoolYearStats? = classStatsLoader.data.let { classStatsLoader.currentYear() }
+
+    fun loadClassStats() = classStatsLoader.loadHistorical()
 
     fun currentYearLessonCount(): Int = statsLoader.currentYearLessonCount()
 
@@ -662,7 +689,9 @@ class TimetableViewModel(app: Application) : AndroidViewModel(app) {
                 Log.d(TAG, "week $claimed failed: ${e.javaClass.simpleName}")
                 synchronized(failedWeeks) { failedWeeks.add(claimed) }
 
-                if (force && weekCache.isNotEmpty()) {
+                if (viewTarget != null && e is UntisException.Api) {
+                    targetRefused = true
+                } else if (force && weekCache.isNotEmpty()) {
                     info = refreshFailureMessage(getApplication(), weekFetchedAt[claimed] ?: 0L, e)
                 } else {
                     error = classifyError(e)

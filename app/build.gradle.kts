@@ -11,11 +11,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "sh.lsx.untisx"
+        applicationId = "de.theunknown.yuntis"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12
-        versionName = "0.8.0-eigen.2"
+        versionCode = 13
+        versionName = "0.9.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -22,7 +22,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "UntisX"
+rootProject.name = "YUntis"
 include(":app")
 include(":core")
 include(":wear")

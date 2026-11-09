@@ -1,5 +1,6 @@
 package sh.lsx.untisx.ui.screens
 
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -97,6 +98,7 @@ fun LessonDetailsScreen(
     onNotebookItemClick: (String) -> Unit = {},
     onCreateNote: () -> Unit = {},
     onCreateTask: () -> Unit = {},
+    onTeacherClick: ((Int) -> Unit)? = null,
     onJumpToDate: (Int) -> Unit = {},
     onEditColor: (() -> Unit)? = null,
     ownExam: ExamInfo? = null,
@@ -335,7 +337,14 @@ fun LessonDetailsScreen(
 
         DetailCard {
             DetailRow(stringResource(R.string.lesson_time), AnnotatedString("${entry.startTime.toUntisLocalTime().format(timeFormat)} - ${entry.endTime.toUntisLocalTime().format(timeFormat)}"))
-            ElementRow(stringResource(R.string.lesson_teacher), entry.teacher, teachersById)
+            ElementRow(
+                stringResource(R.string.lesson_teacher),
+                entry.teacher,
+                teachersById,
+                onClick = onTeacherClick?.let { click ->
+                    entry.teacher.firstOrNull { it.id > 0 }?.let { teacher -> { click(teacher.id) } }
+                },
+            )
             ElementRow(stringResource(R.string.lesson_room), entry.room, roomsById)
         }
 
@@ -451,6 +460,7 @@ private fun ElementRow(
     label: String,
     elements: List<TimetableElement>,
     data: Map<Int, MasterDataItem>?,
+    onClick: (() -> Unit)? = null,
 ) {
     if (elements.isEmpty()) return
 
@@ -476,7 +486,7 @@ private fun ElementRow(
         }
     }
 
-    DetailRow(label, text)
+    DetailRow(label, text, onClick)
 }
 
 private fun MasterDataItem.displayName(): String {
@@ -543,9 +553,19 @@ private fun DetailCard(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun DetailRow(label: String, text: AnnotatedString) {
+private fun DetailRow(label: String, text: AnnotatedString, onClick: (() -> Unit)? = null) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) {
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .tapHaptic { onClick() }
+                } else {
+                    Modifier
+                },
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -560,8 +580,19 @@ private fun DetailRow(label: String, text: AnnotatedString) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (onClick != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f, fill = false),
         )
+
+        if (onClick != null) {
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }
 

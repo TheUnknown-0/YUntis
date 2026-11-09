@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">UntisX</string>
+    <string name="app_name">YUntis</string>
 
     <!-- Generic -->
     <string name="cancel">Abbrechen</string>
@@ -18,7 +18,7 @@
     <string name="rooms">Räume</string>
     <string name="timetable">Stundenplan</string>
     <string name="lesson">Stunde</string>
-    <string name="untisx_logo">UntisX-Logo</string>
+    <string name="untisx_logo">YUntis-Logo</string>
     <string name="person_teacher">Lehrkraft</string>
     <string name="person_student">Schüler:in</string>
 
@@ -28,7 +28,7 @@
 
     <!-- Onboarding -->
     <string name="onboarding_get_started">Los geht\'s</string>
-    <string name="onboarding_welcome">Willkommen bei UntisX</string>
+    <string name="onboarding_welcome">Willkommen bei YUntis</string>
     <string name="onboarding_tagline">Eine bessere app für deinen Stundenplan.</string>
     <string name="onboarding_permissions_title">Berechtigungen</string>
     <string name="onboarding_notifications_title">Benachrichtigungen (optional)</string>
@@ -36,14 +36,14 @@
     <string name="onboarding_notifications_granted">Erlaubt</string>
     <string name="onboarding_notifications_allow">Benachrichtigungen erlauben</string>
     <string name="onboarding_internet_title">Internetzugriff (erforderlich)</string>
-    <string name="onboarding_internet_text">UntisX lädt deinen Stundenplan direkt vom Untis-Server deiner Schule. Es wird kein Konto angelegt, und deine Zugangsdaten bleiben ausschließlich auf diesem Gerät.</string>
+    <string name="onboarding_internet_text">YUntis lädt deinen Stundenplan direkt vom Untis-Server deiner Schule. Es wird kein Konto angelegt, und deine Zugangsdaten bleiben ausschließlich auf diesem Gerät.</string>
     <string name="onboarding_theme_title">Stil anpassen</string>
     <string name="onboarding_language_title">Sprache</string>
 
     <!-- Login -->
     <string name="login_connect_account">Konto verbinden</string>
     <string name="login_privacy">"Dein Benutzername und Passwort werden sicher im Android Keystore verschlüsselt und ausschließlich an den Untis-Server deiner Schule gesendet. "</string>
-    <string name="login_teacher_notice">UntisX ist für Schüler:innen gedacht; Lehrer-Konten werden nicht unterstützt.</string>
+    <string name="login_teacher_notice">YUntis ist für Schüler:innen gedacht; Lehrer-Konten werden nicht unterstützt.</string>
     <string name="login_school_label">Deine Schule</string>
     <string name="login_school_selected">%1$s, „%2$s“</string>
     <string name="login_searching">Suche…</string>
@@ -135,7 +135,7 @@
     <string name="settings_backup_import_confirm_title">Einstellungen importieren?</string>
     <string name="settings_backup_import_confirm_text">Deine aktuellen Anpassungen (Farben, Design, Sprache, ...) werden überschrieben.</string>
     <string name="settings_backup_import_success">Einstellungen importiert.</string>
-    <string name="settings_backup_import_failed">Diese Datei ist kein gültiges UntisX-Backup.</string>
+    <string name="settings_backup_import_failed">Diese Datei ist kein gültiges YUntis-Backup.</string>
     <string name="settings_backup_import_version">Dieses Backup stammt aus einer neueren App-Version.</string>
 
     <!-- Theme -->
@@ -155,6 +155,21 @@
     <string name="timetable_restricted">Gesperrt</string>
     <string name="timetable_today">Heute</string>
     <string name="timetable_parallel_more">%1$d weitere Stunden gleichzeitig</string>
+    <string name="teacher_info">Lehrkraft</string>
+    <string name="teacher_show_timetable">Stundenplan ansehen</string>
+    <string name="teacher_subjects">Deine Fächer bei dieser Lehrkraft</string>
+    <string name="teacher_subjects_none">In den geladenen Wochen unterrichtet sie oder er dich nicht regulär.</string>
+    <string name="teacher_upcoming">Deine nächsten Stunden</string>
+    <string name="teacher_upcoming_none">Keine weiteren Stunden in den geladenen Wochen.</string>
+    <string name="timetable_target_refused">Die Schule gibt diesen Stundenplan für dein Konto nicht frei.</string>
+    <string name="timetable_target_back">Zurück zu meinem Stundenplan</string>
+    <string name="teacher_absence">Abwesenheit (dieses Schuljahr)</string>
+    <string name="teacher_absence_own">In deinen Stunden</string>
+    <string name="teacher_absence_class">In allen Kursen der %1$s</string>
+    <string name="teacher_absence_class_unnamed">In allen Kursen deiner Klasse</string>
+    <string name="teacher_absence_counts">%1$d von %2$d · %3$d Ausfall · %4$d vertreten</string>
+    <string name="teacher_absence_loading">Klassenplan wird geladen: %1$d von %2$d Wochen</string>
+    <string name="teacher_absence_hint">Gezählt werden Stunden, die bei dieser Lehrkraft geplant waren und ausgefallen sind oder vertreten wurden. Stunden während Schulveranstaltungen zählen nicht.</string>
     <string name="timetable_last_refreshed">Zuletzt aktualisiert: %1$s</string>
     <string name="time_now">gerade eben</string>
     <plurals name="time_minutes_ago">
@@ -283,11 +298,11 @@
     <string name="about_lib_serialization_desc">JSON-Verarbeitung</string>
     <string name="about_lib_material3_desc">Design mit dynamischen Farben</string>
     <string name="about_license_title">Lizenz</string>
-    <string name="about_license_text">UntisX ist Open-Source Software unter der GNU GPL-3.0.</string>
-    <string name="about_unofficial_text">UntisX ist ein inoffizieller Client und steht in keinerlei Verbindung zu Untis. Er nutzt teilweise undokumentierte Schnittstellen, die sich jederzeit ändern oder ausfallen können.</string>
+    <string name="about_license_text">YUntis ist Open-Source Software unter der GNU GPL-3.0.</string>
+    <string name="about_unofficial_text">YUntis ist ein inoffizieller Client und steht in keinerlei Verbindung zu Untis. Er nutzt teilweise undokumentierte Schnittstellen, die sich jederzeit ändern oder ausfallen können.</string>
     <string name="about_view_license">Lizenz ansehen</string>
     <string name="about_credits_title">Credits</string>
-    <string name="about_credits_text">UntisX ist stark von BetterUntis inspiriert - dem Open-Source-Untis-Client für Android.</string>
+    <string name="about_credits_text">YUntis basiert auf UntisX von Losterixx (codeberg.org/Losterixx/UntisX), das stark von BetterUntis inspiriert ist, dem Open-Source-Untis-Client für Android.</string>
     <string name="about_by_lsx">von LSX Studios</string>
     <string name="about_debug_title">Debug</string>
     <string name="about_debug_session_id">Sitzungs-ID</string>
@@ -364,7 +379,7 @@
     <string name="settings_notifications">Benachrichtigungen</string>
     <string name="settings_notifications_desc">Stundenplanänderungen und -übersicht</string>
     <string name="settings_notifications_master">Benachrichtigungen aktivieren</string>
-    <string name="settings_notifications_master_desc">UntisX erlauben, Benachrichtigungen zu senden.</string>
+    <string name="settings_notifications_master_desc">YUntis erlauben, Benachrichtigungen zu senden.</string>
     <string name="settings_notifications_permission_missing">Benachrichtigungen sind in den Systemeinstellungen deaktiviert.</string>
     <string name="settings_notifications_grant">Benachrichtigungen erlauben</string>
     <string name="settings_notifications_exact_alarm_desc">Exakte Alarme sind nicht erlaubt - die Übersicht und Klausur-Erinnerungen können sich verzögern.</string>

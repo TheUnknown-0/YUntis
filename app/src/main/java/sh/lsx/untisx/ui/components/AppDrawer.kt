@@ -82,7 +82,7 @@ internal fun AppDrawer(
             Spacer(Modifier.width(12.dp))
 
             Text(
-                text = "UntisX",
+                text = "YUntis",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),

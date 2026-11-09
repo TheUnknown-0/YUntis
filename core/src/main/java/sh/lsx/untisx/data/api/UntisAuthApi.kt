@@ -17,7 +17,7 @@ internal object UntisAuthApi {
 
     /** Only set by debuggable builds that point at a local test server. */
     @Volatile var schoolSearchUrlOverride: String? = null
-    private const val CLIENT_NAME = "UntisX"
+    private const val CLIENT_NAME = "YUntis"
 
     suspend fun searchSchools(query: String): List<School> = withContext(Dispatchers.IO) {
         val params = buildJsonArray {

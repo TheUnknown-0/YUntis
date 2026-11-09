@@ -58,9 +58,9 @@ class UntisXApp : Application() {
         }.getOrNull()
 
         return if (version.isNullOrBlank()) {
-            "UntisX (+https://codeberg.org/Losterixx/UntisX)"
+            "YUntis"
         } else {
-            "UntisX/$version (+https://codeberg.org/Losterixx/UntisX)"
+            "YUntis/$version"
         }
     }
 

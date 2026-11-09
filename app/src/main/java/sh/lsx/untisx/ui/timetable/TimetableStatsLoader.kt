@@ -33,7 +33,11 @@ internal class TimetableStatsLoader(
     private val requireAuth: suspend () -> AuthData,
     private val withPassword: suspend () -> String,
     private val fetchStatsWeek: suspend (AuthData, LocalDate) -> List<TimetableEntry>,
+    /** Appended to the account id, so a second data set (for example the own class) is stored apart. */
+    private val keySuffix: String = "",
 ) {
+
+    private fun key(auth: AuthData) = AccountPrefs.accountId(auth) + keySuffix
 
     var data by mutableStateOf<StatsData?>(null)
         private set
@@ -49,7 +53,7 @@ internal class TimetableStatsLoader(
         private set
 
     suspend fun load(accountId: String) {
-        data = withContext(Dispatchers.IO) { StatsStore.load(context, accountId) }
+        data = withContext(Dispatchers.IO) { StatsStore.load(context, accountId + keySuffix) }
     }
 
     fun currentYear(): SchoolYearStats? = StatsStore.currentYear(data, year)
@@ -74,7 +78,7 @@ internal class TimetableStatsLoader(
         data = withContext(Dispatchers.IO) {
             StatsStore.recordWeek(
                 context = context,
-                accountId = AccountPrefs.accountId(auth),
+                accountId = key(auth),
                 year = statsYear,
                 weekStart = monday,
                 entries = entries,
@@ -107,7 +111,7 @@ internal class TimetableStatsLoader(
 
                 if (lastDay >= start) {
                     val counted = StatsStore.countedDays(data, resolvedYear)
-                    val accountId = AccountPrefs.accountId(currentAuth)
+                    val accountId = key(currentAuth)
 
                     val weeks = generateSequence(start.toUntisWeekStart()) { it.plusWeeks(1) }
                         .takeWhile { it <= lastDay }
@@ -142,7 +146,7 @@ internal class TimetableStatsLoader(
                 }
 
                 data = withContext(Dispatchers.IO) {
-                    StatsStore.load(context, AccountPrefs.accountId(currentAuth))
+                    StatsStore.load(context, key(currentAuth))
                 }
             } catch (e: CancellationException) {
                 throw e

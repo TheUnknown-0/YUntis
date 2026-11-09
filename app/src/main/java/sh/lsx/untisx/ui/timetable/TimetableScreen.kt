@@ -343,6 +343,34 @@ fun TimetableScreen(
             }
         }
 
+        if (vm.targetRefused && vm.viewTarget != null) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(32.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.timetable_target_refused),
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = { vm.showTarget(null) }) {
+                    Text(stringResource(R.string.timetable_target_back))
+                }
+            }
+        }
+
         if (showLastRefreshed && vm.weeks.isNotEmpty()) {
             LastRefreshedLabel(
                 lastFetch = vm.weekFetchedAt[visibleMonday.toUntisDate()] ?: 0L,

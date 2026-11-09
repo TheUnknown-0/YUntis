@@ -260,6 +260,25 @@ internal class TimetableFetch(
         return all
     }
 
+    /** A week of the account's own class (all its courses) for the class statistics. */
+    suspend fun fetchClassWeek(auth: AuthData, weekStart: LocalDate): List<TimetableEntry> {
+        val classId = auth.session.klasseId
+        if (classId == 0) throw UntisException.Api(UntisClient.RPC_NO_RIGHTS, "No own class.")
+
+        val target = TimetableTarget(TimetableTarget.CLASS, classId, "")
+        val (entries, fresh) = SessionManager.withValidSession(context, auth) { a ->
+            UntisClient.fetchWebWeek(a, weekStart, target)
+        }
+
+        if (fresh != null) onFreshSession(fresh)
+
+        val from = weekStart.toUntisDate()
+        val to = weekStart.plusDays(6).toUntisDate()
+
+        return entries?.filter { it.date in from..to }
+            ?: throw UntisException.Api(UntisClient.RPC_NO_RIGHTS, "Class timetable refused.")
+    }
+
     suspend fun fetchStatsWeek(
         auth: AuthData,
         weekStart: LocalDate,

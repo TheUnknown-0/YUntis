@@ -4,9 +4,9 @@ import okhttp3.OkHttpClient
 
 object Http {
 
-    // set by the app at startup, e.g. "UntisX/0.7.0 (+https://codeberg.org/Losterixx/UntisX)"
+    // set by the app at startup, e.g. "YUntis/0.9.0"
     @Volatile
-    var userAgent: String = "UntisX"
+    var userAgent: String = "YUntis"
 
     val base: OkHttpClient = OkHttpClient.Builder()
         .addInterceptor { chain ->

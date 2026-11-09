@@ -4,6 +4,7 @@ internal enum class Screen {
     TIMETABLE,
     PROFILE,
     LESSON_DETAILS,
+    TEACHER_INFO,
     EVENT_DETAILS,
     EVENTS,
     MESSAGES,
@@ -42,4 +43,6 @@ internal fun Screen.depth(): Int = when (this) {
     Screen.MESSAGE_DETAILS,
     Screen.NOTEBOOK_EDITOR,
     -> 2
+
+    Screen.TEACHER_INFO -> 3
 }

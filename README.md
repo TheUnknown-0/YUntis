@@ -1,6 +1,13 @@
-# UntisX
+# YUntis
 
-**by LSX Studios**
+Eigene Version von [UntisX](https://codeberg.org/Losterixx/UntisX) **by LSX Studios**, ohne Updater und mit
+Klassenplan (auch über die WebUntis-Webseite), parallelen Kursen als Karte mit "+N", Tagesansicht,
+Lehrkraft-Infoseite mit Abwesenheitsquote, Statistik je Fach, Klausurblöcken, eigenen Klausuren,
+Hausaufgaben-Übersicht, Fehlzeiten, Schul- und Auto-Fachfarben und einem Dino-Modus.
+
+App-ID: `de.theunknown.yuntis`. Downloads: [Releases](https://github.com/TheUnknown-0/YUntis/releases).
+
+Below is the original UntisX README; "UntisX" there means this app unless it links to Codeberg.
 
 An open-source timetable viewer for the Untis school system - built natively with Kotlin and Jetpack Compose.
 
@@ -91,8 +98,8 @@ The easiest way is to open the project in Android Studio and press Run - it sync
 From the command line you need JDK 21 and the Android SDK (Platform 37, Build-Tools and platform-tools; set `ANDROID_HOME` or add `sdk.dir` to `local.properties`):
 
 ```bash
-git clone https://codeberg.org/Losterixx/UntisX
-cd UntisX
+git clone https://github.com/TheUnknown-0/YUntis
+cd YUntis
 ./gradlew :app:assembleDebug
 ```
 
@@ -112,7 +119,7 @@ Maintainers can use `./install_release.sh` or `./install_wear_release.sh` to run
 
 ### Wear OS
 
-The watch APK is a companion, not a standalone Untis client: first sign in and open the timetable on the phone, then open UntisX on the watch. Swipe horizontally between days, use the crown to scroll, and tap a lesson for details. Refresh requests are handled by the phone through WorkManager and may be delayed in the background.
+The watch APK is a companion, not a standalone Untis client: first sign in and open the timetable on the phone, then open YUntis on the watch. Swipe horizontally between days, use the crown to scroll, and tap a lesson for details. Refresh requests are handled by the phone through WorkManager and may be delayed in the background.
 
 The watch checks freshness when reopened and updates the current day while visible. A loading indicator shows refresh activity; only failed or delayed refreshes show status messages. The current date is underlined, and holidays show their full name when available. Days without a cached week are shown as not loaded. Phone and watch refreshes share a per-week cache; exam markings also use the phone's saved exam list.
 
@@ -148,7 +155,7 @@ There is no in-app watch installer, updater, APK export or bundled watch APK in 
    WATCH_SERIAL=WATCH_IP:DEBUGGING_PORT ./install_wear.sh wear-release.apk
    ```
 
-The script selects only an authorized watch, installs with `adb install -r` and opens UntisX on it. For **updates**, download the signed `wear-release.apk` from the newer Codeberg release, replace your previous downloaded APK and run `./install_wear.sh wear-release.apk` again. Existing app data is retained on a successful compatible update. Signing mismatches and downgrades are rejected by Android; the script never automatically uninstalls anything or grants special installation permissions. You can disable debugging again afterwards; reconnect/re-enable it for the next update.
+The script selects only an authorized watch, installs with `adb install -r` and opens YUntis on it. For **updates**, download the signed `wear-release.apk` from the newer Codeberg release, replace your previous downloaded APK and run `./install_wear.sh wear-release.apk` again. Existing app data is retained on a successful compatible update. Signing mismatches and downgrades are rejected by Android; the script never automatically uninstalls anything or grants special installation permissions. You can disable debugging again afterwards; reconnect/re-enable it for the next update.
 
 ---
 
