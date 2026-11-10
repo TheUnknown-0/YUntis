@@ -288,11 +288,18 @@ internal fun LessonCard(
         0.dp
     }
 
+    // a cancelled note in the notebook style is torn off; teacher and subject move to the
+    // remaining strip and the tear stays below them, so the lesson can still be read
+    val torn = notebook && cancelled && strike
+    var teacherHeight by remember { mutableIntStateOf(0) }
+    var labelHeight by remember { mutableIntStateOf(0) }
+    val tornTextBottom = with(density) { (2.dp + 2.dp + 3.dp).toPx() } + teacherHeight + labelHeight
+
     Box(
         modifier = modifier
             .then(bounds)
             .onSizeChanged { cell = it }
-            .then(if (notebook && cancelled && strike) Modifier.tornNotebookPaper(paperSeed) else Modifier),
+            .then(if (torn) Modifier.tornNotebookPaper(paperSeed, if (labelHeight > 0) tornTextBottom else 0f) else Modifier),
     ) {
         Column(
             modifier = Modifier
@@ -311,7 +318,7 @@ internal fun LessonCard(
                     },
                 )
                 .padding(horizontal = if (compact) 2.dp else 4.dp, vertical = 2.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = if (torn) Arrangement.Top else Arrangement.SpaceBetween,
         ) {
             if (lesson.teachers.isNotBlank()) {
                 Text(
@@ -325,6 +332,7 @@ internal fun LessonCard(
                     fontWeight = FontWeight.Bold,
                     textDecoration = if (marked) TextDecoration.LineThrough else null,
                     modifier = Modifier
+                        .then(if (torn) Modifier.onSizeChanged { teacherHeight = it.height } else Modifier)
                         .padding(end = teacherEndPadding.coerceAtLeast(0.dp))
                         .alpha(if (options.showTeacher) 1f else 0f)
                         .then(if (options.showTeacher) Modifier else Modifier.clearAndSetSemantics {}),
@@ -350,10 +358,13 @@ internal fun LessonCard(
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
                 textDecoration = if (marked) TextDecoration.LineThrough else null,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (torn) Modifier.onSizeChanged { labelHeight = it.height } else Modifier),
             )
 
-            if (lesson.rooms.isNotBlank()) {
+            // the room was on the torn-off part
+            if (lesson.rooms.isNotBlank() && !torn) {
                 Text(
                     text = changedText(lesson.origRooms, lesson.rooms, options.showChanges),
                     style = noteTextStyle,

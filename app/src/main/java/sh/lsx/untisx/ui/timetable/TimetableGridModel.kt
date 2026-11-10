@@ -185,12 +185,28 @@ private fun overlaps(a: TimetableEntry, b: TimetableEntry): Boolean =
  * and longer over shorter lessons.
  */
 internal fun stackParallelLessons(lessons: List<LessonDisplay>, ownSubjectIds: Set<Int> = emptySet()): List<LessonStack> =
-    stackParallelLessonsByTime(lessons).map { stack ->
+    stackParallelLessonsByTime(lessons.withoutLoneServerLayouts()).map { stack ->
         if (ownSubjectIds.isEmpty() || stack.hidden.isEmpty()) return@map stack
         // in a class or year timetable the own courses come first (stable: held before cancelled stays)
         val sorted = stack.all.sortedBy { lesson -> if (lesson.entry.subject.any { it.id in ownSubjectIds }) 0 else 1 }
         LessonStack(sorted.first(), sorted.drop(1))
     }
+
+/**
+ * The server also makes room for events (school activities) when it lays out a day, so a
+ * lesson during an activity may come with half the width. Events are drawn across the whole
+ * column here, so a lesson that overlaps no other lesson gets the full width back.
+ */
+internal fun List<LessonDisplay>.withoutLoneServerLayouts(): List<LessonDisplay> = map { lesson ->
+    val entry = lesson.entry
+    val alone = none { other -> other !== lesson && overlaps(other.entry, entry) }
+
+    if (entry.hasServerLayout() && alone) {
+        lesson.copy(entry = entry.copy(layoutStartPosition = 0, layoutWidth = 1000))
+    } else {
+        lesson
+    }
+}
 
 private fun stackParallelLessonsByTime(lessons: List<LessonDisplay>): List<LessonStack> {
     val (laidOut, free) = lessons.partition { it.entry.hasServerLayout() }
@@ -236,6 +252,31 @@ internal fun freeGaps(lessons: List<TimetableEntry>, minMinutes: Int = FREE_MIN_
     }
 
     return gaps
+}
+
+/**
+ * Where the length label of [gap] goes, as a range in minutes of the day: the longest
+ * stretch of the gap that no (cancelled) lesson covers, so the label does not sit on a
+ * card. If cancelled lessons fill the whole gap, the label goes to its last minutes.
+ */
+internal fun freeLabelSpot(gap: FreeGap, lessons: List<TimetableEntry>): Pair<Int, Int> {
+    val start = minutesOf(gap.start)
+    val end = minutesOf(gap.end)
+    val covered = lessons
+        .map { minutesOf(it.startTime).coerceIn(start, end) to minutesOf(it.endTime).coerceIn(start, end) }
+        .filter { (from, to) -> to > from }
+        .sortedBy { it.first }
+
+    var best = start to start
+    var cursor = start
+
+    covered.forEach { (from, to) ->
+        if (from - cursor > best.second - best.first) best = cursor to from
+        cursor = maxOf(cursor, to)
+    }
+    if (end - cursor > best.second - best.first) best = cursor to end
+
+    return if (best.second > best.first) best else maxOf(start, end - 12) to end
 }
 
 /** "45 min", "2 h", "1 h 30". */

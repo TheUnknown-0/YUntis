@@ -252,8 +252,8 @@ internal fun Modifier.stickyNoteBackground(
     }
 }
 
-internal fun Modifier.tornNotebookPaper(seed: Int): Modifier = drawWithCache {
-    val points = paperTearPoints(size, density, seed)
+internal fun Modifier.tornNotebookPaper(seed: Int, minTearY: Float = 0f): Modifier = drawWithCache {
+    val points = paperTearPoints(size, density, seed, minTearY)
     val sheet = Path().apply {
         moveTo(0f, 0f)
         lineTo(size.width, 0f)

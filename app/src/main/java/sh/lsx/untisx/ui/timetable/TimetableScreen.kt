@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -966,27 +967,35 @@ private fun PeriodGutter(
             val topMinutes = minutesOf(slot.start) - minutesOf(dayStart)
             val slotHeight = MINUTE_HEIGHT * (minutesOf(slot.end) - minutesOf(slot.start))
 
-            Column(
+            // each label is placed on its own: in a Column the end time got only the height
+            // left over and was cut in half with a large system font or the notebook font
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .offset(y = MINUTE_HEIGHT * topMinutes)
                     .height(slotHeight),
-                verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     text = slot.start.toUntisLocalTime().format(timeFormat),
                     fontSize = 10.sp,
                     lineHeight = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 4.dp),
+                    maxLines = 1,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 4.dp),
                 )
 
                 Text(
                     text = "${slot.label}.",
                     fontSize = 14.sp,
+                    lineHeight = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 1,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth(),
                     textAlign = TextAlign.Center,
                 )
 
@@ -995,8 +1004,9 @@ private fun PeriodGutter(
                     fontSize = 10.sp,
                     lineHeight = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .align(Alignment.BottomEnd)
                         .padding(end = 4.dp),
                     textAlign = TextAlign.End,
                 )
@@ -1218,24 +1228,34 @@ private fun DayColumn(
         }
 
         gaps.forEach { gap ->
-            val top = (minutesOf(gap.start) - dayStartMinutes).coerceAtLeast(0)
+            val (spotStart, spotEnd) = freeLabelSpot(gap, lessons.map { it.entry })
+            val top = (spotStart - dayStartMinutes).coerceAtLeast(0)
+            val bottom = (spotEnd - dayStartMinutes).coerceIn(top, gridEndMinutes - dayStartMinutes)
             val label = stringResource(R.string.timetable_free, freeDurationText(gap.minutes))
 
-            Text(
-                text = freeDurationText(gap.minutes),
-                fontSize = 9.sp,
-                lineHeight = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onTertiary,
-                maxLines = 1,
+            // centred in the free stretch next to cancelled lessons instead of on their cards
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = MINUTE_HEIGHT * top + 1.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(freeColor)
-                    .padding(horizontal = 5.dp, vertical = 1.dp)
-                    .semantics { contentDescription = label },
-            )
+                    .fillMaxWidth()
+                    .offset(y = MINUTE_HEIGHT * top)
+                    .height(MINUTE_HEIGHT * (bottom - top)),
+            ) {
+                Text(
+                    text = freeDurationText(gap.minutes),
+                    fontSize = 9.sp,
+                    lineHeight = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onTertiary,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .wrapContentHeight(unbounded = true)
+                        .clip(RoundedCornerShape(50))
+                        .background(freeColor)
+                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                        .semantics { contentDescription = label },
+                )
+            }
         }
 
         if (isPast || isToday) {

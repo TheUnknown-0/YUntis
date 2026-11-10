@@ -88,4 +88,14 @@ class NotebookPaperGeometryTest {
             })
         }
     }
+
+    @Test
+    fun `tear stays below the text on the remaining strip and keeps its slant`() {
+        for (seed in 0..50) {
+            val size = Size(220f, 60f)
+            val points = paperTearPoints(size, 2f, seed, minY = 40f)
+            assertTrue(points.all { it.y in 40f..size.height })
+            assertNotEquals(points.first().y, points.last().y)
+        }
+    }
 }

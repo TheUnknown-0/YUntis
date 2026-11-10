@@ -1,3 +1,13 @@
+## 0.11.2
+
+Der Stundenplan im Notebook-Stil ist wieder richtig lesbar: ausgefallene Stunden, Endzeiten, Freistunden und Stunden während einer Aktivität.
+
+### Behoben
+* [Stundenplan] Bei ausgefallenen Stunden im Notebook-Stil verdeckte der Riss das Fach; Lehrkraft und Fach stehen jetzt lesbar über dem Riss
+* [Stundenplan] Die Endzeiten in der Zeitspalte wurden bei größerer Schrift halb abgeschnitten
+* [Stundenplan] Die Freistunden-Anzeige („1 h 10“) lag auf ausgefallenen Stunden; sie steht jetzt in der freien Zeit daneben, meist in der Pause
+* [Stundenplan] Stunden während einer Aktivität waren nur halb so breit; sie bekommen jetzt die volle Breite
+
 ## 0.11.1
 
 Lernen mit Pomodoro und Atempausen, ein Papierkorb für Hausaufgaben, der Schulheft-Stil für Widgets und flüssiges Wischen in der Tagesansicht.

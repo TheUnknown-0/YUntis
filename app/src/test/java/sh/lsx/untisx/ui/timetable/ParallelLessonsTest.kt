@@ -76,6 +76,29 @@ class ParallelLessonsTest {
     }
 
     @Test
+    fun `a lesson made narrow only by an activity gets the full width`() {
+        // the server halves the lesson because an activity runs at the same time
+        val stack = stackParallelLessons(listOf(lesson(1, "IN_L", 1205, 1335, cancelled = true, layoutWidth = 500))).single()
+
+        assertEquals(0, stack.shown.entry.layoutStartPosition)
+        assertEquals(1000, stack.shown.entry.layoutWidth)
+    }
+
+    @Test
+    fun `the free label avoids cancelled cards`() {
+        // E_GI until 08:45, DE cancelled 08:50 to 09:35, Ch from 09:55
+        val gap = FreeGap(845, 955)
+        val cancelled = lesson(2, "DE_G3", 850, 935, cancelled = true).entry
+
+        assertEquals(935 to 955, freeLabelSpot(gap, listOf(cancelled)).let { untisTimeOf(it.first) to untisTimeOf(it.second) })
+        // nothing in the gap: the whole gap
+        assertEquals(minutesOf(845) to minutesOf(955), freeLabelSpot(gap, emptyList()))
+        // fully covered: the last minutes
+        val covering = lesson(3, "X", 845, 955, cancelled = true).entry
+        assertEquals(minutesOf(943) to minutesOf(955), freeLabelSpot(gap, listOf(covering)))
+    }
+
+    @Test
     fun `in a class timetable the own course is shown first`() {
         val lessons = listOf(
             lesson(1, "BI_L", 800, 845),

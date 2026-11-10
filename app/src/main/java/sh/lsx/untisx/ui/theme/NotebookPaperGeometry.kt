@@ -90,21 +90,27 @@ internal class FoldedPaperShape(private val seed: Int) : Shape {
         )
 }
 
-internal fun paperTearPoints(size: Size, density: Float, seed: Int): List<Offset> {
+/**
+ * The torn edge of a cancelled note. [minY] keeps the edge below the text left on the
+ * remaining strip: the whole edge moves down (keeping its slant) until its highest point
+ * is there.
+ */
+internal fun paperTearPoints(size: Size, density: Float, seed: Int, minY: Float = 0f): List<Offset> {
     val variation = paperVariation(seed)
     val random = Random(seed xor 0x71EA2)
     val points = mutableListOf<Offset>()
+    val shift = (minY - size.height * min(variation.tearLeft, variation.tearRight)).coerceAtLeast(0f)
     var x = 0f
 
     while (x < size.width) {
         val fraction = x / size.width
-        val y = size.height * (variation.tearLeft + (variation.tearRight - variation.tearLeft) * fraction)
+        val y = size.height * (variation.tearLeft + (variation.tearRight - variation.tearLeft) * fraction) + shift
 
-        points += Offset(x, (y + (random.nextFloat() - 0.5f) * 2.4f * density).coerceIn(0f, size.height))
+        points += Offset(x, (y + (random.nextFloat() - 0.5f) * 2.4f * density).coerceIn(minY.coerceAtMost(size.height), size.height))
         x += (2f + random.nextFloat() * 2.5f) * density
     }
 
-    points += Offset(size.width, size.height * variation.tearRight)
+    points += Offset(size.width, (size.height * variation.tearRight + shift).coerceAtMost(size.height))
 
     return points
 }
