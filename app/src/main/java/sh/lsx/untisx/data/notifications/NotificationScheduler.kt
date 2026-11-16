@@ -63,7 +63,8 @@ object NotificationScheduler {
         val workManager = WorkManager.getInstance(context)
 
         val enabled = NotificationPrefs.isEnabled(context) &&
-            (NotificationPrefs.areChangesEnabled(context) || NotificationPrefs.areAnyNewsEnabled(context)) &&
+            (NotificationPrefs.areChangesEnabled(context) || NotificationPrefs.areAnyNewsEnabled(context) ||
+                sh.lsx.untisx.data.absences.AbsenceAlerts.enabled(context)) &&
             Notifications.canPost(context)
 
         if (!enabled) {

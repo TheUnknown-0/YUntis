@@ -104,7 +104,7 @@ fun describe(payload: SharePayload): String {
 fun ShareDialog(payload: SharePayload, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val link = remember(payload) { ShareCodec.encode(payload) }
-    val bitmap = remember(link) { qrBitmap(link) }
+    val bitmap = remember(link) { runCatching { qrBitmap(link) }.getOrNull() }
     val text = describe(payload)
     val intro = stringResource(R.string.share_link_intro)
 
@@ -113,7 +113,7 @@ fun ShareDialog(payload: SharePayload, onDismiss: () -> Unit) {
         title = { Text(stringResource(R.string.share_title)) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Image(
+                if (bitmap != null) Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = stringResource(R.string.share_qr),
                     modifier = Modifier.size(240.dp).clip(RoundedCornerShape(12.dp)).background(Color.White),

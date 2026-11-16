@@ -148,7 +148,7 @@ object WidgetUpdater {
 
     internal fun openApp(context: Context, date: LocalDate): PendingIntent = PendingIntent.getActivity(
         context,
-        REQUEST_REFRESH + 1,
+        date.toUntisDate(),
         Intent(context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             .putExtra(Notifications.EXTRA_FOCUS_DATE, date.toUntisDate()),

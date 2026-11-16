@@ -208,13 +208,15 @@ class CalendarExportWorker(
         events.sortedWith(compareBy({ it.date }, { it.startTime }))
             .fold(ArrayList<sh.lsx.untisx.data.model.TimetableEntry>()) { acc, e ->
                 val last = acc.lastOrNull()
-                if (last != null && last.date == e.date && last.eventTitle == e.eventTitle && e.startTime <= last.endTime + 30 && e.startTime != 0) {
+                if (last != null && last.date == e.date && last.eventTitle == e.eventTitle && e.startTime != 0 && minutes(e.startTime) <= minutes(last.endTime) + 30) {
                     acc[acc.lastIndex] = last.copy(endTime = maxOf(last.endTime, e.endTime))
                 } else {
                     acc += e
                 }
                 acc
             }
+
+    private fun minutes(hhmm: Int) = hhmm / 100 * 60 + hhmm % 100
 
     companion object {
         private const val TAG = "CalendarExport"

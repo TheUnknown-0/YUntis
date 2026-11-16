@@ -1,3 +1,16 @@
+## 0.11.3
+
+Die Frist zum Entschuldigen zählt jetzt nur noch Schultage, dazu mehrere Fehlerbehebungen aus einem Code-Audit.
+
+### Behoben
+* [Fehlzeiten] Samstage und Sonntage zählten zur Frist zum Entschuldigen; jetzt zählen nur Montag bis Freitag, auch bei den übrigen Tagen und in der Erinnerung
+* [Fehlzeiten] Waren nur die Fehlzeiten-Meldungen eingeschaltet, lief die Hintergrundprüfung nicht
+* [Teilen] Beschädigte oder zu große geteilte Links konnten die App abstürzen lassen
+* [Teilen] Zu große Inhalte für einen QR-Code führten zum Absturz; Teilen als Link geht weiterhin
+* [Widgets] Widgets für verschiedene Tage öffneten alle denselben Tag
+* [Kalender] Gleichnamige Termine mit kurzer Lücke über eine volle Stunde hinweg wurden nicht zusammengefasst
+* [Wecker] Bei einem fehlerhaften Weckton blieben Ressourcen belegt, der Audiofokus wird nach dem Wecken zurückgegeben
+
 ## 0.11.2
 
 Der Stundenplan im Notebook-Stil ist wieder richtig lesbar: ausgefallene Stunden, Endzeiten, Freistunden und Stunden während einer Aktivität.

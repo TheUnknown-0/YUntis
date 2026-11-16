@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import sh.lsx.untisx.data.automation.SchoolDayPlan
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisDate
+import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
 import java.io.ByteArrayOutputStream
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -64,6 +65,7 @@ object ShareCodec {
     const val SCHEME = "yuntis"
     const val HOST = "share"
     private const val VERSION = 1
+    private const val MAX_PAYLOAD_BYTES = 256 * 1024
     private val json = Json { ignoreUnknownKeys = true; classDiscriminator = "t" }
 
     /** "yuntis://share?v=1&d=..." with the payload compressed and base64url encoded. */
@@ -80,6 +82,7 @@ object ShareCodec {
 
     /** Reads a link made by [encode]; null for anything else or a damaged code. */
     fun decode(link: String): SharePayload? = runCatching {
+        if (link.length > MAX_PAYLOAD_BYTES * 2) return null
         val trimmed = link.trim()
         if (!trimmed.startsWith("$SCHEME://$HOST?")) return null
         val params = trimmed.substringAfter('?').split('&').associate { it.substringBefore('=') to it.substringAfter('=', "") }
@@ -88,13 +91,24 @@ object ShareCodec {
         val inflater = Inflater(true).apply { setInput(bytes) }
         val out = ByteArrayOutputStream()
         val buffer = ByteArray(1024)
-        while (!inflater.finished()) {
-            val n = inflater.inflate(buffer)
-            if (n == 0 && (inflater.needsInput() || inflater.needsDictionary())) break
-            out.write(buffer, 0, n)
+        try {
+            while (!inflater.finished()) {
+                val n = inflater.inflate(buffer)
+                if (n == 0 && !inflater.finished()) return null
+                if (out.size() + n > MAX_PAYLOAD_BYTES) return null
+                out.write(buffer, 0, n)
+            }
+        } finally {
+            inflater.end()
         }
-        inflater.end()
-        json.decodeFromString(SharePayload.serializer(), out.toString(Charsets.UTF_8.name()))
+        json.decodeFromString(SharePayload.serializer(), out.toString(Charsets.UTF_8.name())).takeIf { payload ->
+            when (payload) {
+                is SharePayload.Homework -> payload.due == 0 || payload.due.toUntisLocalDateOrNull() != null
+                is SharePayload.Exam -> payload.date.toUntisLocalDateOrNull() != null
+                is SharePayload.Week -> payload.monday.toUntisLocalDateOrNull() != null &&
+                    payload.busy.all { it.date.toUntisLocalDateOrNull() != null }
+            }
+        }
     }.getOrNull()
 
     /** The own lesson stretches of the week starting [monday] (Monday to Friday). */

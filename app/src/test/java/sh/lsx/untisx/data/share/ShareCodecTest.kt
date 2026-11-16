@@ -11,6 +11,22 @@ import java.time.LocalTime
 
 class ShareCodecTest {
     @Test
+    fun `invalid dates from incoming links are rejected`() {
+        listOf(
+            SharePayload.Week("", 20261109, listOf(Busy(20260230, 800, 900))),
+            SharePayload.Week("", 20261301, emptyList()),
+            SharePayload.Exam(date = 20260230),
+            SharePayload.Homework(title = "Task", due = 20260230),
+        ).forEach { assertNull(ShareCodec.decode(ShareCodec.encode(it))) }
+    }
+
+    @Test
+    fun `oversized decompressed payload is rejected`() {
+        val link = ShareCodec.encode(SharePayload.Homework(title = "Task", body = "a".repeat(300_000)))
+        assertNull(ShareCodec.decode(link))
+    }
+
+    @Test
     fun `payloads survive the link round trip`() {
         val payloads = listOf(
             SharePayload.Homework("anna", "S. 42 Nr. 3", "a bis d, mit Rechenweg", "Mathematik", 20261111),

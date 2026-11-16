@@ -415,7 +415,8 @@ private fun AbsenceRow(
         }
 
         if (deadline != null) {
-            val overdue = deadline.isBefore(today)
+            val daysLeft = AbsenceAssistant.schoolDaysLeft(today, deadline)
+            val overdue = daysLeft < 0
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
                 Text(
                     stringResource(
@@ -423,7 +424,7 @@ private fun AbsenceRow(
                         rememberDateFormat("EEEdMMM").format(deadline),
                     ),
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (overdue || !deadline.isAfter(today.plusDays(1))) UnexcusedColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (daysLeft <= 1) UnexcusedColor else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedButton(onClick = onExcuse) { Text(stringResource(R.string.absences_write_excuse)) }

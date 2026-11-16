@@ -89,8 +89,9 @@ class WakeAlarmService : Service() {
             RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
         ).distinct()
         for (uri in candidates) {
+            val candidate = MediaPlayer()
             val started = runCatching {
-                MediaPlayer().apply {
+                candidate.apply {
                     setAudioAttributes(attributes)
                     setDataSource(this@WakeAlarmService, uri)
                     isLooping = true
@@ -98,7 +99,7 @@ class WakeAlarmService : Service() {
                     prepare()
                     start()
                 }
-            }.getOrNull()
+            }.onFailure { candidate.release() }.getOrNull()
             if (started != null) {
                 player = started
                 break
@@ -150,6 +151,10 @@ class WakeAlarmService : Service() {
     }
 
     override fun onDestroy() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            focus?.let { getSystemService(AudioManager::class.java)?.abandonAudioFocusRequest(it) }
+        }
+        focus = null
         if (ringing || player != null) {
             handler.removeCallbacksAndMessages(null)
             runCatching { player?.release() }

@@ -26,7 +26,6 @@ import sh.lsx.untisx.ui.util.AppDateFormats
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZonedDateTime
-import java.time.temporal.ChronoUnit
 
 /** An absence whose excuse still has to be handed in. */
 data class ExcuseDue(
@@ -34,7 +33,7 @@ data class ExcuseDue(
     val item: AbsenceItem,
     val deadline: LocalDate?,
 ) {
-    fun daysLeft(today: LocalDate): Long? = deadline?.let { ChronoUnit.DAYS.between(today, it) }
+    fun daysLeft(today: LocalDate): Long? = deadline?.let { AbsenceAssistant.schoolDaysLeft(today, it) }
 }
 
 /**

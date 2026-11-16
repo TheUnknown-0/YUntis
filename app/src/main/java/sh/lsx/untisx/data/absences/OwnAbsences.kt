@@ -7,6 +7,7 @@ import sh.lsx.untisx.data.model.Absence
 import sh.lsx.untisx.data.model.MasterDataItem
 import sh.lsx.untisx.data.model.TimetableEntry
 import sh.lsx.untisx.data.model.toUntisLocalDateOrNull
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 /** An absence the user entered in the app (the school may not share its own records). */
@@ -105,8 +106,29 @@ object AbsenceAssistant {
             .distinctBy { Triple(it.startTime, it.endTime, it.subject.firstOrNull()?.id) }
             .sortedBy { it.startTime }
 
-    fun deadline(item: AbsenceItem, days: Int): LocalDate? =
-        item.date.toUntisLocalDateOrNull()?.plusDays(days.toLong())
+    fun deadline(item: AbsenceItem, days: Int): LocalDate? {
+        var date = item.date.toUntisLocalDateOrNull() ?: return null
+        var remaining = days.coerceAtLeast(0)
+        while (remaining > 0 || !date.isSchoolDay()) {
+            date = date.plusDays(1)
+            if (date.isSchoolDay() && remaining > 0) remaining--
+        }
+        return date
+    }
+
+    /** Counts weekdays after today through the deadline, backwards when overdue. */
+    fun schoolDaysLeft(today: LocalDate, deadline: LocalDate): Long {
+        val step = if (deadline.isBefore(today)) -1L else 1L
+        var date = today
+        var days = 0L
+        while (date != deadline) {
+            date = date.plusDays(step)
+            if (date.isSchoolDay()) days += step
+        }
+        return days
+    }
+
+    private fun LocalDate.isSchoolDay() = dayOfWeek != DayOfWeek.SATURDAY && dayOfWeek != DayOfWeek.SUNDAY
 
     fun subjectNames(lessons: List<TimetableEntry>, subjects: Map<Int, MasterDataItem>): List<String> =
         lessons.mapNotNull { lesson ->
