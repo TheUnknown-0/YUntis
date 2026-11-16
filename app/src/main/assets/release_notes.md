@@ -1,3 +1,13 @@
+## 0.11.4
+
+Die restlichen Funde aus dem Code-Audit sind behoben: Kalenderexport, Wecker und Pomodoro.
+
+### Behoben
+* [Kalender] Liefen der automatische und der manuelle Export gleichzeitig, konnten Termine doppelt im Kalender landen
+* [Kalender] Schlug das Löschen eines Termins fehl, blieb er für immer stehen; die App versucht es jetzt beim nächsten Export erneut
+* [Wecker] Fiel ein ganzer Schultag weg, klingelten Wecker und Ruhemodus weiter nach den alten Stunden
+* [Lernen] Nach einem Neustart des Handys oder einem App-Update lief der Pomodoro-Timer nicht weiter
+
 ## 0.11.3
 
 Die Frist zum Entschuldigen zählt jetzt nur noch Schultage, dazu mehrere Fehlerbehebungen aus einem Code-Audit.

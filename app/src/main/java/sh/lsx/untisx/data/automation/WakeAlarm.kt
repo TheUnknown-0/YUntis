@@ -93,12 +93,12 @@ object WakeAlarm {
     )
 
     /** Lessons of the active account from the cache, or [fresh] ones (e.g. just loaded by the background check). */
-    fun lessons(context: Context, fresh: List<TimetableEntry>? = null): Pair<List<TimetableEntry>, List<sh.lsx.untisx.data.model.Holiday>> {
+    fun lessons(context: Context, fresh: FreshLessons? = null): Pair<List<TimetableEntry>, List<sh.lsx.untisx.data.model.Holiday>> {
         val auth = AccountStore.active ?: AccountPrefs.getActive()
         val cache = auth?.let { TimetableCache.load(context, AccountPrefs.accountId(it)) }
         val cached = cache?.weeks?.values?.flatten().orEmpty()
-        // fresh days replace the cached ones of the same date
-        val lessons = if (fresh == null) cached else fresh + cached.filter { entry -> fresh.none { it.date == entry.date } }
+        // The fetched range also replaces days that now have no lessons.
+        val lessons = fresh?.mergeWith(cached) ?: cached
         return lessons to cache?.holidays.orEmpty()
     }
 
@@ -110,7 +110,7 @@ object WakeAlarm {
     }
 
     /** Sets (or clears) the alarm for the next school day. Cheap; safe to call often. */
-    fun reschedule(context: Context, fresh: List<TimetableEntry>? = null) {
+    fun reschedule(context: Context, fresh: FreshLessons? = null) {
         val alarm = context.getSystemService(AlarmManager::class.java) ?: return
         if (!enabled(context)) {
             alarm.cancel(fireIntent(context, ""))

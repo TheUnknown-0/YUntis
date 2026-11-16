@@ -1,5 +1,6 @@
 package sh.lsx.untisx.data.planner
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,4 +41,20 @@ class PomodoroRulesTest {
         val resumed = PomodoroRules.resume(paused, now = 100_000)
         assertEquals(100_000 + 24 * 60_000L, resumed.endsAt)
     }
+    @Test
+    fun `restoring a running session only advances when its phase is due`() {
+        val session = PomodoroRules.start("M", "", "", 25, 5, 2, now = 0)
+        assertFalse(PomodoroRules.phaseEndDue(session, session.endsAt - 1))
+        assertTrue(PomodoroRules.phaseEndDue(session, session.endsAt))
+        val now = session.endsAt + 60_000
+        assertTrue(PomodoroRules.phaseEndDue(session, now))
+        val next = PomodoroRules.next(session, now)
+        assertEquals(PomodoroPhase.BREAK, next.phase)
+        assertEquals(now + 5 * 60_000L, next.endsAt)
+        assertFalse(PomodoroRules.phaseEndDue(PomodoroRules.pause(session, 1000), now))
+        val done = PomodoroRules.next(session.copy(round = 2), now)
+        assertEquals(PomodoroPhase.DONE, done.phase)
+        assertFalse(PomodoroRules.phaseEndDue(done, now))
+    }
+
 }

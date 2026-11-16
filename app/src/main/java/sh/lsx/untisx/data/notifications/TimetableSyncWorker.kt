@@ -138,12 +138,14 @@ class TimetableSyncWorker(
 
         val changes = ArrayList<ScheduleChange>()
         val observed = HashMap<String, List<TimetableEntry>>()
+        val fetchedEntries = ArrayList<TimetableEntry>()
         var fresh = auth
 
         for (week in if (boost) listOf(monday) else listOf(monday, monday.plusWeeks(1))) {
             val fetched = if (boost) TimetableSource.fetchRange(context, fresh, today, today)
                 else TimetableSource.fetchWeek(context, fresh, week)
             fetched.fresh?.let { fresh = it }
+            fetchedEntries += fetched.entries
             SyncSchedule.rememberStarts(context, accountId, fetched.entries)
 
             val key = week.toUntisDate().toString()
@@ -189,7 +191,14 @@ class TimetableSyncWorker(
         ChangeBaseline.save(context, accountId, pruned)
 
         // a first lesson cancelled over night moves the alarm and the quiet times at once
-        sh.lsx.untisx.data.automation.Automation.refresh(context, observed.values.flatten())
+        sh.lsx.untisx.data.automation.Automation.refresh(
+            context,
+            sh.lsx.untisx.data.automation.FreshLessons(
+                entries = fetchedEntries,
+                from = (if (boost) today else monday).toUntisDate(),
+                to = (if (boost) today else monday.plusDays(13)).toUntisDate(),
+            ),
+        )
 
         return fresh
     }

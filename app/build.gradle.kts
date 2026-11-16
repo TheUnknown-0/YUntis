@@ -28,8 +28,8 @@ android {
         applicationId = "de.theunknown.yuntis"
         minSdk = 26
         targetSdk = 37
-        versionCode = 19
-        versionName = "0.11.3"
+        versionCode = 20
+        versionName = "0.11.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

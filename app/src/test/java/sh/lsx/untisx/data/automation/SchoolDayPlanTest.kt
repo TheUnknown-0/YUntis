@@ -66,4 +66,27 @@ class SchoolDayPlanTest {
             SchoolDayPlan.nextTransition(LocalDateTime.of(2026, 11, 10, 10, 0), lessons),
         )
     }
+    @Test
+    fun `empty fetched day removes its cached lessons and preserves other days`() {
+        val merged = FreshLessons(emptyList(), 20261110, 20261110).mergeWith(lessons)
+        assertEquals(lessons.filter { it.date == 20261111 }, merged)
+        assertFalse(SchoolDayPlan.isQuiet(LocalDateTime.of(2026, 11, 10, 10, 0), merged))
+        assertEquals(
+            LocalDate.of(2026, 11, 11),
+            SchoolDayPlan.nextWake(LocalDateTime.of(2026, 11, 9, 20, 0), merged, 30, 60)!!.wakeAt.toLocalDate(),
+        )
+    }
+
+    @Test
+    fun `two fetched weeks replace all covered days including missing days`() {
+        val before = lesson(20261108, 800, 845)
+        val after = lesson(20261123, 800, 845)
+        val fresh = lesson(20261111, 900, 945)
+        assertEquals(
+            listOf(fresh, before, after),
+            FreshLessons(listOf(fresh), 20261109, 20261122).mergeWith(listOf(before) + lessons + after),
+        )
+        assertTrue(FreshLessons(emptyList(), 20261109, 20261122).mergeWith(lessons).isEmpty())
+    }
+
 }

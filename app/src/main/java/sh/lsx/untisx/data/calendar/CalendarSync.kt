@@ -99,6 +99,10 @@ object CalendarSync {
     private const val TAG = "CalendarSync"
     private const val MAP_PREFS = "calendar_export_map"
     private const val KEY_MAP = "map"
+    private const val KEY_ORPHANS = "orphans"
+
+    /** Periodic and manual export may run at the same time; they share one mapping. */
+    private val lock = Any()
     const val OWN_ACCOUNT_NAME = "YUntis"
     private const val OWN_CALENDAR_NAME = "yuntis_export"
 
@@ -230,14 +234,39 @@ object CalendarSync {
             null,
         )?.use { c -> c.moveToFirst() && c.getInt(1) == 0 } ?: false
 
-    private fun deleteEvent(context: Context, id: Long) {
+    /** True when the event is gone afterwards (deleted now or already missing). */
+    private fun deleteEvent(context: Context, id: Long): Boolean =
         runCatching {
-            context.contentResolver.delete(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id), null, null)
-        }.onFailure { Log.d(TAG, "delete failed: ${it.javaClass.simpleName}") }
+            val rows = context.contentResolver.delete(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id), null, null)
+            rows > 0 || !eventExists(context, id)
+        }.onFailure { Log.d(TAG, "delete failed: ${it.javaClass.simpleName}") }.getOrDefault(false)
+
+    private fun loadOrphans(context: Context): Set<Long> =
+        context.getSharedPreferences(MAP_PREFS, Context.MODE_PRIVATE).getStringSet(KEY_ORPHANS, null)
+            ?.mapNotNull(String::toLongOrNull)?.toSet().orEmpty()
+
+    private fun saveOrphans(context: Context, ids: Set<Long>) {
+        context.getSharedPreferences(MAP_PREFS, Context.MODE_PRIVATE).edit()
+            .putStringSet(KEY_ORPHANS, ids.map(Long::toString).toSet())
+            .apply()
+    }
+
+    /**
+     * Deletes [ids] plus the events whose deletion failed before. Failed ones are remembered and
+     * tried again on the next run, so an entry the app no longer maps is not left behind for good.
+     */
+    private fun deleteEvents(context: Context, ids: Collection<Long>) {
+        val pending = loadOrphans(context) + ids
+        if (pending.isEmpty()) return
+        val failed = pending.filterNot { deleteEvent(context, it) }.toSet()
+        saveOrphans(context, failed)
     }
 
     /** Brings the calendar in line with [items] for one account. */
-    fun sync(context: Context, accountId: String, calendarId: Long, items: List<CalendarItem>, today: LocalDate): CalendarSyncResult {
+    fun sync(context: Context, accountId: String, calendarId: Long, items: List<CalendarItem>, today: LocalDate): CalendarSyncResult =
+        synchronized(lock) { syncLocked(context, accountId, calendarId, items, today) }
+
+    private fun syncLocked(context: Context, accountId: String, calendarId: Long, items: List<CalendarItem>, today: LocalDate): CalendarSyncResult {
         val map = loadMap(context)
         val plan = CalendarPlanner.plan(
             accountId = accountId,
@@ -249,7 +278,7 @@ object CalendarSync {
             exists = { eventExists(context, it) },
         )
 
-        plan.deletes.forEach { deleteEvent(context, it) }
+        deleteEvents(context, plan.deletes)
         plan.dropKeys.forEach { map.remove(it) }
 
         var updated = 0
@@ -287,17 +316,15 @@ object CalendarSync {
     }
 
     /** Removes every entry the app wrote, for one account or for all. Returns how many were removed. */
-    fun removeAll(context: Context, accountId: String? = null): Int {
+    fun removeAll(context: Context, accountId: String? = null): Int = synchronized(lock) {
         val map = loadMap(context)
         val keys = map.keys.filter { accountId == null || it.startsWith("$accountId:") }
 
-        keys.forEach { key ->
-            map[key]?.let { deleteEvent(context, it.eventId) }
-            map.remove(key)
-        }
+        deleteEvents(context, keys.mapNotNull { map[it]?.eventId })
+        keys.forEach(map::remove)
 
         saveMap(context, map)
 
-        return keys.size
+        keys.size
     }
 }

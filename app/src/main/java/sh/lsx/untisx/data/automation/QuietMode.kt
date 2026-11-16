@@ -17,7 +17,6 @@ import android.service.notification.Condition
 import android.util.Log
 import sh.lsx.untisx.MainActivity
 import sh.lsx.untisx.R
-import sh.lsx.untisx.data.model.TimetableEntry
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -129,7 +128,7 @@ object QuietMode {
 
     /** Applies the state for now and plans the next switch. Cheap; safe to call often. */
     @SuppressLint("ScheduleExactAlarm")
-    fun reschedule(context: Context, fresh: List<TimetableEntry>? = null) {
+    fun reschedule(context: Context, fresh: FreshLessons? = null) {
         val alarm = context.getSystemService(AlarmManager::class.java) ?: return
         val intent = transitionIntent(context)
         alarm.cancel(intent)
@@ -162,7 +161,7 @@ class QuietModeReceiver : BroadcastReceiver() {
 
 /** Everything that follows the timetable outside the app: alarm clock and quiet mode. */
 object Automation {
-    fun refresh(context: Context, fresh: List<TimetableEntry>? = null) {
+    fun refresh(context: Context, fresh: FreshLessons? = null) {
         runCatching { WakeAlarm.reschedule(context, fresh) }.onFailure { Log.d("Automation", "alarm: ${it.javaClass.simpleName}") }
         runCatching { QuietMode.reschedule(context, fresh) }.onFailure { Log.d("Automation", "quiet: ${it.javaClass.simpleName}") }
     }

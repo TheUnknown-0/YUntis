@@ -73,6 +73,9 @@ object PomodoroRules {
         PomodoroPhase.DONE -> session
     }
 
+    fun phaseEndDue(session: PomodoroSession, now: Long): Boolean =
+        session.phase != PomodoroPhase.DONE && !session.paused && session.endsAt <= now
+
     fun pause(session: PomodoroSession, now: Long) =
         if (session.paused || session.phase == PomodoroPhase.DONE) session else session.copy(pausedLeft = (session.endsAt - now).coerceAtLeast(1))
 
@@ -113,6 +116,17 @@ object Pomodoro {
             ?.let { runCatching { json.decodeFromString<PomodoroSession>(it) }.getOrNull() }
         _session.value = stored
         return stored
+    }
+
+    /** Restores alarms cleared by a restart or update, including an overdue phase change. */
+    fun restore(context: Context) {
+        val current = load(context) ?: return
+        if (PomodoroRules.phaseEndDue(current, System.currentTimeMillis())) {
+            skip(context, alert = true)
+        } else {
+            schedule(context, current)
+            showRunning(context, current)
+        }
     }
 
     private fun save(context: Context, session: PomodoroSession?) {

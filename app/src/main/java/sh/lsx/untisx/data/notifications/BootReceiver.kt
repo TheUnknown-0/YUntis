@@ -16,6 +16,7 @@ class BootReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
 
         try {
+            sh.lsx.untisx.data.planner.Pomodoro.restore(context)
             NotificationScheduler.ensureAll(context)
             sh.lsx.untisx.data.widget.WidgetUpdater.updateAll(context)
             sh.lsx.untisx.data.automation.Automation.refresh(context)
